@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Xcode 8, Swift 3, and Alamofire Setup"
-date:   2016-09-12 00:34:50 +0200
+date:   2016-09-13 00:34:50 +0200
 categories: swift swift3 alamofire
 ---
 Getting [Alamofire](https://github.com/Alamofire/Alamofire) to install and build correctly on Xcode 8 and Swift 3 can be challenging (due most likely to the rapid changes going on in the Swift 3 language as well as the fairly rapid catch-up efforts going on in the Alamofire codebase).
