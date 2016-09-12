@@ -28,3 +28,6 @@ github_username:  michaelteter
 # Build settings
 markdown: kramdown
 theme: minima
+disqus:
+  shortname: blog_michaelteter_com
+google_analytics: UA-1548850-6
