@@ -2,11 +2,7 @@
 layout: post
 title:  "Case-insensitive Sorting in Swift 3"
 date:   2016-09-12 00:34:50 +0200
-tags:
-- swift
-- swift3
-- selector
-- selectors
+tags: [swift swift3 selector selectors]
 ---
 Sorting with CoreData is pretty simple, but I ran into difficulty while trying to get string sorting to be case-insensitive.  Examples I found worked, but they gave deprecation warnings regarding using selectors.  This is the solution that worked for me:
 
