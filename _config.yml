@@ -29,5 +29,5 @@ github_username:  michaelteter
 markdown: kramdown
 theme: minima
 disqus:
-  shortname: blog_michaelteter_com
+  shortname: michaelteter_com
 google_analytics: UA-1548850-1
