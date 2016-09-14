@@ -1,1 +1,1 @@
-# michaelteter.github.io
+# michaelteter.com website/blog
