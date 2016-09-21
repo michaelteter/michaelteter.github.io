@@ -20,4 +20,4 @@ There are probably a number of ways to do this, but one simple way to make a nav
 
 The result should look like this (two color background is to illustrate the transparency):
 
-![Example](assets/NavbarTransparent.png)
+![Example](/assets/NavbarTransparent.png)
