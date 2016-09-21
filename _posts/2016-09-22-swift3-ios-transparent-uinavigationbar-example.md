@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Swift3 iOS Transparent UINavigationBar Example"
-date:   2016-09-13 00:34:50 +0200
+date:   2016-09-22 00:34:50 +0200
 tags: [swift swift3 iOS UINavigationBar]
 ---
 
