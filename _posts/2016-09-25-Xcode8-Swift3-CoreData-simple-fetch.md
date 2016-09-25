@@ -23,7 +23,7 @@ basic method of fetching (all rows) from a table:
             let fetchResult = try moc.fetch(fetchReq as! NSFetchRequest<NSFetchRequestResult>) as! [Person]
             for r in fetchResult {
                 // do something with each object returned, such as
-                print("\(r.name!))
+                print("\(r.name!)")
             }
         } catch {
             let er = error as NSError
