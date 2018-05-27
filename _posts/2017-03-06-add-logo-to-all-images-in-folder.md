@@ -67,30 +67,3 @@ Next, we [pipe](https://en.wikipedia.org/wiki/Pipeline_(Unix)) `|` the output of
 * the `b` (replace) field is empty because we don't want to replace the search text with anything - we just want to eliminate the search term
 
 Then we pipe the output of the previous step into `tr`, [translate](https://en.wikipedia.org/wiki/Tr_(Unix)).
-
-
-
-[Example project code](https://github.com/michaelteter/CoreDataSimpleFetch)
-
-Once you have done the essential steps like creating a project with [x] CoreData included, and you have imported CoreData in the code, this is the
-basic method of fetching (all rows) from a table:
-
-```swift
-    func fetchData() {
-        let ad  = UIApplication.shared.delegate as! AppDelegate
-        let moc = ad.persistentContainer.viewContext
-        let fetchReq: NSFetchRequest<Person> = NSFetchRequest(entityName: "Person")
-        fetchReq.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
-
-        do {
-            let fetchResult = try moc.fetch(fetchReq as! NSFetchRequest<NSFetchRequestResult>) as! [Person]
-            for r in fetchResult {
-                // do something with each object returned, such as
-                print("\(r.name!)")
-            }
-        } catch {
-            let er = error as NSError
-            // do something with the er (error)
-        }
-    }
-```
