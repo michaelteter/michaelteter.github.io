@@ -1,0 +1,56 @@
+==================================================================
+https://keybase.io/michaelteter
+--------------------------------------------------------------------
+
+I hereby claim:
+
+  * I am an admin of http://michaelteter.com
+  * I am michaelteter (https://keybase.io/michaelteter) on keybase.
+  * I have a public key ASAd5dPHefit_A3zwOIAxdy2yHPop6HZ_V5bpfkZ6kAN-go
+
+To do so, I am signing this object:
+
+{
+  "body": {
+    "key": {
+      "eldest_kid": "0101f932f5ed80c102db522419ce209cba90f86e1945120ca3e6ef45d7ae31e3bcc90a",
+      "host": "keybase.io",
+      "kid": "01201de5d3c779f8adfc0df3c0e200c5dcb6c873e8a7a1d9fd5e5ba5f919ea400dfa0a",
+      "uid": "bc96130fb6c73f8fddf59da89cdaa019",
+      "username": "michaelteter"
+    },
+    "merkle_root": {
+      "ctime": 1535975072,
+      "hash": "0bc30f872ee7dbdd7c4c7308296c20917359c29118d598c469639751cc19833d12f60a23df4c7aff1cb2cdd93cb47cbe6ccd8edf1e3a55a3bc1c9eb553fa1672",
+      "hash_meta": "9efc7f87d76fcb92e6dfec0f277bd65ead9228b75f7fc6a1b1ee6e5253ad22fc",
+      "seqno": 3555665
+    },
+    "service": {
+      "entropy": "zEMvWhYvTjF4FNp7/jJQppwo",
+      "hostname": "michaelteter.com",
+      "protocol": "http:"
+    },
+    "type": "web_service_binding",
+    "version": 2
+  },
+  "client": {
+    "name": "keybase.io go client",
+    "version": "2.5.2"
+  },
+  "ctime": 1535975089,
+  "expire_in": 504576000,
+  "prev": "972fe5c7abaff3cdbaab9297a1a472bb9172f190c22dc56a72aa9901c31bff55",
+  "seqno": 40,
+  "tag": "signature"
+}
+
+which yields the signature:
+
+hKRib2R5hqhkZXRhY2hlZMOpaGFzaF90eXBlCqNrZXnEIwEgHeXTx3n4rfwN88DiAMXctshz6Keh2f1eW6X5GepADfoKp3BheWxvYWTESpcCKMQgly/lx6uv8826q5KXoaRyu5Fy8ZDCLcVqcqqZAcMb/1XEIDBV9wsCs+KGvp6kcMvSh2B4voEm0ynrMUOy8XRHb19jAgHCo3NpZ8RAgsfqcvLxDJeg7Tk360vKRqXkGxj2OgBVmB0YWFoKqrNQwKaUTInQnegcmjxjBUhfHOOfFUwNuU91RrkcpLMQCahzaWdfdHlwZSCkaGFzaIKkdHlwZQildmFsdWXEIORLu8kQ2oDUzTSH48VTEw17nbRtLumeyNynJmbSuYepo3RhZ80CAqd2ZXJzaW9uAQ==
+
+And finally, I am proving ownership of this host by posting or
+appending to this document.
+
+View my publicly-auditable identity here: https://keybase.io/michaelteter
+
+==================================================================
