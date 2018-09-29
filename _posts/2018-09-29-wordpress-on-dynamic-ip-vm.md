@@ -19,6 +19,8 @@ I do not yet know the correct solution; surely there is one, but the crude
 manual fix is to change the (unfortunately?) hard-coded IP address in the Wordpress
 site database.
 
+## Solution
+
 Login to the WP database and check the following:
 
 ```
