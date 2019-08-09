@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Bitbucket CI Pipepiline runs forever (won't stop)"
+title:  "Bitbucket CI Pipeline never completes"
 date:   2019-08-09 13:26:00 -0200
 tags: [Bitbucket continuous-integration mocha]
 ---
