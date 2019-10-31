@@ -7,7 +7,7 @@ permalink: /generative-art/
 Recently I have begun exploring visual art using algorithms - <em>generative art</em>.  While my methods are rather
 crude, I find some of the output pleasing.
 
-View my work at <a href="http://miketeter.com/portfolio/generative-art">miketeter.com/portfolio/generative-art</a>; I welcome feedback and critique.
+View my work at <a href="https://genart.space">genart.space</a>.
 
 Unlike some generative artists, I currently use no mathematical algorithms aside from random number generators.  The
 effects I get come from the management of parameters and limits provided to the random number generator.  Through
