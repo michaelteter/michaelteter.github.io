@@ -16,14 +16,14 @@
 title: Michael Teter's Blog
 email: michael@michaelteter.com
 art: My Generative Art
-art_gallery: "https://miketeter.com/portfolio/generative-art"
+art_gallery: "https://genart.space"
 description: > # this means to ignore newlines until "baseurl:"
   This blog is where I write notes and reminders to myself which may also
   be of use to others.  There will be posts on technical problems and solutions,
   commentary on technology topics, and sometimes commentary on social or
   global topics.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "http://michaelteter.com" # the base hostname & protocol for your site
+url: "https://michaelteter.com" # the base hostname & protocol for your site
 twitter_username: michaelteter
 github_username:  michaelteter
 linkedin_username: michaelteter
