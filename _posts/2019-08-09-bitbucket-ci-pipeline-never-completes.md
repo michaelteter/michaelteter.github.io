@@ -20,8 +20,8 @@ made by the author (excusable, but a bit surprising... nobody edited it?)
 Other issues were just differences of user interface of today's Bitbucket vs
 what the guide author had available at time of publishing.
 
-However, the cause of the hanging pipeline is that Mocha changed its default behavior
-from auto-exit to keep-running.  Thus, `npm test` would never exit on its own.  So when
+However, <strong>the cause of the hanging pipeline is that Mocha changed its default behavior
+from auto-exit to keep-running</strong>.  Thus, `npm test` would never exit on its own.  So when
 pipeline would run it, pipeline would hang on that step.
 
 If you're like me, and new to the Bitbucket pipelines, you might inadvertently eat up all of your CI minutes... you have to manually stop them if they won't end naturally!
