@@ -28,6 +28,8 @@ twitter_username: michaelteter
 github_username:  michaelteter
 linkedin_username: michaelteter
 
+future: true
+
 # Build settings
 markdown: kramdown
 theme: minima

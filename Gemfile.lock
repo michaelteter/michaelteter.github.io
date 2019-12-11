@@ -72,10 +72,13 @@ PLATFORMS
   x64-mingw32
 
 DEPENDENCIES
-  jekyll (~> 3.8.6)
+  jekyll
   jekyll-feed (~> 0.6)
   minima (~> 2.0)
   tzinfo-data
+
+RUBY VERSION
+   ruby 2.6.4p104
 
 BUNDLED WITH
    1.17.2
