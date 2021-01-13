@@ -1,0 +1,9 @@
+I"n<p>Sorting with CoreData is pretty simple, but I ran into difficulty while trying to get string sorting to be case-insensitive.  Examples I found worked, but they gave deprecation warnings regarding using selectors.  This is the solution that worked for me:</p>
+
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="n">sortDescriptors</span><span class="o">.</span><span class="nf">append</span><span class="p">(</span>
+  <span class="kt">NSSortDescriptor</span><span class="p">(</span><span class="nv">key</span><span class="p">:</span> <span class="s">"title"</span><span class="p">,</span>
+                   <span class="nv">ascending</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+                   <span class="nv">selector</span><span class="p">:</span> <span class="kd">#selector(</span><span class="nf">NSString.localizedCaseInsensitiveCompare</span><span class="kd">)</span><span class="p">))</span></code></pre></figure>
+
+<p>Of course this leaves out a lot of detail, but the importance of the example is in the proper (Swift 3) selector use.</p>
+:ET

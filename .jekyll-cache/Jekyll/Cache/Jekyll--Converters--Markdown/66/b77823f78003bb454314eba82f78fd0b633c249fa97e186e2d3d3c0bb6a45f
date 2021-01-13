@@ -1,0 +1,18 @@
+I"ò<p>There are probably a number of ways to do this, but one simple way to make a navbar transparent is to add the following code to each view controller:</p>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="k">override</span> <span class="kd">func</span> <span class="nf">viewWillAppear</span><span class="p">(</span><span class="n">_</span> <span class="nv">animated</span><span class="p">:</span> <span class="kt">Bool</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">super</span><span class="o">.</span><span class="nf">viewWillAppear</span><span class="p">(</span><span class="n">animated</span><span class="p">)</span>
+        <span class="k">if</span> <span class="k">let</span> <span class="nv">nav</span> <span class="o">=</span> <span class="k">self</span><span class="o">.</span><span class="n">navigationController</span><span class="p">?</span><span class="o">.</span><span class="n">navigationBar</span> <span class="p">{</span>
+            <span class="n">nav</span><span class="o">.</span><span class="nf">setBackgroundImage</span><span class="p">(</span><span class="kt">UIImage</span><span class="p">(),</span> <span class="nv">for</span><span class="p">:</span> <span class="o">.</span><span class="k">default</span><span class="p">)</span>
+            <span class="n">nav</span><span class="o">.</span><span class="n">shadowImage</span> <span class="o">=</span> <span class="kt">UIImage</span><span class="p">()</span>
+            <span class="n">nav</span><span class="o">.</span><span class="n">isTranslucent</span> <span class="o">=</span> <span class="kc">true</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+</code></pre></div></div>
+
+<p><a href="https://github.com/michaelteter/NavbarTransparent">Example project code</a></p>
+
+<p>The result should look like this (two color background is to illustrate the transparency):</p>
+
+<p><img src="/assets/NavbarTransparent.png" alt="Example" /></p>
+:ET

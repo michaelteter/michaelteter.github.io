@@ -1,0 +1,72 @@
+I"�<h1 id="goal">Goal</h1>
+<p><strong>We want to superimpose (or overlay) our logo image on top of all images in the current directory.</strong></p>
+
+<blockquote>
+  <p>These instructions are for <strong>macOS</strong>, and they assume a basic level of familiarity with entering commands via the <strong>Terminal</strong>.</p>
+</blockquote>
+
+<p>This example shows how to overlay an image (such as a logo) on every image in the current directory.  It works on macOS 10.12, and it probably works in Linux.</p>
+
+<p>The command will create new images having the original image name with the word <strong>logo_</strong> prepended.  So <code class="language-plaintext highlighter-rouge">an_image.png</code> is used to create a new file, <code class="language-plaintext highlighter-rouge">logo_an_image.png</code>.</p>
+
+<h2 id="pre-requisites">Pre-requisites</h2>
+
+<ul>
+  <li>You’re on a modern Mac</li>
+  <li>You have <a href="http://brew.sh/">HomeBrew</a> or <a href="http://www.macports.org/">MacPorts</a> installed</li>
+  <li>You have installed <a href="https://www.imagemagick.org/script/download.php#macosx">ImageMagick</a></li>
+</ul>
+
+<h2 id="assumptions">Assumptions</h2>
+
+<ol>
+  <li>You aren’t afraid to use the Terminal</li>
+  <li>You want to process all images in the current directory</li>
+  <li>Your logo image is in a subfolder of this directory called “logo”, and the logo filename is “logo.png”</li>
+</ol>
+
+<p>You can change all of the settings and names once you understand the command.</p>
+
+<h2 id="risks-and-caveats">Risks and Caveats</h2>
+
+<p>If something goes wrong, you could lose data.  It is wise to make regular backups, and it is also wise play with this command first in a test folder with some sample images and logo image.</p>
+
+<p>This may not be the most efficient or terse solution to the problem, so feel free to share better solutions.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd </span>my_test_folder_with_copies_of_images
+
+find <span class="nb">.</span> <span class="nt">-type</span> f <span class="nt">-maxdepth</span> 1 <span class="se">\(</span> <span class="nt">-iname</span> <span class="s2">"*.jpg"</span> <span class="nt">-o</span> <span class="nt">-iname</span> <span class="s2">"*.png"</span> <span class="se">\)</span> <span class="se">\</span>
+    | <span class="nb">tr</span> <span class="nt">-d</span> <span class="s1">'./'</span> <span class="se">\</span>
+    | <span class="nb">tr</span> <span class="s1">'\n'</span> <span class="s1">'\0'</span> <span class="se">\</span>
+    | xargs <span class="nt">-0</span> <span class="nt">-n1</span> <span class="nt">-I</span> <span class="o">{}</span> <span class="se">\</span>
+    composite <span class="nt">-gravity</span> SouthWest <span class="nt">-geometry</span> +10+10 <span class="se">\</span>
+        logo/logo.png <span class="o">{}</span> logo_<span class="o">{}</span>
+</code></pre></div></div>
+
+<h2 id="what-is-happening">What is Happening?</h2>
+
+<p>In short, we get a list of the image files in the current directory, then use the <code class="language-plaintext highlighter-rouge">composite</code> command from <a href="https://www.imagemagick.org/script/index.php">ImageMagick</a> to add our logo image down near the lower left (<em>SouthWest</em>) corner of each image from our found list.</p>
+
+<p>Let’s explore this line by line.  Note that the trailing <code class="language-plaintext highlighter-rouge">\</code> (backslash) tells the shell to continue the command on the next line.  it’s a good way to break up the long compound command into more readable chunks.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find . -type f -maxdepth 1 \( -iname "*.jpg" -o -iname "*.png" \) \
+</code></pre></div></div>
+
+<p>First, we need to get a list of all image files in the current directory.  The command for that is <code class="language-plaintext highlighter-rouge">find</code>.</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">.</code> (dot) means apply the command to the current directory</li>
+  <li><code class="language-plaintext highlighter-rouge">-type f</code> means to only list files (not directories)</li>
+  <li><code class="language-plaintext highlighter-rouge">-maxdepth 1</code> means to only look at the current level; don’t go into any sub-directories</li>
+  <li><code class="language-plaintext highlighter-rouge">\( -iname "*.jpg" -o -iname "*.png" \)</code> from the inside out, this says to use the <code class="language-plaintext highlighter-rouge">-iname</code> flag to search, case-insensitive, for files ending in <code class="language-plaintext highlighter-rouge">.jpg</code>, <code class="language-plaintext highlighter-rouge">-o</code> (or) (do another case-insensitive search for files ending in <code class="language-plaintext highlighter-rouge">.png</code>).  Then we need to wrap that expression with <code class="language-plaintext highlighter-rouge">(</code> and <code class="language-plaintext highlighter-rouge">)</code> so they get processed together.  If we don’t do that, the arguments will get parsed from left to right in a way that will not give us the correct result.  Lastly, we have to <em>escape</em> the <code class="language-plaintext highlighter-rouge">(</code> and <code class="language-plaintext highlighter-rouge">)</code> with leading <code class="language-plaintext highlighter-rouge">\</code> backslashes so the shell doesn’t try to interpret them.</li>
+</ul>
+
+<p>Next, we <a href="https://en.wikipedia.org/wiki/Pipeline_(Unix)">pipe</a> <code class="language-plaintext highlighter-rouge">|</code> the output of <code class="language-plaintext highlighter-rouge">find</code> into <code class="language-plaintext highlighter-rouge">sed</code>, the <em>stream editor</em>.  <code class="language-plaintext highlighter-rouge">find</code> is listing the files it finds with a path showing the current directory (<code class="language-plaintext highlighter-rouge">.</code>) - it looks like this: <code class="language-plaintext highlighter-rouge">./an_image.png</code>.  However, since we will need to prepend the word <strong>logo_</strong> to the beginning of our output files, we need to get rid of the <code class="language-plaintext highlighter-rouge">./</code> from each source file name.  <code class="language-plaintext highlighter-rouge">sed</code> does this for us.</p>
+<ul>
+  <li>provide a substitution rule string, denoted by the leading and closing <code class="language-plaintext highlighter-rouge">'</code> (single quote)</li>
+  <li><code class="language-plaintext highlighter-rouge">s|a|b|</code> says “search” for a, replace with b</li>
+  <li>our <code class="language-plaintext highlighter-rouge">a</code> in this case is <code class="language-plaintext highlighter-rouge">\./</code> , which is the <code class="language-plaintext highlighter-rouge">./</code> that we want to remove, but we have to <em>escape</em> that <code class="language-plaintext highlighter-rouge">.</code> so the shell won’t try to interpret it</li>
+  <li>the <code class="language-plaintext highlighter-rouge">b</code> (replace) field is empty because we don’t want to replace the search text with anything - we just want to eliminate the search term</li>
+</ul>
+
+<p>Then we pipe the output of the previous step into <code class="language-plaintext highlighter-rouge">tr</code>, <a href="https://en.wikipedia.org/wiki/Tr_(Unix)">translate</a>.</p>
+:ET

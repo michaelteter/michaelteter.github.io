@@ -1,0 +1,13 @@
+I"j<h2 id="problem">Problem</h2>
+
+<p>macOS Catalina sometimes does not display right click context menu, or top screen dropdown menus only appear partially (and possibly with gaps, in strange colors, etc.).</p>
+
+<h2 id="solution">Solution</h2>
+
+<p>Uncheck (disable) <strong>Reduce transparency</strong> in System Preferences-&gt;Accessibility-&gt;Display.</p>
+
+<p>I had at some previous time enabled reduced transparency to alleviate some aesthetic issue, but apparently Catalina has introduced some display bugs that this option affects.</p>
+
+<p>With the option unchecked, the display problem is resolved (for me).</p>
+
+:ET

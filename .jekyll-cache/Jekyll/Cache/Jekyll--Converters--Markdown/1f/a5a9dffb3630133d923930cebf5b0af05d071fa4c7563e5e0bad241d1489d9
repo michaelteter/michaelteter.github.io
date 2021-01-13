@@ -1,0 +1,35 @@
+I"s	<h2 id="problem">Problem</h2>
+
+<p>Bitbucket CI pipeline on Nodejs project with Mocha test never completes <code class="language-plaintext highlighter-rouge">npm test</code> phase.</p>
+
+<p>I was exploring Bitbucket’s continuous integration pipeline feature, following this
+<a href="https://www.atlassian.com/continuous-delivery/tutorials/continuous-integration-tutorial">Atlassian tutorial</a>, but there were a few problems.  The most significant problem was that
+the pipelines would never complete: they would hang on <code class="language-plaintext highlighter-rouge">npm test</code>.</p>
+
+<p><img src="/assets/never_ending_npm_test.png" alt="Never Ending Test" /></p>
+
+<p>Some of the problems with the tutorial were formatting or other little mistakes
+made by the author (excusable, but a bit surprising… nobody edited it?)
+Other issues were just differences of user interface of today’s Bitbucket vs
+what the guide author had available at time of publishing.</p>
+
+<p>However, <strong>the cause of the hanging pipeline is that Mocha changed its default behavior
+from auto-exit to keep-running</strong>.  Thus, <code class="language-plaintext highlighter-rouge">npm test</code> would never exit on its own.  So when
+pipeline would run it, pipeline would hang on that step.</p>
+
+<p>If you’re like me, and new to the Bitbucket pipelines, you might inadvertently eat up all of your CI minutes… you have to manually stop them if they won’t end naturally!</p>
+
+<p><img src="/assets/wasting_pipeline_minutes.png" alt="Wasted Minutes" /></p>
+
+<h2 id="solution">Solution</h2>
+
+<p>The solution is to modify the project’s package.json file, updating the <a href="https://mochajs.org">Mocha</a>
+line to this</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s2">"</span><span class="s">scripts"</span><span class="pi">:</span> <span class="pi">{</span>
+    <span class="s2">"</span><span class="s">test"</span><span class="pi">:</span> <span class="s2">"</span><span class="s">mocha</span><span class="nv"> </span><span class="s">--exit"</span>
+  <span class="pi">}</span><span class="err">,</span>
+</code></pre></div></div>
+<p><a href="https://mochajs.org/#command-line-usage">mocha command line options</a></p>
+
+<p>With this change, Mocha will now exit when all tests are complete, and your Bitbucket pipeline will continue to its natural end.</p>
+:ET

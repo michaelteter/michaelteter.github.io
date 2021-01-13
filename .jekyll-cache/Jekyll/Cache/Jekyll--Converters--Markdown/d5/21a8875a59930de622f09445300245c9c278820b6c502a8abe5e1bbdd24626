@@ -1,0 +1,58 @@
+I"�<p>The <a href="https://hexdocs.pm/timex/getting-started.html">Timex</a> library for Elixir provides a vast
+array of functions for processing dates and times.  However, its documentation may not be useful
+to everyone (such as me).</p>
+
+<p>My need was to take an integer such as 20180125 and turn that into a string like “15 Jan, 2018”.
+But digging through the Timex docs didn’t give me the final guidance that I needed – namely the
+<code class="language-plaintext highlighter-rouge">format()</code> example.  What I did find for examples appeared to be designed for writing APIs, not
+for presenting dates/times to humans.</p>
+
+<p><strong>Update</strong>: After solving this, I was informed of another library that has a lovely landing
+documentation page.  It appears this <a href="https://hexdocs.pm/ex_cldr_dates_times/readme.html">Cldr Dates &amp; Times</a>
+library may even be a better choice than Timex when it comes to presenting date/time data
+to humans.</p>
+
+<h3 id="tldr-the-format-i-needed">TLDR; The Format I Needed</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Timex.format!(my_date, "%d %b, %Y", :strftime)
+</code></pre></div></div>
+
+<p><strong>What I Started With</strong>: <code class="language-plaintext highlighter-rouge">20180125</code></p>
+
+<p><strong>What I Wanted</strong>: <code class="language-plaintext highlighter-rouge">25 Jan, 2018</code></p>
+
+<h3 id="getting-there">Getting There</h3>
+
+<p>Getting from this date represented as an integer is easy.  Try this in iex:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>iex(27)&gt; 20180125 
+         |&gt; Integer.to_string 
+         |&gt; Timex.parse!("%Y%m%d", :strftime)
+~N[2018-01-25 00:00:00]
+</code></pre></div></div>
+
+<p>This takes the integer, converts it to a string, and then uses Timex.parse(),
+providing a strftime string that describes how to parse the string.</p>
+
+<p>There are probably many good sources of information on strftime strings,
+but I found this <a href="http://strftime.org/">Python strftime</a> page useful.</p>
+
+<p>The output is a good step forward, but it’s certainly not
+for normal human consumption.  The final step is the <code class="language-plaintext highlighter-rouge">Timex.format!()</code> function
+mentioned above.  Note the <code class="language-plaintext highlighter-rouge">format!</code>, which returns the datetime or blows up
+if the parsing fails.  Without the <strong>!</strong>, you get back a tuple of the usual
+<code class="language-plaintext highlighter-rouge">{:ok, ...}</code> or <code class="language-plaintext highlighter-rouge">{:error, ...}</code> variety.</p>
+
+<p>Referring to the <a href="http://strftime.org/">strftime</a> docs, you can choose a format
+string to suit your output needs.  Then apply the <code class="language-plaintext highlighter-rouge">Timex.format!()</code> function.
+In my case, I wanted <code class="language-plaintext highlighter-rouge">%d</code> (day number), <code class="language-plaintext highlighter-rouge">%b</code> (local month abbreviation), and
+<code class="language-plaintext highlighter-rouge">%Y</code> (four digit year).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>iex(28)&gt; 20180125 
+         |&gt; Integer.to_string 
+         |&gt; Timex.parse!("%Y%m%d", :strftime) 
+         |&gt; Timex.format!("%d %b, %Y", :strftime)
+"25 Jan, 2018"
+</code></pre></div></div>
+
+:ET

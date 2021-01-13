@@ -1,0 +1,26 @@
+I"·<h2 id="problem">Problem</h2>
+
+<p>In Elixir, when trying to write an Ecto query such as this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>q = from(v in Vol,
+    where: v.user_id == ^user.id,
+    order_by: [desc: v.inserted_at])
+</code></pre></div></div>
+
+<p>you may encounter the error:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>undefined function from/2
+</code></pre></div></div>
+
+<p>This is a rather difficult error to search for on a search engine, and
+more than once over time I have encountered it and had to dig around to find
+the solution.</p>
+
+<h2 id="solution">Solution</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>import Ecto.Query
+</code></pre></div></div>
+
+<p>Do this before your use of from/2 to include the functions provided by Ecto.Query.</p>
+
+:ET

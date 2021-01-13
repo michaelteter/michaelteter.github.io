@@ -1,0 +1,2 @@
+I"<p>Sorting with CoreData is pretty simple, but I ran into difficulty while trying to get string sorting to be case-insensitive.  Examples I found worked, but they gave deprecation warnings regarding using selectors.  This is the solution that worked for me:</p>
+:ET

@@ -1,0 +1,13 @@
+I"<p>Periodically I experiment with visual art using algorithms - <em>generative art</em>.  While my methods are rather
+crude, I find some of the output pleasing.</p>
+
+<p>Unlike some generative artists, I currently use no mathematical algorithms aside from random number generators.  The
+effects I get come from the management of parameters and limits provided to the random number generator.  Through
+these parameters (and gradual improvement/modification of my algorithm that drives the drawing), I can find patterns
+that feel more natural - more human - than purely mathematical formulas.  While I find the math-based art attractive,
+it feels more like visual representations of math.</p>
+
+<p>My goal is to find that balance between complexity and repetitive patterns that is pleasing but not dull.</p>
+
+<p><img src="/assets/jazz_at_midnight.png" alt="Mike Teter generative art example" /></p>
+:ET
