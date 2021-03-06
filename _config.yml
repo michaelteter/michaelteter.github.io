@@ -16,7 +16,6 @@
 title: Michael Teter's Blog
 email: michael@michaelteter.com
 art: My Generative Art
-art_gallery: "https://genart.space"
 description: > # this means to ignore newlines until "baseurl:"
   This blog is where I write notes and reminders to myself which may also
   be of use to others.  There will be posts on technical problems and solutions,
@@ -33,6 +32,3 @@ future: true
 # Build settings
 markdown: kramdown
 theme: minima
-disqus:
-  shortname: michaelteter-com
-google_analytics: UA-1548850-1 
