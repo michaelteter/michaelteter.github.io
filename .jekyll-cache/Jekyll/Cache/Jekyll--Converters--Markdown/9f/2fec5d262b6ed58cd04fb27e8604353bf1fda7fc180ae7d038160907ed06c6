@@ -1,0 +1,15 @@
+I"{<h2 id="bad-user-interfaces">Bad User Interfaces</h2>
+
+<p>Plenty of examples, everywhere - in our own work, in our companies, and also in big, super-well-funded companies.  Recent HN posts have illustrated this.</p>
+
+<p>No shame on Netflix, because they are (made up of) human(s).  Here’s a UI failure.</p>
+
+<p>Like the preview?  Click the checkmark.  … Oops!  Already added it to your list?  You just inadvertently removed it.</p>
+
+<p>Why is the checkmark button not filled like the Play button?  You think it needs to be filled to be “true”.</p>
+
+<p>Small UI mistake, but almost certainly one that has confused a lot of users.  (Yes, I post this because I fell for it too!)  Do you see the tooltip <em>Remove from My List</em>, or do you see the empty check circle?  <strong>IT MUST BE FILLED!</strong></p>
+
+<p><img src="/assets/netflix1.png" alt="Netflix UI (mis)example" /></p>
+
+:ET
