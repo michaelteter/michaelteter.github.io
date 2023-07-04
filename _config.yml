@@ -31,3 +31,5 @@ future: true
 # Build settings
 markdown: kramdown
 theme: minima
+
+github: [metadata]
