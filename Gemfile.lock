@@ -254,6 +254,7 @@ PLATFORMS
 
 DEPENDENCIES
   github-pages (~> 228)
+  minima
   webrick (~> 1.8)
 
 RUBY VERSION

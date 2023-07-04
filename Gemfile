@@ -6,7 +6,7 @@ ruby '3.2.0'
 # uncomment the line below. To upgrade, run `bundle update github-pages`.
 gem "github-pages", "~> 228", group: :jekyll_plugins
 
-
+gem "minima"
 
 
 
