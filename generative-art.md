@@ -17,6 +17,8 @@ My goal is to find that balance between complexity and repetitive patterns that 
 
 A few samples
 
+![Mike Teter generative art example 5](/assets/img_20230602_163313_169__9.jpg)
+
 ![Mike Teter generative art example 0](/assets/img_20191107_001351_4.png)
 
 ![Mike Teter generative art example 1](/assets/img_20191109_111419_19.jpg)
