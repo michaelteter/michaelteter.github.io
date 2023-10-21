@@ -1,35 +1,21 @@
-# Welcome to Jekyll!
-#
-# This config file is meant for settings that affect your whole blog, values
-# which you are expected to set up once and rarely edit after that. If you find
-# yourself editing these this file very often, consider using Jekyll's data files
-# feature for the data you need to update frequently.
-#
-# For technical reasons, this file is *NOT* reloaded automatically when you use
-# 'jekyll serve'. If you change this file, please restart the server process.
-
-# Site settings
-# These are used to personalize your new site. If you look in the HTML files,
-# you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
-# You can create any custom variable you would like, and they will be accessible
-# in the templates via {{ site.myvariable }}.
+# These settings can be accessed via {{ site.title }}, {{ site.email }}, in the html pages.
 title: Michael Teter's Blog
 email: blog@michaelteter.com
 # art: My Generative Art
 description: > # this means to ignore newlines until "baseurl:"
-  This blog is where I write notes and reminders to myself which may also
-  be of use to others.  There will be posts on technical problems and solutions,
-  commentary on technology topics, and sometimes commentary on social or
-  global topics.
+  A few notes of mine, and some generative art.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://michaelteter.com" # the base hostname & protocol for your site
-github_username:  michaelteter
+github_username: michaelteter
 linkedin_username: michaelteter
 
 future: true
 
 # Build settings
 markdown: kramdown
-theme: minima
+# theme: minima
+remote_theme: pages-themes/hacker@v0.2.0
+plugins:
+  - jekyll-remote-theme # add this line to the plugins list if you already have one
 
 github: [metadata]
