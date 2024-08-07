@@ -15,6 +15,6 @@ may prevent LiveBook from connecting to other nodes.
 To make your node visible to LiveBook now, you must use
 long names.
 
-Now when starting iex, use `--name` instead of --sname.
+Now when starting iex, use ✅ `--name` instead of ❌ `--sname`.
 
 Then in the LiveBook config, specify the full node name such as myproject@mymac.local (for local Mac users).
