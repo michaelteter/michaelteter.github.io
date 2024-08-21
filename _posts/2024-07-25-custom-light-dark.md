@@ -31,16 +31,17 @@ change_themes() {
   fi
 }
 
-alias wezl='change_themes "Alabaster" "Default Light+" "light"'
-alias wezd='change_themes "3024 (dark) (terminal.sexy)" "Panda Syntax" "dark"'
+alias light='change_themes "Alabaster" "Default Light+" "light"'
+alias dark='change_themes "3024 (dark) (terminal.sexy)" "Panda Syntax" "dark"'
 ```
 
 Then from any terminal app that's using zshell and my normal zshell dotfile,
 
-`wezl` to change my themes to Light mode.
+`light` to change my themes to Light mode.
 
-`wezd` to change the themes to Dark mode.
+`dark` to change the themes to Dark mode.
 
-Obviously you can choose your own theme names in the aliases, and you can change the alias names as well.
+Obviously you can choose your own theme names in the aliases, and you can change the alias names as well. (Be sure to check `which dark` or whatever names you choose so you don't
+shadow some other program with that name.)
 
 Remember to `source ~/.zshrc` after you change your zshell config file so your changes are recognized in your current shell while setting this up.
