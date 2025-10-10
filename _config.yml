@@ -1,9 +1,9 @@
 # These settings can be accessed via {{ site.title }}, {{ site.email }}, in the html pages.
-title: Michael Teter's Blog
+title: Michael Teter
 email: blog@michaelteter.com
 # art: My Generative Art
 description: > # this means to ignore newlines until "baseurl:"
-  A few notes of mine, and some generative art.
+
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://michaelteter.com" # the base hostname & protocol for your site
 github_username: michaelteter
@@ -18,3 +18,9 @@ plugins:
   - jekyll-remote-theme # add this line to the plugins list if you already have one
 
 github: [metadata]
+
+permalink: /archived-posts/:year/:month/:day/:title:output_ext
+
+header_pages:
+  - digital-art.md
+  - resume.md # if you make one

@@ -1,0 +1,26 @@
+---
+layout: default
+title: Archived Posts
+permalink: /archived-posts/
+nav_exclude: true
+---
+
+<div class="home">
+  <h1>Archived Posts</h1>
+
+  <p>
+    These are older technical posts I’ve written over time. Some may reference
+    outdated versions of tools or frameworks.
+  </p>
+
+  <ul class="post-list">
+    {% for post in site.posts %}
+    <li>
+      <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
+      <h2>
+        <a class="post-link" href="{{ post.url }}">{{ post.title | escape }}</a>
+      </h2>
+    </li>
+    {% endfor %}
+  </ul>
+</div>

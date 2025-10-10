@@ -1,31 +1,74 @@
 ---
 layout: default
+title: Michael Teter
+nav_exclude: true
 ---
 
 <div class="home">
+  <h1>Hello, I’m Michael Teter.</h1>
 
-  <h2>
-    <i class="fa-solid fa-file-pdf"></i> <a href="https://michaelteter.com/michaelteter_resume.pdf">Available for freelance or permanent work</a>
-  </h2>
+  <p>
+    I’m a software developer and systems designer who enjoys solving problems
+    across the stack — from backend architecture to automation tools and
+    developer UX. I also experiment with generative art and build tech tools in
+    my spare time.
+  </p>
 
-  <h1 class="page-heading">Posts</h1>
+  <p>
+    <strong
+      >Currently looking for new opportunities as a Sales Engineer or Senior
+      Software Engineer.</strong
+    >
+    You can reach me on
+    <a href="https://www.linkedin.com/in/michaelteter/"  target="_blank" rel="noopener noreferrer"
+      >LinkedIn <i class="fa fa-external-link"></i
+    ></a>
+    or at <a href="mailto:blog@michaelteter.com">blog@michaelteter.com</a>.
+  </p>
 
-  <h3>Note the date of posts, especially for technical solutions.</h3>
-  <p>Many technical solutions are time/version dependent.  As such, some solutions
-    may no longer be relevant or may not reflect current reality.</p>
+  <h2>Projects</h2>
+  <p>
+    <strong><a href="https://github.com/michaelteter/docgen"  target="_blank" rel="noopener noreferrer">docgen <i class="fa fa-external-link"></i
+  ></a></a></strong>
+    — an open-source tool that generates documentation snapshots from project
+    trees, ideal for reproducible documentation or automated portfolio pages.
+  </p>
+  <p>
+    <strong
+      ><a href="https://github.com/michaelteter/crossfiregame"  target="_blank" rel="noopener noreferrer"
+        >Crossfire <i class="fa fa-external-link"></i
+      ></a></a
+      ></strong
+    >
+    — a simple multiplayer game demo to illustrate the power of Elixir/OTP +
+    Phoenix LiveView.
+  </p>
 
-  <ul class="post-list">
-    {% for post in site.posts %}
-      <li>
-        <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
+  <h2>Resume</h2>
+  <p><a href="/resume/">View Resume</a> / <a href="/resume/michaelteter_resume.pdf">Download PDF</a></p>
 
-        <h2>
-          <a class="post-link" href="{{ post.url | prepend: site.baseurl }}">{{ post.title | escape }}</a>
-        </h2>
-      </li>
-    {% endfor %}
+  <h2>Generative Art</h2>
+  <p>
+    I create algorithmic, non-AI
+    <a href="/digital-art/">generative art</a> using code and randomness. Each
+    piece explores form and balance through deterministic chaos.
+  </p>
+
+  <h2>More about me</h2>
+  <ul>
+    <li>
+      Based in the US, love travel (for business or pleasure), and open to
+      global remote work or global relocation
+    </li>
+    <li>
+      Enjoy Salsa and Bachata dancing, singing, fitness and weightlifting,
+      massage therapy, problem solving, and much more
+    </li>
   </ul>
 
-  <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | prepend: site.baseurl }}">via RSS</a></p>
-
+  <h3>Archived Posts</h3>
+  <p>
+    Occasionally I have written a little a tech tidbit post, but most are
+    outdated now - <a href="/archived-posts/">archived posts</a>.
+  </p>
 </div>

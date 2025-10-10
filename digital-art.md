@@ -4,22 +4,24 @@ title: Digital Art
 permalink: /digital-art/
 ---
 
-Below are some samples of digital (generative) art I have created.
+<link href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
 
-*These are not AI-generated images.*  Rather, I create algorithms which use random number generators, tuning the parameters with
-general goals in mind.  Every image is unique.
+<h1>Generative Art</h1>
+<p>These are examples of my generative art, created with custom algorithms.
+Each piece is unique, using randomness and procedural design. Click any image to view full size.</p>
 
-A few samples
+<div class="gallery" style="display:flex; flex-wrap:wrap; gap:10px;">
+  {% for image in site.static_files %}
+    {% if image.path contains '/assets/art/thumbs/' %}
+      {% assign full_path = image.path | replace: '/thumbs', '' %}
+      <a href="{{ full_path }}" class="glightbox" data-gallery="genart">
+        <img src="{{ image.path }}" width="220" height="auto" loading="lazy" style="border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1);" />
+      </a>
+    {% endif %}
+  {% endfor %}
+</div>
 
-![Mike Teter generative art example 5](/assets/img_20230602_163313_169__9.jpg)
-
-![Mike Teter generative art example 0](/assets/img_20191107_001351_4.png)
-
-![Mike Teter generative art example 1](/assets/img_20191109_111419_19.jpg)
-
-![Mike Teter generative art example 2](/assets/img_20191104_023740_6.jpg)
-
-![Mike Teter generative art example 3](/assets/img_20200131_000302_8.jpeg)
-
-![Mike Teter generative art example 4](/assets/img_redraw_20200207_155027_3_993999_layer_5.jpeg)
-
+<script>
+  const lightbox = GLightbox({ selector: '.glightbox' });
+</script>
