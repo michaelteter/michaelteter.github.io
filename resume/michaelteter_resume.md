@@ -2,114 +2,108 @@
 
 <resume@michaelteter.com> | +1-817-500-5607 | [LinkedIn](https://www.linkedin.com/in/michaelteter) | [GitHub](https://github.com/michaelteter) | US / Global / Remote
 
-## Sales Engineer | Solutions Consultant | Senior Software Engineer | Solutions Architect | Technical Lead
+## Technical Solutions Consultant | Sales Engineer
 
-As a technical leader with over two decades of engineering experience, I excel at translating complex technology into business value for stakeholders at all levels. I've designed and delivered scalable solutions across diverse industries, combining deep technical expertise in backend systems, APIs, and infrastructure with a proven ability to understand customer needs and communicate solutions that drive measurable outcomes.
+Technical Solutions Consultant with extensive experience bridging business needs and engineering capabilities. I specialize in understanding unique customer scenarios, translating requirements into practical technical approaches, and guiding stakeholders toward clear, confident decisions. My strength is connecting the 'what' and the 'how', quickly grasping the structure of a system, mapping it to a customer’s goals, and communicating the best path forward.
 
-My unique strength lies in bridging the gap between engineering and business teams — whether mentoring developers, automating customer onboarding, or collaborating with product and sales to align technical capabilities with market opportunities. I bring hands-on experience with modern programming languages, database systems, and performance optimization, paired with a consultative approach that prioritizes understanding business challenges before proposing solutions. Having thrived in remote, cross-functional environments using Agile methodologies, I'm skilled at building trust, managing expectations, and delivering results that improve both operational efficiency and customer satisfaction.
+With a background spanning software engineering, architecture, integration, system troubleshooting, and customer-facing consulting, I excel in roles where analytical thinking, clear communication, and problem-solving are essential. I am the person who diagnoses ambiguous problems, designs a workable plan, and ensures the right solution gets built — whether by me or by the teams I collaborate with. Comfortable in sales cycles, technical evaluations, onboarding, and support handoffs, I help customers understand technology in business terms and help teams deliver solutions that fit. I have collaborated with clients around the world and am comfortable traveling extensively to support discovery sessions, technical evaluations, and successful solution adoption.
 
 ---
 
 ## Career Highlights
 
-- Reduced HR onboarding cycle from weeks to days while eliminating gaps and improving stakeholder confidence.
-- Engineered and delivered a high performance, high availability infrastructure solution that dramatically reduced business downtime and recovery costs.
-- Identified process gaps and configuration errors, enabling telcos to recover millions in revenue and prevent future losses.
-- Solved critical productivity bottlenecks for business users by re-architecting a key Excel application, reducing load time from 5 minutes to 10 seconds, tripling calculation speed, and eliminating crashes and corruption.
-- Re-engineered legacy system engineer configuration tool, saving users hours of time and frustration during recurring tasks.
-- Re-engineered country-scale network management data migration system, cutting upgrade time from days to hours.
+- Partnered with business leaders to clarify requirements, uncover root issues, and design solutions that improved operational efficiency across finance, HR, and engineering domains.
+- Led diagnostic efforts for telecom providers to identify system misconfigurations and process failures that were causing significant revenue leakage—enabling recovery of millions.
+- Rescued a mission-critical Excel-based business application through analysis, redesign, and performance optimization, cutting load times from 5 minutes to 10 seconds and eliminating crashes.
+- Architected a multi-environment data migration system for a nationwide telecom network, reducing upgrade windows from days to hours and minimizing business disruption.
+- Developed and guided integrations across e-commerce, payments, and internal systems, helping clients achieve seamless data flow and reduce manual work.
 
 ---
 
 ## Core Competencies
 
-- **Languages/Frameworks:** Elixir/Phoenix LiveView, Ruby/Rails, Python, Clojure, JavaScript
-- **Databases:** PostgreSQL, MySQL
-- **Specialties:** Systems Architecture, System Integration, Tool Development, Pragmatic Functional Programming, Remote Collaboration, Agile, Mentoring
+- **Specialties:** Requirements Discovery, Solution Design, Systems Integration, Technical Troubleshooting, Architecture Review, API Analysis, Cross-Functional Collaboration, Client Communication, Technical Demos, Process Optimization
+- **Languages/Frameworks:** Ruby/Rails, Python, Elixir/Phoenix, Java/C++ (legacy experience), JavaScript
+- **Databases:** PostgreSQL, MySQL, Other RDBMSs
 
 ---
 
 ## Professional Experience
 
-### Software Engineer & IT Consultant — Freelance Consulting
+### Technical Consultant / Solutions Engineer — Freelance Consulting
 
-**Location:** remote | **Dates:** 2015-09 – present
+**Location:** Remote | **Dates:** 2015-09 – present
 
-- Delivered custom web applications for retail and content management, tailored to client workflows and business needs
-- Built integrations between web backends and e-commerce platforms, enabling seamless multi-system connectivity
-- Developed bi-directional payment gateways for Bitcoin and Stellar networks, improving customer payment options
-- Trained and mentored students and professionals on technical concepts and tooling
+- Partner with clients to clarify business goals, analyze workflows, and design technical approaches that address operational challenges.
+- Guide customers through the evaluation of system capabilities, explaining concepts clearly for both technical and non-technical stakeholders.
+- Design integration architectures connecting payment systems, e-commerce platforms, CMS systems, and internal tools to improve automation and data consistency.
+- Lead requirements discovery sessions and translate ambiguous needs into actionable plans for development teams.
+- Troubleshoot complex system behavior across multiple services, identifying root causes and recommending practical remediation paths.
 
 ### Senior Software Engineer — Biller.AI
 
-**Location:** Netherlands remote | **Dates:** 2022-01 – 2022-07
+**Location:** Netherlands (Remote) | **Dates:** 2022-01 – 2022-07
 
-- Developed APIs for internal and external clients, improving integration speed and reliability for business partners
-- Demonstrated functional programming and architecture patterns that improved maintainability and onboarding for new developers
-- Paired with junior devs and reviewed PRs to promote best practices and reduce development friction
-- Promoted effective SCRUM practices, accelerating delivery and improving team alignment
+- Worked closely with product, engineering, and business stakeholders to understand requirements and translate them into practical API-driven solutions.
+- Conducted architecture reviews and guided developers through design decisions that improved system clarity and maintainability.
 
 ### Senior Software Engineer / SCRUM Master — YoungCapital
 
-**Location:** Netherlands remote | **Dates:** 2020-01 – 2021-09
+**Location:** Netherlands (Remote) | **Dates:** 2020-01 – 2021-09
 
-- Partnered with product, UX, and business stakeholders to architect and launch a workflow automation system that reduced HR onboarding from weeks to days, eliminating candidate loss and improving team coordination
-- Optimized backend data management to reduce cloud costs and improve performance for internal stakeholders
-- Mentored junior developers, increasing team output with limited resources
-- Planned and implemented major application version migration in incremental, seamless stages with beta and production users
-- Developed web applications and APIs
-- Reviewed peers' and juniors' code
-- Contributed to UX designs and product/business system designs
+- Partnered with product, UX, and business stakeholders to build and launch a workflow automation system that reduced HR onboarding timelines from weeks to days and eliminated candidate drop-off.
+- Analyzed backend data usage patterns to optimize cloud resource allocation, reducing operating costs while improving system responsiveness for internal users.
+- Coached junior developers and guided team members through architectural and design decisions, improving delivery consistency and team effectiveness.
+- Contributed to product and UX discussions, helping translate business needs into workable system designs and clear implementation plans.
+- Provided cross-functional leadership as SCRUM Master, aligning engineering efforts with business priorities and improving team communication.
 
-### Software Developer & Infrastructure Manager — IMC
+### Senior Software Engineer & Infrastructure Manager — IMC
 
 **Location:** Amsterdam, NL | **Dates:** 2012-09 – 2015-08
 
-- Led infrastructure transformation initiative - assessed risks, developed multiple solution strategies with ROI analysis, presented to executives, and secured budget approval
-- Managed vendor selection and negotiation, involving stakeholders in evaluation to ensure buy-in
-- Redesigned critical Excel application after analyzing user workflows, reducing load time by 98% and eliminating daily productivity losses
-- Built custom integrations between Excel and internal systems which greatly simplified recurring mid-office trade reconciliation processes while reducing errors
-- Improved performance and resilience of recurring large data ingestion processes while reducing human change management and troubleshooting effort
-- Developed optimal data backup and retention system with Bacula, interchangeable JBODs, and business user-friendly Excel retention policy management interfaces
-- Designed server rooms and facilities for New York and Amsterdam offices
-- New infrastructure provided multiple benefits
-- • High availability with data consistency between US and NL
-- • Vastly increased compute performance for existing software systems
-- • Greatly simplified financial analysis and model backtesting experiments via rapid compute provisioning and versioning
-- • Virtually eliminated hardware failure recovery time
+- Led a complete infrastructure transformation initiative by identifying risks, developing solution options, analyzing ROI, and presenting actionable recommendations that secured executive approval and funding.
+- Guided vendor evaluation and selection, ensuring stakeholder alignment and long-term scalability of chosen solutions.
+- Improved business user productivity by diagnosing bottlenecks in a mission-critical Excel application, redesigning its architecture, and reducing load time by 98% while improving stability and reliability.
+- Simplified recurring mid-office trade reconciliation workflows by designing custom integrations between Excel tools and internal systems, reducing manual work and error rates.
+- Architected improvements for high-volume data ingestion pipelines, resulting in higher reliability, faster processing, and reduced troubleshooting burden for operations teams.
+- Designed a robust backup and retention strategy using Bacula and modular storage configurations, including user-friendly interfaces for business teams to manage retention policies.
+- Planned and designed server rooms and supporting infrastructure for offices in New York and Amsterdam, ensuring capacity, safety, and operational resilience.
+- Delivered a new infrastructure platform providing high availability across US and EU regions, improved compute performance for quantitative research, and near-zero downtime in the event of hardware failures.
 
-### Software Engineer & IT Generalist — Freelance
+### Technical Consultant & Solutions Engineer — Freelance
 
-**Location:** US remote | **Dates:** 2011-03 – 2012-07
+**Location:** US (Remote) | **Dates:** 2011-03 – 2012-07
 
-- Developed e-commerce web applications
-- Guided non-technical business leaders on technical topics and solutions
+- Designed and delivered e-commerce and business workflow applications tailored to the requirements of small and midsize businesses.
+- Advised non-technical business owners on technical decisions, translating abstract requirements into clear implementation plans and long-term architecture considerations.
+- Helped organizations adopt new tools and platforms by providing structured onboarding support, documentation, and training.
 
-### Software Engineer — Martin Dawes Analytics (Lavastorm)
+### Technical Consultant / Software Engineer — Martin Dawes Analytics (Lavastorm)
 
-**Location:** Global remote | **Dates:** 2008-03 – 2011-09
+**Location:** Global (Remote) | **Dates:** 2008-03 – 2011-09
 
-- Served as a technical consultant for Fortune 100 and international telecom clients, identifying millions in revenue leakage and fraud through switch-to-bill reconciliation.
-- Delivered business process simulations and on-site and remote training globally, enabling clients to recover millions in lost revenue
-- Developed custom analytics solutions and business rule simulations tailored to each client's infrastructure
+- Served as a technical consultant for Fortune 100 and global telecom providers, identifying millions in revenue leakage through switch-to-bill reconciliation and data analysis.
+- Provided on-site and remote training for clients worldwide, equipping teams with the tools and understanding needed to analyze revenue assurance issues.
+- Designed custom analytics workflows and business rule simulations aligned with each client’s infrastructure, enabling faster diagnosis and ongoing prevention of revenue-impacting discrepancies.
 
 ### IT Director — Jetta Operating Company
 
 **Location:** Fort Worth, TX, US | **Dates:** 2001-05 – 2008-01
 
-- Planned and grew corporate IT infrastructure as the company tripled in size
-- Developed custom software solutions for oil and gas equipment management, employee time tracking, and client/partner reporting
-- Managed vendors and IT support providers
-- Developed custom ETL solutions for ingesting disparate data from acquisitions
+- Scaled corporate IT systems as the company tripled in size, ensuring reliability, security, and operational continuity.
+- Designed and delivered business-critical internal tools for equipment management, employee time tracking, and client reporting.
+- Managed vendor relationships, negotiated contracts, and ensured alignment between business needs and IT capabilities.
+- Developed ETL workflows to unify disparate datasets from acquisitions, improving reporting accuracy and decision-making.
+- Supported leadership with technology evaluations, risk assessments, and long-term system planning.
 
-### Software Engineer — Previous Work at TeleCheck, IBM, NEC America, CompUSA, St. Gobain, Ensemble Studios, MCI/Worldcom
+### Software Engineer — TeleCheck, IBM, NEC America, CompUSA, St. Gobain, Ensemble Studios, MCI/Worldcom
 
-**Location:** US | **Dates:** 1993 – 2001
+**Location:** United States | **Dates:** 1993 – 2001
 
-- Developed components and tools for AAA computer game
-- Developed manufacturing monitoring and management systems
-- Designed large data migration solutions for national-scale network monitoring systems
-- Developed GUI applications for aircraft maintenance management systems
+- Contributed to development of tools and components for AAA game production environments.
+- Designed manufacturing monitoring and management systems supporting high-volume industrial operations.
+- Developed national-scale data migration solutions for telecom network monitoring systems.
+- Built GUI applications for aircraft maintenance and inspection workflows, improving clarity and auditability for technicians.
 
 ---
 
@@ -118,4 +112,4 @@ My unique strength lies in bridging the gap between engineering and business tea
 **Principia College** — B.S., Computer Science
 Illinois, USA | 1989–1993
 
-<!-- ATS Keywords: Elixir, Phoenix LiveView, Ruby on Rails, Python, PostgreSQL, Linux, API Design, Functional Programming, Remote Collaboration, SCRUM -->
+<!-- ATS Keywords: Solutions Engineering, Pre-Sales Consulting, Systems Architecture, API Integration, Technical Discovery, Business Analysis, Data Workflows, Stakeholder Communication, Solution Design, Cross-Functional Leadership, Technical Consulting, Requirements Gathering, Technical Demos, Process Optimization, Presales -->
