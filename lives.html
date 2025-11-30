@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stacked Game of Life</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #222;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: sans-serif;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none; /* Let clicks pass through to canvas if we add interaction later */
+        }
+    </style>
+</head>
+<body>
+    <!-- <div id="controls">
+        Stacked Game of Life<br>
+    </div> -->
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Drawing Styles
+        const DRAW_STYLES = {
+            SOLID: 'SOLID',
+            TL_DIAG_LINES: 'TL_DIAG_LINES', // Top-Left to Bottom-Right
+            BL_DIAG_LINES: 'BL_DIAG_LINES', // Bottom-Left to Top-Right
+            H_LINES: 'H_LINES',             // Horizontal
+            V_LINES: 'V_LINES',             // Vertical
+            CIRCLES: 'CIRCLES',             // Concentric circle outlines, similar to the lines regarding stroke width and gaps between circles
+            SOLID_CIRCLE: 'SOLID_CIRCLE'    // Solid circle
+        };
+
+        // Configuration
+        const CONFIG = {
+            cellSizePercent: 0.1,     // Size of each cell as % of min dimension (0.1 = 10%)
+            actualCellSize: 0,        // Calculated at runtime
+            gridOffsetX: 0,           // Calculated at runtime
+            gridOffsetY: 0,           // Calculated at runtime
+            updateInterval: 2000,     // Time between generations in ms
+            maxHistory: 9,            // Number of generations to check for stability
+            randomThreshold: 0.75,    // Probability of a cell being dead initially (0.0 - 1.0)
+            layers: [
+                { color: '#707070', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
+                { color: '#707070', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
+                { color: '#707070', drawStyle: DRAW_STYLES.CIRCLES },
+                { color: '#707070', drawStyle: DRAW_STYLES.H_LINES },
+                { color: '#707070', drawStyle: DRAW_STYLES.V_LINES }
+            ]
+        };
+
+        let width, height;
+        let cols, rows;
+
+        // Resize canvas to fill window
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            const minDim = Math.min(width, height);
+            // Calculate cell size based on percentage, round down to ensure fit
+            let size = Math.floor(minDim * CONFIG.cellSizePercent);
+            // Ensure at least 1 pixel
+            size = Math.max(size, 1);
+            CONFIG.actualCellSize = size;
+
+            cols = Math.floor(width / size);
+            rows = Math.floor(height / size);
+
+            // Calculate offsets to center the grid (letterbox/pillarbox)
+            CONFIG.gridOffsetX = Math.floor((width - cols * size) / 2);
+            CONFIG.gridOffsetY = Math.floor((height - rows * size) / 2);
+
+            // Re-initialize layers on resize to fit new dimensions
+            // Note: This resets the game, which is acceptable for a simple demo
+            initLayers();
+        }
+
+        window.addEventListener('resize', resize);
+
+        class LifeLayer {
+            constructor(config) {
+                this.color = config.color;
+                this.drawStyle = config.drawStyle || DRAW_STYLES.SOLID;
+                this.grid = [];
+                this.nextGrid = [];
+                this.history = [];
+                this.maxHistory = CONFIG.maxHistory;
+            }
+
+            init() {
+                this.grid = new Array(cols).fill(null).map(() => new Array(rows).fill(0));
+                this.nextGrid = new Array(cols).fill(null).map(() => new Array(rows).fill(0));
+                this.history = [];
+
+                // Randomize
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        this.grid[i][j] = Math.random() > CONFIG.randomThreshold ? 1 : 0;
+                    }
+                }
+
+                // Compute initial next state so we can interpolate immediately
+                this.computeNext();
+            }
+
+            computeNext() {
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        let state = this.grid[i][j];
+                        let neighbors = this.countNeighbors(i, j);
+
+                        if (state === 0 && neighbors === 3) {
+                            this.nextGrid[i][j] = 1;
+                        } else if (state === 1 && (neighbors < 2 || neighbors > 3)) {
+                            this.nextGrid[i][j] = 0;
+                        } else {
+                            this.nextGrid[i][j] = state;
+                        }
+                    }
+                }
+            }
+
+            step() {
+                // Check for stability before advancing
+                if (this.isStable()) {
+                    this.init();
+                    return;
+                }
+
+                // Add current state to history
+                this.addToHistory();
+
+                // Advance: nextGrid becomes current grid
+                // We need to copy nextGrid to grid, or swap and reuse buffer
+                // Deep copy is safer to avoid reference issues, though swap is faster.
+                // Given the small size now (20x larger cells), copy is fine.
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        this.grid[i][j] = this.nextGrid[i][j];
+                    }
+                }
+
+                // Compute new nextGrid
+                this.computeNext();
+            }
+
+            addToHistory() {
+                // Create a simple signature of the grid
+                // Since grid is 0/1, we can just join it.
+                // For performance with larger grids, a hash would be better, but for this size string is ok.
+                const signature = this.grid.map(row => row.join('')).join('');
+                this.history.push(signature);
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                }
+            }
+
+            isStable() {
+                if (this.history.length === 0) return false;
+                const currentSignature = this.grid.map(row => row.join('')).join('');
+                return this.history.includes(currentSignature);
+            }
+
+            countNeighbors(x, y) {
+                let sum = 0;
+                for (let i = -1; i < 2; i++) {
+                    for (let j = -1; j < 2; j++) {
+                        let col = (x + i + cols) % cols;
+                        let row = (y + j + rows) % rows;
+                        sum += this.grid[col][row];
+                    }
+                }
+                sum -= this.grid[x][y];
+                return sum;
+            }
+
+            draw(ctx, alpha) {
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2; // Line width for patterns
+
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        let start = this.grid[i][j];
+                        let end = this.nextGrid[i][j];
+
+                        // Interpolate opacity
+                        // If start=1, end=1: opacity 1
+                        // If start=0, end=0: opacity 0
+                        // If start=1, end=0: opacity 1 -> 0 (1 - alpha)
+                        // If start=0, end=1: opacity 0 -> 1 (alpha)
+
+                        let opacity = 0;
+                        if (start === 1 && end === 1) opacity = 1;
+                        else if (start === 1 && end === 0) opacity = 1 - alpha;
+                        else if (start === 0 && end === 1) opacity = alpha;
+
+                        if (opacity > 0.01) {
+                            ctx.globalAlpha = opacity;
+                            this.drawCell(ctx,
+                                CONFIG.gridOffsetX + i * CONFIG.actualCellSize,
+                                CONFIG.gridOffsetY + j * CONFIG.actualCellSize,
+                                CONFIG.actualCellSize
+                            );
+                        }
+                    }
+                }
+                ctx.globalAlpha = 1.0; // Reset
+            }
+
+            drawCell(ctx, x, y, size) {
+                ctx.beginPath();
+                switch (this.drawStyle) {
+                    case DRAW_STYLES.TL_DIAG_LINES:
+                        // Top-Left to Bottom-Right
+                        for (let k = 0; k <= size; k += 8) {
+                            ctx.moveTo(x + k, y);
+                            ctx.lineTo(x, y + k);
+                            ctx.moveTo(x + size, y + k);
+                            ctx.lineTo(x + k, y + size);
+                        }
+                        ctx.stroke();
+                        break;
+                    case DRAW_STYLES.BL_DIAG_LINES:
+                        // Bottom-Left to Top-Right
+                        for (let k = 0; k <= size; k += 8) {
+                            ctx.moveTo(x, y + size - k);
+                            ctx.lineTo(x + k, y + size);
+                            ctx.moveTo(x + k, y);
+                            ctx.lineTo(x + size, y + size - k);
+                        }
+                        ctx.stroke();
+                        break;
+                    case DRAW_STYLES.H_LINES:
+                        for (let k = 4; k < size; k += 8) {
+                            ctx.moveTo(x, y + k);
+                            ctx.lineTo(x + size, y + k);
+                        }
+                        ctx.stroke();
+                        break;
+                    case DRAW_STYLES.V_LINES:
+                        for (let k = 4; k < size; k += 8) {
+                            ctx.moveTo(x + k, y);
+                            ctx.lineTo(x + k, y + size);
+                        }
+                        ctx.stroke();
+                        break;
+                    case DRAW_STYLES.SOLID_CIRCLE:
+                        ctx.arc(x + size / 2, y + size / 2, size / 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                    case DRAW_STYLES.CIRCLES:
+                        // Draw concentric circles from outer edge to center
+                        // Match density to line patterns (lines use 8px spacing)
+                        const spacing = 8;
+                        const padding = 6; // More padding from cell edge
+                        const maxRadius = size / 2 - padding;
+                        const numCircles = Math.floor(maxRadius / spacing);
+                        for (let k = 0; k < numCircles; k++) {
+                            ctx.beginPath();
+                            const radius = maxRadius - (k * spacing);
+                            if (radius > 0) {
+                                ctx.arc(x + size / 2, y + size / 2, radius, 0, Math.PI * 2);
+                                ctx.stroke();
+                            }
+                        }
+                        break;
+                    case DRAW_STYLES.SOLID:
+                    default:
+                        ctx.rect(x, y, size, size);
+                        ctx.fill();
+                        break;
+                }
+            }
+        }
+
+        let layers = [];
+
+        function initLayers() {
+            layers = CONFIG.layers.map(layerConfig => new LifeLayer(layerConfig));
+            layers.forEach(layer => layer.init());
+        }
+
+        let lastUpdate = 0;
+
+        function loop(timestamp) {
+            if (!lastUpdate) lastUpdate = timestamp;
+            const elapsed = timestamp - lastUpdate;
+
+            // Calculate interpolation factor (0.0 to 1.0)
+            // Clamp to 1.0 to avoid overshooting if frame drops
+            let alpha = Math.min(elapsed / CONFIG.updateInterval, 1.0);
+
+            if (elapsed > CONFIG.updateInterval) {
+                // Update all layers
+                layers.forEach(layer => layer.step());
+                lastUpdate = timestamp;
+                alpha = 0; // Reset alpha for new frame
+            }
+
+            // Clear screen
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw all layers with additive blending
+            ctx.globalCompositeOperation = 'lighter'; // Use 'lighter' for true additive mixing
+            layers.forEach(layer => layer.draw(ctx, alpha));
+            ctx.globalCompositeOperation = 'source-over'; // Reset
+
+            requestAnimationFrame(loop);
+        }
+
+        // Start
+        resize();
+        loop();
+
+    </script>
+</body>
+</html>
