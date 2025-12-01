@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stacked Game of Life</title>
+    <title>Lives</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #222;
+            background-color: #EEE;
             overflow: hidden;
         }
         canvas {
@@ -52,6 +52,12 @@
 
         // Configuration
         const CONFIG = {
+            backgroundColor: '#001122',  // Background color for canvas
+            // Blend mode for compositing layers:
+            //   'multiply'    - Use with LIGHT backgrounds and DARK layer colors (subtractive, like ink on paper)
+            //   'lighter'     - Use with DARK backgrounds and LIGHT layer colors (additive, like light beams)
+            //   'source-over' - Normal blending, no special mixing between layers
+            blendMode: 'lighter',
             cellSizePercent: 0.1,     // Size of each cell as % of min dimension (0.1 = 10%)
             actualCellSize: 0,        // Calculated at runtime
             gridOffsetX: 0,           // Calculated at runtime
@@ -60,11 +66,16 @@
             maxHistory: 9,            // Number of generations to check for stability
             randomThreshold: 0.75,    // Probability of a cell being dead initially (0.0 - 1.0)
             layers: [
-                { color: '#707070', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
-                { color: '#707070', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
-                { color: '#707070', drawStyle: DRAW_STYLES.CIRCLES },
-                { color: '#707070', drawStyle: DRAW_STYLES.H_LINES },
-                { color: '#707070', drawStyle: DRAW_STYLES.V_LINES }
+                { color: '#3366CC', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
+                { color: '#3366CC', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
+                { color: '#3366CC', drawStyle: DRAW_STYLES.CIRCLES },
+                { color: '#3366CC', drawStyle: DRAW_STYLES.H_LINES },
+                { color: '#3366CC', drawStyle: DRAW_STYLES.V_LINES }
+                // { color: '#707070', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
+                // { color: '#707070', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
+                // { color: '#707070', drawStyle: DRAW_STYLES.CIRCLES },
+                // { color: '#707070', drawStyle: DRAW_STYLES.H_LINES },
+                // { color: '#707070', drawStyle: DRAW_STYLES.V_LINES }
             ]
         };
 
@@ -235,21 +246,59 @@
                 switch (this.drawStyle) {
                     case DRAW_STYLES.TL_DIAG_LINES:
                         // Top-Left to Bottom-Right
-                        for (let k = 0; k <= size; k += 8) {
-                            ctx.moveTo(x + k, y);
-                            ctx.lineTo(x, y + k);
-                            ctx.moveTo(x + size, y + k);
-                            ctx.lineTo(x + k, y + size);
+                        // Calculate spacing to align with cell boundaries
+                        // Target ~11px (8 * sqrt(2)) but adjust to divide evenly into size
+                        const targetSpacing1 = 11;
+                        const numLines1 = Math.round(size / targetSpacing1);
+                        const diagSpacing1 = size / numLines1;
+
+                        for (let k = 0; k <= size; k += diagSpacing1) {
+                            // Lines parallel to main diagonal, offset by k
+                            if (k === 0) {
+                                // Center diagonal
+                                ctx.moveTo(x, y);
+                                ctx.lineTo(x + size, y + size);
+                            } else {
+                                // Upper-left side
+                                if (k < size) {
+                                    ctx.moveTo(x, y + k);
+                                    ctx.lineTo(x + size - k, y + size);
+                                }
+                                // Lower-right side
+                                if (k < size) {
+                                    ctx.moveTo(x + k, y);
+                                    ctx.lineTo(x + size, y + size - k);
+                                }
+                            }
                         }
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.BL_DIAG_LINES:
                         // Bottom-Left to Top-Right
-                        for (let k = 0; k <= size; k += 8) {
-                            ctx.moveTo(x, y + size - k);
-                            ctx.lineTo(x + k, y + size);
-                            ctx.moveTo(x + k, y);
-                            ctx.lineTo(x + size, y + size - k);
+                        // Calculate spacing to align with cell boundaries
+                        // Target ~11px (8 * sqrt(2)) but adjust to divide evenly into size
+                        const targetSpacing2 = 11;
+                        const numLines2 = Math.round(size / targetSpacing2);
+                        const diagSpacing2 = size / numLines2;
+
+                        for (let k = 0; k <= size; k += diagSpacing2) {
+                            // Lines parallel to main diagonal, offset by k
+                            if (k === 0) {
+                                // Center diagonal
+                                ctx.moveTo(x, y + size);
+                                ctx.lineTo(x + size, y);
+                            } else {
+                                // Lower-left side
+                                if (k < size) {
+                                    ctx.moveTo(x, y + size - k);
+                                    ctx.lineTo(x + size - k, y);
+                                }
+                                // Upper-right side
+                                if (k < size) {
+                                    ctx.moveTo(x + k, y + size);
+                                    ctx.lineTo(x + size, y + k);
+                                }
+                            }
                         }
                         ctx.stroke();
                         break;
@@ -278,7 +327,7 @@
                         const padding = 6; // More padding from cell edge
                         const maxRadius = size / 2 - padding;
                         const numCircles = Math.floor(maxRadius / spacing);
-                        for (let k = 0; k < numCircles; k++) {
+                        for (let k = 0; k <= numCircles; k++) {
                             ctx.beginPath();
                             const radius = maxRadius - (k * spacing);
                             if (radius > 0) {
@@ -321,11 +370,11 @@
             }
 
             // Clear screen
-            ctx.fillStyle = 'black';
+            ctx.fillStyle = CONFIG.backgroundColor;
             ctx.fillRect(0, 0, width, height);
 
-            // Draw all layers with additive blending
-            ctx.globalCompositeOperation = 'lighter'; // Use 'lighter' for true additive mixing
+            // Draw all layers with configured blending
+            ctx.globalCompositeOperation = CONFIG.blendMode;
             layers.forEach(layer => layer.draw(ctx, alpha));
             ctx.globalCompositeOperation = 'source-over'; // Reset
 
