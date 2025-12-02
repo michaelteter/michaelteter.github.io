@@ -50,9 +50,9 @@
             SOLID_CIRCLE: 'SOLID_CIRCLE'    // Solid circle
         };
 
+
         // Configuration
         const CONFIG = {
-            backgroundColor: '#001122',  // Background color for canvas
             // Blend mode for compositing layers:
             //   'multiply'    - Use with LIGHT backgrounds and DARK layer colors (subtractive, like ink on paper)
             //   'lighter'     - Use with DARK backgrounds and LIGHT layer colors (additive, like light beams)
@@ -62,22 +62,87 @@
             actualCellSize: 0,        // Calculated at runtime
             gridOffsetX: 0,           // Calculated at runtime
             gridOffsetY: 0,           // Calculated at runtime
-            updateInterval: 2000,     // Time between generations in ms
+            updateInterval: 1000,     // Time between generations in ms
             maxHistory: 9,            // Number of generations to check for stability
-            randomThreshold: 0.75,    // Probability of a cell being dead initially (0.0 - 1.0)
+            randomThreshold: 0.8,    // Probability of a cell being dead initially (0.0 - 1.0)
+            // Color cycling settings
+            colorCycling: true,       // Enable color cycling animation
+            colorTransitionGens: 8,  // Number of generations to transition between colors
+            backgroundColors: ['#001122', '#220011', '#112200'], // Background color waypoints
+            foregroundColors: ['#3344DD', '#DD3344', '#44DD33'], // Foreground color waypoints
             layers: [
-                { color: '#3366CC', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
-                { color: '#3366CC', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
-                { color: '#3366CC', drawStyle: DRAW_STYLES.CIRCLES },
-                { color: '#3366CC', drawStyle: DRAW_STYLES.H_LINES },
-                { color: '#3366CC', drawStyle: DRAW_STYLES.V_LINES }
-                // { color: '#707070', drawStyle: DRAW_STYLES.TL_DIAG_LINES },
-                // { color: '#707070', drawStyle: DRAW_STYLES.BL_DIAG_LINES },
-                // { color: '#707070', drawStyle: DRAW_STYLES.CIRCLES },
-                // { color: '#707070', drawStyle: DRAW_STYLES.H_LINES },
-                // { color: '#707070', drawStyle: DRAW_STYLES.V_LINES }
+                { drawStyle: DRAW_STYLES.TL_DIAG_LINES },
+                { drawStyle: DRAW_STYLES.BL_DIAG_LINES },
+                { drawStyle: DRAW_STYLES.CIRCLES },
+                { drawStyle: DRAW_STYLES.H_LINES },
+                { drawStyle: DRAW_STYLES.V_LINES }
             ]
         };
+
+        // Color cycling state
+        let generationCount = 0;
+        let currentBgColor = CONFIG.backgroundColors[0];
+        let currentFgColor = CONFIG.foregroundColors[0];
+
+        // Parse hex color to RGB
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        // Convert RGB to hex
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+        }
+
+        // Interpolate between two colors
+        function interpolateColor(color1, color2, t) {
+            const c1 = hexToRgb(color1);
+            const c2 = hexToRgb(color2);
+            const r = c1.r + (c2.r - c1.r) * t;
+            const g = c1.g + (c2.g - c1.g) * t;
+            const b = c1.b + (c2.b - c1.b) * t;
+            return rgbToHex(r, g, b);
+        }
+
+        // Update colors based on generation count
+        function updateColors() {
+            if (!CONFIG.colorCycling) {
+                currentBgColor = CONFIG.backgroundColors[0];
+                currentFgColor = CONFIG.foregroundColors[0];
+                return;
+            }
+
+            const numWaypoints = CONFIG.backgroundColors.length;
+            const totalGens = CONFIG.colorTransitionGens * numWaypoints;
+            const cyclePosition = generationCount % totalGens;
+            const waypointIndex = Math.floor(cyclePosition / CONFIG.colorTransitionGens);
+            const nextWaypointIndex = (waypointIndex + 1) % numWaypoints;
+            const t = (cyclePosition % CONFIG.colorTransitionGens) / CONFIG.colorTransitionGens;
+
+            currentBgColor = interpolateColor(
+                CONFIG.backgroundColors[waypointIndex],
+                CONFIG.backgroundColors[nextWaypointIndex],
+                t
+            );
+            currentFgColor = interpolateColor(
+                CONFIG.foregroundColors[waypointIndex],
+                CONFIG.foregroundColors[nextWaypointIndex],
+                t
+            );
+
+            // Update all layers to use the same foreground color
+            CONFIG.layers.forEach(layer => {
+                layer.color = currentFgColor;
+            });
+        }
+
+        // Initialize colors
+        updateColors();
 
         let width, height;
         let cols, rows;
@@ -156,7 +221,16 @@
             step() {
                 // Check for stability before advancing
                 if (this.isStable()) {
-                    this.init();
+                    // Instead of abruptly resetting, set nextGrid to a new random state
+                    // This allows the transition system to smoothly fade to the new state
+                    for (let i = 0; i < cols; i++) {
+                        for (let j = 0; j < rows; j++) {
+                            this.nextGrid[i][j] = Math.random() > CONFIG.randomThreshold ? 1 : 0;
+                        }
+                    }
+                    // Clear history since we're starting fresh
+                    this.history = [];
+                    // Don't advance grid or compute next - just let the transition happen
                     return;
                 }
 
@@ -164,9 +238,6 @@
                 this.addToHistory();
 
                 // Advance: nextGrid becomes current grid
-                // We need to copy nextGrid to grid, or swap and reuse buffer
-                // Deep copy is safer to avoid reference issues, though swap is faster.
-                // Given the small size now (20x larger cells), copy is fine.
                 for (let i = 0; i < cols; i++) {
                     for (let j = 0; j < rows; j++) {
                         this.grid[i][j] = this.nextGrid[i][j];
@@ -303,14 +374,32 @@
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.H_LINES:
-                        for (let k = 4; k < size; k += 8) {
+                        // Calculate spacing with reduced padding on top and bottom
+                        const targetSpacingH = 8;
+                        const numLinesH = Math.floor(size / targetSpacingH);
+                        const paddingFactorH = 0.5; // Padding is 30% of normal gap
+                        const totalPaddingH = 2 * paddingFactorH * targetSpacingH;
+                        const spacingH = (size - totalPaddingH) / (numLinesH - 1);
+                        const startOffsetH = paddingFactorH * targetSpacingH;
+
+                        for (let i = 0; i < numLinesH; i++) {
+                            const k = startOffsetH + (i * spacingH);
                             ctx.moveTo(x, y + k);
                             ctx.lineTo(x + size, y + k);
                         }
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.V_LINES:
-                        for (let k = 4; k < size; k += 8) {
+                        // Calculate spacing with reduced padding on left and right
+                        const targetSpacingV = 8;
+                        const numLinesV = Math.floor(size / targetSpacingV);
+                        const paddingFactorV = 0.5; // Padding is 30% of normal gap
+                        const totalPaddingV = 2 * paddingFactorV * targetSpacingV;
+                        const spacingV = (size - totalPaddingV) / (numLinesV - 1);
+                        const startOffsetV = paddingFactorV * targetSpacingV;
+
+                        for (let i = 0; i < numLinesV; i++) {
+                            const k = startOffsetV + (i * spacingV);
                             ctx.moveTo(x + k, y);
                             ctx.lineTo(x + k, y + size);
                         }
@@ -365,12 +454,14 @@
             if (elapsed > CONFIG.updateInterval) {
                 // Update all layers
                 layers.forEach(layer => layer.step());
+                generationCount++;
+                updateColors();
                 lastUpdate = timestamp;
                 alpha = 0; // Reset alpha for new frame
             }
 
             // Clear screen
-            ctx.fillStyle = CONFIG.backgroundColor;
+            ctx.fillStyle = currentBgColor;
             ctx.fillRect(0, 0, width, height);
 
             // Draw all layers with configured blending
