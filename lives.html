@@ -39,50 +39,10 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Drawing Styles
-        const DRAW_STYLES = {
-            SOLID: 'SOLID',
-            TL_DIAG_LINES: 'TL_DIAG_LINES', // Top-Left to Bottom-Right
-            BL_DIAG_LINES: 'BL_DIAG_LINES', // Bottom-Left to Top-Right
-            H_LINES: 'H_LINES',             // Horizontal
-            V_LINES: 'V_LINES',             // Vertical
-            CIRCLES: 'CIRCLES',             // Concentric circle outlines, similar to the lines regarding stroke width and gaps between circles
-            SOLID_CIRCLE: 'SOLID_CIRCLE'    // Solid circle
-        };
+        // Debug Frame Counter
+        window.debugFrameCount = 0;
 
-
-        // Configuration
-        const CONFIG = {
-            // Blend mode for compositing layers:
-            //   'multiply'    - Use with LIGHT backgrounds and DARK layer colors (subtractive, like ink on paper)
-            //   'lighter'     - Use with DARK backgrounds and LIGHT layer colors (additive, like light beams)
-            //   'source-over' - Normal blending, no special mixing between layers
-            blendMode: 'lighter',
-            cellSizePercent: 0.1,     // Size of each cell as % of min dimension (0.1 = 10%)
-            actualCellSize: 0,        // Calculated at runtime
-            gridOffsetX: 0,           // Calculated at runtime
-            gridOffsetY: 0,           // Calculated at runtime
-            updateInterval: 1000,     // Time between generations in ms
-            maxHistory: 9,            // Number of generations to check for stability
-            randomThreshold: 0.8,    // Probability of a cell being dead initially (0.0 - 1.0)
-            // Color cycling settings
-            colorCycling: true,       // Enable color cycling animation
-            colorTransitionGens: 8,  // Number of generations to transition between colors
-            backgroundColors: ['#001122', '#220011', '#112200'], // Background color waypoints
-            foregroundColors: ['#3344DD', '#DD3344', '#44DD33'], // Foreground color waypoints
-            layers: [
-                { drawStyle: DRAW_STYLES.TL_DIAG_LINES },
-                { drawStyle: DRAW_STYLES.BL_DIAG_LINES },
-                { drawStyle: DRAW_STYLES.CIRCLES },
-                { drawStyle: DRAW_STYLES.H_LINES },
-                { drawStyle: DRAW_STYLES.V_LINES }
-            ]
-        };
-
-        // Color cycling state
-        let generationCount = 0;
-        let currentBgColor = CONFIG.backgroundColors[0];
-        let currentFgColor = CONFIG.foregroundColors[0];
+        // --- Common Helpers ---
 
         // Parse hex color to RGB
         function hexToRgb(hex) {
@@ -109,101 +69,93 @@
             return rgbToHex(r, g, b);
         }
 
-        // Update colors based on generation count
-        function updateColors() {
-            if (!CONFIG.colorCycling) {
-                currentBgColor = CONFIG.backgroundColors[0];
-                currentFgColor = CONFIG.foregroundColors[0];
-                return;
+        // --- HSV Helpers ---
+
+        function rgbToHsv(r, g, b) {
+            r /= 255, g /= 255, b /= 255;
+            var max = Math.max(r, g, b), min = Math.min(r, g, b);
+            var h, s, v = max;
+
+            var d = max - min;
+            s = max == 0 ? 0 : d / max;
+
+            if (max == min) {
+                h = 0; // achromatic
+            } else {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
             }
-
-            const numWaypoints = CONFIG.backgroundColors.length;
-            const totalGens = CONFIG.colorTransitionGens * numWaypoints;
-            const cyclePosition = generationCount % totalGens;
-            const waypointIndex = Math.floor(cyclePosition / CONFIG.colorTransitionGens);
-            const nextWaypointIndex = (waypointIndex + 1) % numWaypoints;
-            const t = (cyclePosition % CONFIG.colorTransitionGens) / CONFIG.colorTransitionGens;
-
-            currentBgColor = interpolateColor(
-                CONFIG.backgroundColors[waypointIndex],
-                CONFIG.backgroundColors[nextWaypointIndex],
-                t
-            );
-            currentFgColor = interpolateColor(
-                CONFIG.foregroundColors[waypointIndex],
-                CONFIG.foregroundColors[nextWaypointIndex],
-                t
-            );
-
-            // Update all layers to use the same foreground color
-            CONFIG.layers.forEach(layer => {
-                layer.color = currentFgColor;
-            });
+            return { h, s, v };
         }
 
-        // Initialize colors
-        updateColors();
+        function hsvToRgb(h, s, v) {
+            var r, g, b;
+            var i = Math.floor(h * 6);
+            var f = h * 6 - i;
+            var p = v * (1 - s);
+            var q = v * (1 - f * s);
+            var t = v * (1 - (1 - f) * s);
 
-        let width, height;
-        let cols, rows;
-
-        // Resize canvas to fill window
-        function resize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
-
-            const minDim = Math.min(width, height);
-            // Calculate cell size based on percentage, round down to ensure fit
-            let size = Math.floor(minDim * CONFIG.cellSizePercent);
-            // Ensure at least 1 pixel
-            size = Math.max(size, 1);
-            CONFIG.actualCellSize = size;
-
-            cols = Math.floor(width / size);
-            rows = Math.floor(height / size);
-
-            // Calculate offsets to center the grid (letterbox/pillarbox)
-            CONFIG.gridOffsetX = Math.floor((width - cols * size) / 2);
-            CONFIG.gridOffsetY = Math.floor((height - rows * size) / 2);
-
-            // Re-initialize layers on resize to fit new dimensions
-            // Note: This resets the game, which is acceptable for a simple demo
-            initLayers();
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
         }
 
-        window.addEventListener('resize', resize);
+        // --- Program 1: Stacked Game of Life ---
+        // (Encapsulated version of the original code)
+
+        const DRAW_STYLES = {
+            SOLID: 'SOLID',
+            TL_DIAG_LINES: 'TL_DIAG_LINES',
+            BL_DIAG_LINES: 'BL_DIAG_LINES',
+            H_LINES: 'H_LINES',
+            V_LINES: 'V_LINES',
+            CIRCLES: 'CIRCLES',
+            SOLID_CIRCLE: 'SOLID_CIRCLE'
+        };
 
         class LifeLayer {
-            constructor(config) {
+            constructor(config, cols, rows) {
                 this.color = config.color;
                 this.drawStyle = config.drawStyle || DRAW_STYLES.SOLID;
+                this.cols = cols;
+                this.rows = rows;
                 this.grid = [];
                 this.nextGrid = [];
                 this.history = [];
-                this.maxHistory = CONFIG.maxHistory;
+                this.maxHistory = 9; // Hardcoded or passed in
+                this.randomThreshold = 0.8;
             }
 
             init() {
-                this.grid = new Array(cols).fill(null).map(() => new Array(rows).fill(0));
-                this.nextGrid = new Array(cols).fill(null).map(() => new Array(rows).fill(0));
+                this.grid = new Array(this.cols).fill(null).map(() => new Array(this.rows).fill(0));
+                this.nextGrid = new Array(this.cols).fill(null).map(() => new Array(this.rows).fill(0));
                 this.history = [];
 
                 // Randomize
-                for (let i = 0; i < cols; i++) {
-                    for (let j = 0; j < rows; j++) {
-                        this.grid[i][j] = Math.random() > CONFIG.randomThreshold ? 1 : 0;
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
+                        this.grid[i][j] = Math.random() > this.randomThreshold ? 1 : 0;
                     }
                 }
 
-                // Compute initial next state so we can interpolate immediately
+                // Compute initial next state
                 this.computeNext();
             }
 
             computeNext() {
-                for (let i = 0; i < cols; i++) {
-                    for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
                         let state = this.grid[i][j];
                         let neighbors = this.countNeighbors(i, j);
 
@@ -219,39 +171,28 @@
             }
 
             step() {
-                // Check for stability before advancing
                 if (this.isStable()) {
-                    // Instead of abruptly resetting, set nextGrid to a new random state
-                    // This allows the transition system to smoothly fade to the new state
-                    for (let i = 0; i < cols; i++) {
-                        for (let j = 0; j < rows; j++) {
-                            this.nextGrid[i][j] = Math.random() > CONFIG.randomThreshold ? 1 : 0;
+                    for (let i = 0; i < this.cols; i++) {
+                        for (let j = 0; j < this.rows; j++) {
+                            this.nextGrid[i][j] = Math.random() > this.randomThreshold ? 1 : 0;
                         }
                     }
-                    // Clear history since we're starting fresh
                     this.history = [];
-                    // Don't advance grid or compute next - just let the transition happen
                     return;
                 }
 
-                // Add current state to history
                 this.addToHistory();
 
-                // Advance: nextGrid becomes current grid
-                for (let i = 0; i < cols; i++) {
-                    for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
                         this.grid[i][j] = this.nextGrid[i][j];
                     }
                 }
 
-                // Compute new nextGrid
                 this.computeNext();
             }
 
             addToHistory() {
-                // Create a simple signature of the grid
-                // Since grid is 0/1, we can just join it.
-                // For performance with larger grids, a hash would be better, but for this size string is ok.
                 const signature = this.grid.map(row => row.join('')).join('');
                 this.history.push(signature);
                 if (this.history.length > this.maxHistory) {
@@ -269,8 +210,8 @@
                 let sum = 0;
                 for (let i = -1; i < 2; i++) {
                     for (let j = -1; j < 2; j++) {
-                        let col = (x + i + cols) % cols;
-                        let row = (y + j + rows) % rows;
+                        let col = (x + i + this.cols) % this.cols;
+                        let row = (y + j + this.rows) % this.rows;
                         sum += this.grid[col][row];
                     }
                 }
@@ -278,21 +219,15 @@
                 return sum;
             }
 
-            draw(ctx, alpha) {
+            draw(ctx, alpha, offsetX, offsetY, cellSize) {
                 ctx.fillStyle = this.color;
                 ctx.strokeStyle = this.color;
-                ctx.lineWidth = 2; // Line width for patterns
+                ctx.lineWidth = 2;
 
-                for (let i = 0; i < cols; i++) {
-                    for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
                         let start = this.grid[i][j];
                         let end = this.nextGrid[i][j];
-
-                        // Interpolate opacity
-                        // If start=1, end=1: opacity 1
-                        // If start=0, end=0: opacity 0
-                        // If start=1, end=0: opacity 1 -> 0 (1 - alpha)
-                        // If start=0, end=1: opacity 0 -> 1 (alpha)
 
                         let opacity = 0;
                         if (start === 1 && end === 1) opacity = 1;
@@ -302,86 +237,56 @@
                         if (opacity > 0.01) {
                             ctx.globalAlpha = opacity;
                             this.drawCell(ctx,
-                                CONFIG.gridOffsetX + i * CONFIG.actualCellSize,
-                                CONFIG.gridOffsetY + j * CONFIG.actualCellSize,
-                                CONFIG.actualCellSize
+                                offsetX + i * cellSize,
+                                offsetY + j * cellSize,
+                                cellSize
                             );
                         }
                     }
                 }
-                ctx.globalAlpha = 1.0; // Reset
+                ctx.globalAlpha = 1.0;
             }
 
             drawCell(ctx, x, y, size) {
                 ctx.beginPath();
                 switch (this.drawStyle) {
                     case DRAW_STYLES.TL_DIAG_LINES:
-                        // Top-Left to Bottom-Right
-                        // Calculate spacing to align with cell boundaries
-                        // Target ~11px (8 * sqrt(2)) but adjust to divide evenly into size
                         const targetSpacing1 = 11;
                         const numLines1 = Math.round(size / targetSpacing1);
                         const diagSpacing1 = size / numLines1;
-
                         for (let k = 0; k <= size; k += diagSpacing1) {
-                            // Lines parallel to main diagonal, offset by k
                             if (k === 0) {
-                                // Center diagonal
                                 ctx.moveTo(x, y);
                                 ctx.lineTo(x + size, y + size);
                             } else {
-                                // Upper-left side
-                                if (k < size) {
-                                    ctx.moveTo(x, y + k);
-                                    ctx.lineTo(x + size - k, y + size);
-                                }
-                                // Lower-right side
-                                if (k < size) {
-                                    ctx.moveTo(x + k, y);
-                                    ctx.lineTo(x + size, y + size - k);
-                                }
+                                if (k < size) { ctx.moveTo(x, y + k); ctx.lineTo(x + size - k, y + size); }
+                                if (k < size) { ctx.moveTo(x + k, y); ctx.lineTo(x + size, y + size - k); }
                             }
                         }
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.BL_DIAG_LINES:
-                        // Bottom-Left to Top-Right
-                        // Calculate spacing to align with cell boundaries
-                        // Target ~11px (8 * sqrt(2)) but adjust to divide evenly into size
                         const targetSpacing2 = 11;
                         const numLines2 = Math.round(size / targetSpacing2);
                         const diagSpacing2 = size / numLines2;
-
                         for (let k = 0; k <= size; k += diagSpacing2) {
-                            // Lines parallel to main diagonal, offset by k
                             if (k === 0) {
-                                // Center diagonal
                                 ctx.moveTo(x, y + size);
                                 ctx.lineTo(x + size, y);
                             } else {
-                                // Lower-left side
-                                if (k < size) {
-                                    ctx.moveTo(x, y + size - k);
-                                    ctx.lineTo(x + size - k, y);
-                                }
-                                // Upper-right side
-                                if (k < size) {
-                                    ctx.moveTo(x + k, y + size);
-                                    ctx.lineTo(x + size, y + k);
-                                }
+                                if (k < size) { ctx.moveTo(x, y + size - k); ctx.lineTo(x + size - k, y); }
+                                if (k < size) { ctx.moveTo(x + k, y + size); ctx.lineTo(x + size, y + k); }
                             }
                         }
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.H_LINES:
-                        // Calculate spacing with reduced padding on top and bottom
                         const targetSpacingH = 8;
                         const numLinesH = Math.floor(size / targetSpacingH);
-                        const paddingFactorH = 0.5; // Padding is 30% of normal gap
+                        const paddingFactorH = 0.5;
                         const totalPaddingH = 2 * paddingFactorH * targetSpacingH;
                         const spacingH = (size - totalPaddingH) / (numLinesH - 1);
                         const startOffsetH = paddingFactorH * targetSpacingH;
-
                         for (let i = 0; i < numLinesH; i++) {
                             const k = startOffsetH + (i * spacingH);
                             ctx.moveTo(x, y + k);
@@ -390,14 +295,12 @@
                         ctx.stroke();
                         break;
                     case DRAW_STYLES.V_LINES:
-                        // Calculate spacing with reduced padding on left and right
                         const targetSpacingV = 8;
                         const numLinesV = Math.floor(size / targetSpacingV);
-                        const paddingFactorV = 0.5; // Padding is 30% of normal gap
+                        const paddingFactorV = 0.5;
                         const totalPaddingV = 2 * paddingFactorV * targetSpacingV;
                         const spacingV = (size - totalPaddingV) / (numLinesV - 1);
                         const startOffsetV = paddingFactorV * targetSpacingV;
-
                         for (let i = 0; i < numLinesV; i++) {
                             const k = startOffsetV + (i * spacingV);
                             ctx.moveTo(x + k, y);
@@ -410,10 +313,8 @@
                         ctx.fill();
                         break;
                     case DRAW_STYLES.CIRCLES:
-                        // Draw concentric circles from outer edge to center
-                        // Match density to line patterns (lines use 8px spacing)
                         const spacing = 8;
-                        const padding = 6; // More padding from cell edge
+                        const padding = 6;
                         const maxRadius = size / 2 - padding;
                         const numCircles = Math.floor(maxRadius / spacing);
                         for (let k = 0; k <= numCircles; k++) {
@@ -434,47 +335,648 @@
             }
         }
 
-        let layers = [];
+        class StackedGameOfLife {
+            constructor() {
+                this.config = {
+                    blendMode: 'lighter',
+                    cellSizePercent: 0.1,
+                    updateInterval: 1000,
+                    maxHistory: 9,
+                    randomThreshold: 0.8,
+                    colorCycling: true,
+                    colorTransitionGens: 8,
+                    backgroundColors: ['#001122', '#220011', '#112200'],
+                    foregroundColors: ['#3344DD', '#DD3344', '#44DD33'],
+                    layersConfig: [
+                        { drawStyle: DRAW_STYLES.TL_DIAG_LINES },
+                        { drawStyle: DRAW_STYLES.BL_DIAG_LINES },
+                        { drawStyle: DRAW_STYLES.CIRCLES },
+                        { drawStyle: DRAW_STYLES.H_LINES },
+                        { drawStyle: DRAW_STYLES.V_LINES }
+                    ]
+                };
 
-        function initLayers() {
-            layers = CONFIG.layers.map(layerConfig => new LifeLayer(layerConfig));
-            layers.forEach(layer => layer.init());
-        }
+                this.generationCount = 0;
+                this.currentBgColor = this.config.backgroundColors[0];
+                this.currentFgColor = this.config.foregroundColors[0];
+                this.layers = [];
+                this.lastUpdate = 0;
 
-        let lastUpdate = 0;
+                // Layout metrics
+                this.cols = 0;
+                this.rows = 0;
+                this.actualCellSize = 0;
+                this.gridOffsetX = 0;
+                this.gridOffsetY = 0;
 
-        function loop(timestamp) {
-            if (!lastUpdate) lastUpdate = timestamp;
-            const elapsed = timestamp - lastUpdate;
-
-            // Calculate interpolation factor (0.0 to 1.0)
-            // Clamp to 1.0 to avoid overshooting if frame drops
-            let alpha = Math.min(elapsed / CONFIG.updateInterval, 1.0);
-
-            if (elapsed > CONFIG.updateInterval) {
-                // Update all layers
-                layers.forEach(layer => layer.step());
-                generationCount++;
-                updateColors();
-                lastUpdate = timestamp;
-                alpha = 0; // Reset alpha for new frame
+                this.updateColors();
             }
 
-            // Clear screen
-            ctx.fillStyle = currentBgColor;
-            ctx.fillRect(0, 0, width, height);
+            getName() { return "Stacked Game of Life"; }
 
-            // Draw all layers with configured blending
-            ctx.globalCompositeOperation = CONFIG.blendMode;
-            layers.forEach(layer => layer.draw(ctx, alpha));
-            ctx.globalCompositeOperation = 'source-over'; // Reset
+            updateColors() {
+                if (!this.config.colorCycling) {
+                    this.currentBgColor = this.config.backgroundColors[0];
+                    this.currentFgColor = this.config.foregroundColors[0];
+                    return;
+                }
 
-            requestAnimationFrame(loop);
+                const numWaypoints = this.config.backgroundColors.length;
+                const totalGens = this.config.colorTransitionGens * numWaypoints;
+                const cyclePosition = this.generationCount % totalGens;
+                const waypointIndex = Math.floor(cyclePosition / this.config.colorTransitionGens);
+                const nextWaypointIndex = (waypointIndex + 1) % numWaypoints;
+                const t = (cyclePosition % this.config.colorTransitionGens) / this.config.colorTransitionGens;
+
+                this.currentBgColor = interpolateColor(
+                    this.config.backgroundColors[waypointIndex],
+                    this.config.backgroundColors[nextWaypointIndex],
+                    t
+                );
+                this.currentFgColor = interpolateColor(
+                    this.config.foregroundColors[waypointIndex],
+                    this.config.foregroundColors[nextWaypointIndex],
+                    t
+                );
+
+                this.layers.forEach(layer => layer.color = this.currentFgColor);
+            }
+
+            resize(width, height) {
+                const minDim = Math.min(width, height);
+                let size = Math.floor(minDim * this.config.cellSizePercent);
+                size = Math.max(size, 1);
+                this.actualCellSize = size; // Store locally using 'this'
+
+                this.cols = Math.floor(width / size);
+                this.rows = Math.floor(height / size);
+
+                this.gridOffsetX = Math.floor((width - this.cols * size) / 2);
+                this.gridOffsetY = Math.floor((height - this.rows * size) / 2);
+
+                // Re-initialize layers on resize
+                this.initLayers();
+            }
+
+            initLayers() {
+                this.layers = this.config.layersConfig.map(layerConfig =>
+                    new LifeLayer({ ...layerConfig, color: this.currentFgColor }, this.cols, this.rows)
+                );
+                this.layers.forEach(layer => layer.init());
+            }
+
+            loop(ctx, width, height, timestamp) {
+                if (!this.lastUpdate) this.lastUpdate = timestamp;
+                const elapsed = timestamp - this.lastUpdate;
+                let alpha = Math.min(elapsed / this.config.updateInterval, 1.0);
+
+                if (elapsed > this.config.updateInterval) {
+                     this.layers.forEach(layer => layer.step());
+                     this.generationCount++;
+                     this.updateColors();
+                     this.lastUpdate = timestamp;
+                     alpha = 0;
+                }
+
+                ctx.fillStyle = this.currentBgColor;
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.globalCompositeOperation = this.config.blendMode;
+                this.layers.forEach(layer => {
+                    // Update layer color just in case
+                    layer.color = this.currentFgColor;
+                    layer.draw(ctx, alpha, this.gridOffsetX, this.gridOffsetY, this.actualCellSize)
+                });
+                ctx.globalCompositeOperation = 'source-over';
+            }
         }
 
-        // Start
-        resize();
-        loop();
+        // --- Program 2: Solid Rect (Full Screen HSV Cycle) ---
+
+        class SolidRectProgram {
+            constructor() {
+                this.stepsPerTransition = 240; // Slower transition for smoothness
+                this.step = 0;
+
+                this.currentColor = this.randomHSV();
+                this.targetColor = this.randomHSV();
+            }
+
+            getName() { return "Solid Rect HSV"; }
+
+            randomHSV() {
+                return {
+                    h: Math.random(),
+                    s: 0.5 + Math.random() * 0.5, // Avoid too dull
+                    v: 0.2 + Math.random() * 0.8  // Avoid pitch black
+                };
+            }
+
+            resize(width, height) {
+                // No specific resize logic needed
+            }
+
+            loop(ctx, width, height, timestamp) {
+                // Update step
+                this.step++;
+                if (this.step >= this.stepsPerTransition) {
+                    this.step = 0;
+                    this.currentColor = this.targetColor;
+                    this.targetColor = this.randomHSV();
+                }
+
+                const t = this.step / this.stepsPerTransition;
+
+                // Interpolate HSV
+                // Check for shortest path around the hue circle
+                let h1 = this.currentColor.h;
+                let h2 = this.targetColor.h;
+                let dH = h2 - h1;
+
+                if (dH > 0.5) h1 += 1.0;
+                else if (dH < -0.5) h1 -= 1.0;
+
+                const h = h1 + (h2 - h1) * t;
+                // Normalize h back to 0-1
+                const hNorm = (h % 1 + 1) % 1;
+
+                const s = this.currentColor.s + (this.targetColor.s - this.currentColor.s) * t;
+                const v = this.currentColor.v + (this.targetColor.v - this.currentColor.v) * t;
+
+                const rgb = hsvToRgb(hNorm, s, v);
+
+                ctx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+                ctx.fillRect(0, 0, width, height);
+            }
+        }
+
+        // --- Common Drawing Helper ---
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return { r, g, b };
+        }
+
+        function drawZoomLines(ctx, cellX, cellY, cellWidth, cellHeight, offset, lineSpacing, exponent, isVertical, baseColorRgb, centerBrightness) {
+            const centerX = cellX + cellWidth / 2;
+            const centerY = cellY + cellHeight / 2;
+            // Radius depends on the direction of travel for the lines
+            // Vertical lines move horizontally (width), Horizontal lines move vertically (height)
+            const radius = isVertical ? cellWidth / 2 : cellHeight / 2;
+
+            // Draw permanent static center line
+            const r_c = Math.floor(baseColorRgb.r * centerBrightness);
+            const g_c = Math.floor(baseColorRgb.g * centerBrightness);
+            const b_c = Math.floor(baseColorRgb.b * centerBrightness);
+            // ctx.strokeStyle = `rgb(${r_c},${g_c},${b_c})`;
+
+            // ctx.beginPath();
+            // if (isVertical) {
+            //     ctx.moveTo(centerX, cellY);
+            //     ctx.lineTo(centerX, cellY + cellHeight);
+            // } else {
+            //     ctx.moveTo(cellX, centerY);
+            //     ctx.lineTo(cellX + cellWidth, centerY);
+            // }
+            // ctx.stroke();
+
+            // We iterate in "virtual" space (linear)
+            // Then map to "actual" space (exponential)
+            // Start earlier so lines emerge from center.
+            // Using -lineSpacing/2 ensures we have a line coming in from "behind" 0 as offset increases
+            for (let v = -lineSpacing / 2; v < radius; v += lineSpacing) {
+                const d_v = offset + v;
+                // If it's too close to center (or behind it), skip so we don't double draw over 0 if we don't want to
+                // But generally we want lines to start being visible very close to 0.
+                if (d_v <= 0.1) continue;
+
+                if (d_v > radius) continue;
+
+                // Normalize to 0..1
+                const t = d_v / radius;
+
+                // Apply exponent
+                const t_exp = Math.pow(t, exponent);
+
+                // Map back to pixels
+                // Enforce minimum 1px gap by blending linear spacing with exponential
+                // We want d_actual to increase by at least (lineWidth + 1px) for every 'lineSpacing' visible lines
+                // Line width is 2px, so we need 3px center-to-center spacing.
+                // The linear component coefficient B should satisfy B * (1/radius) * lineSpacing = 3
+                // So B = 3 * radius / lineSpacing
+                const linearFactor = (3 * radius) / lineSpacing;
+                // We want total distance at t=1 to be radius, so ExpCoef + LinCoef = radius
+                const expFactor = radius - linearFactor;
+
+                const d_actual = expFactor * t_exp + linearFactor * t;
+
+                // Calculate brightness
+                const brightnessFactor = centerBrightness + (1 - centerBrightness) * t_exp;
+                const r = Math.floor(baseColorRgb.r * brightnessFactor);
+                const g = Math.floor(baseColorRgb.g * brightnessFactor);
+                const b = Math.floor(baseColorRgb.b * brightnessFactor);
+
+                // DEBUG LOGGING
+                if (!isVertical && window.debugFrameCount < 15) {
+                    // Center 50% means within 0.25 * height of the center
+                    const range = cellHeight * 0.25;
+                    const dist = Math.abs(d_actual); // d_actual is distance from center
+                    if (dist < range) {
+                        console.log(`Frame ${window.debugFrameCount}: d_act=${d_actual.toFixed(2)}, t_exp=${t_exp.toFixed(3)}, Bri=${brightnessFactor.toFixed(3)}, RGB=${r},${g},${b}`);
+                    }
+                }
+
+                // Optimization: reuse color string if possible, but simplest is just set it
+                ctx.strokeStyle = `rgb(${r},${g},${b})`;
+
+                if (isVertical) {
+                    // Vertical lines moving left/right from center
+                    const xLeft = centerX - d_actual;
+                    ctx.moveTo(xLeft, cellY);
+                    ctx.lineTo(xLeft, cellY + cellHeight);
+
+                    const xRight = centerX + d_actual;
+                    ctx.moveTo(xRight, cellY);
+                    ctx.lineTo(xRight, cellY + cellHeight);
+                } else {
+                    // Horizontal lines moving up/down from center
+                    const yUp = centerY - d_actual;
+                    ctx.moveTo(cellX, yUp);
+                    ctx.lineTo(cellX + cellWidth, yUp);
+
+                    const yDown = centerY + d_actual;
+                    ctx.moveTo(cellX, yDown);
+                    ctx.lineTo(cellX + cellWidth, yDown);
+                }
+                // Must stroke per line to apply color change
+                ctx.stroke();
+                ctx.beginPath(); // Reset for next line
+            }
+        }
+
+        // --- Program 3: H-Lines Zoom In ---
+
+        class HLinesZoomInProgram {
+            constructor() {
+                this.config = {
+                    cellSizePercent: 1,
+                    expandSoloCell: true,
+                    lineSpacing: 10,   // Virtual distance between lines
+                    speed: 0.02,       // Virtual pixels per ms
+                    color: '#00FFFF',  // Cyan
+                    exponent: 4,       // Acceleration of lines
+                    centerBrightness: 0.07 // Brightness at center (0..1)
+                };
+
+                this.rgbColor = hexToRgb(this.config.color);
+
+                // Layout metrics
+                this.cols = 0;
+                this.rows = 0;
+                this.actualCellSize = 0; // Legacy / Fallback
+                this.cellWidth = 0;
+                this.cellHeight = 0;
+                this.gridOffsetX = 0;
+                this.gridOffsetY = 0;
+            }
+
+            getName() { return "H-Lines Zoom In"; }
+
+            resize(width, height) {
+                if (this.config.cellSizePercent === 1 && this.config.expandSoloCell) {
+                    // Special case: fill entire screen
+                    this.cols = 1;
+                    this.rows = 1;
+                    this.cellWidth = width;
+                    this.cellHeight = height;
+                    this.actualCellSize = Math.min(width, height);
+                    this.gridOffsetX = 0;
+                    this.gridOffsetY = 0;
+                } else {
+                    // Standard logic
+                    const minDim = Math.min(width, height);
+                    let size = Math.floor(minDim * this.config.cellSizePercent);
+                    size = Math.max(size, 1);
+                    this.actualCellSize = size;
+                    this.cellWidth = size;
+                    this.cellHeight = size;
+
+                    this.cols = Math.floor(width / size);
+                    this.rows = Math.floor(height / size);
+
+                    this.gridOffsetX = Math.floor((width - this.cols * size) / 2);
+                    this.gridOffsetY = Math.floor((height - this.rows * size) / 2);
+                }
+            }
+
+            loop(ctx, width, height, timestamp) {
+                // Clear screen
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.lineWidth = 2;
+
+                const virtualOffset = (timestamp * this.config.speed) % this.config.lineSpacing;
+
+                // For each cell
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
+                        const cellX = this.gridOffsetX + i * this.cellWidth;
+                        const cellY = this.gridOffsetY + j * this.cellHeight;
+
+                        ctx.save();
+                        // Clip to cell area
+                        ctx.beginPath();
+                        ctx.rect(cellX, cellY, this.cellWidth, this.cellHeight);
+                        ctx.clip();
+
+                        ctx.beginPath();
+                        drawZoomLines(
+                            ctx, cellX, cellY, this.cellWidth, this.cellHeight, virtualOffset,
+                            this.config.lineSpacing, this.config.exponent, false,
+                            this.rgbColor, this.config.centerBrightness
+                        );
+                        // Stroke is handled inside drawZoomLines now
+
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // --- Program 4: V-Lines Zoom In ---
+
+        class VLinesZoomInProgram {
+            constructor() {
+                this.config = {
+                    cellSizePercent: 1,
+                    expandSoloCell: true,
+                    lineSpacing: 10,
+                    speed: 0.02,
+                    color: '#FF00FF', // Magenta
+                    exponent: 4,
+                    centerBrightness: 0.07
+                };
+
+                this.rgbColor = hexToRgb(this.config.color);
+
+                this.cols = 0;
+                this.rows = 0;
+                this.actualCellSize = 0;
+                this.cellWidth = 0;
+                this.cellHeight = 0;
+                this.gridOffsetX = 0;
+                this.gridOffsetY = 0;
+            }
+
+            getName() { return "V-Lines Zoom In"; }
+
+            resize(width, height) {
+                if (this.config.cellSizePercent === 1 && this.config.expandSoloCell) {
+                    this.cols = 1;
+                    this.rows = 1;
+                    this.cellWidth = width;
+                    this.cellHeight = height;
+                    this.actualCellSize = Math.min(width, height);
+                    this.gridOffsetX = 0;
+                    this.gridOffsetY = 0;
+                } else {
+                    const minDim = Math.min(width, height);
+                    let size = Math.floor(minDim * this.config.cellSizePercent);
+                    size = Math.max(size, 1);
+                    this.actualCellSize = size;
+                    this.cellWidth = size;
+                    this.cellHeight = size;
+                    this.cols = Math.floor(width / size);
+                    this.rows = Math.floor(height / size);
+                    this.gridOffsetX = Math.floor((width - this.cols * size) / 2);
+                    this.gridOffsetY = Math.floor((height - this.rows * size) / 2);
+                }
+            }
+
+            loop(ctx, width, height, timestamp) {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, width, height);
+                ctx.lineWidth = 2;
+
+                const virtualOffset = (timestamp * this.config.speed) % this.config.lineSpacing;
+
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
+                        const cellX = this.gridOffsetX + i * this.cellWidth;
+                        const cellY = this.gridOffsetY + j * this.cellHeight;
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(cellX, cellY, this.cellWidth, this.cellHeight);
+                        ctx.clip();
+
+                        ctx.beginPath();
+                        drawZoomLines(
+                            ctx, cellX, cellY, this.cellWidth, this.cellHeight, virtualOffset,
+                            this.config.lineSpacing, this.config.exponent, true,
+                            this.rgbColor, this.config.centerBrightness
+                        );
+
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // --- Program 5: V+H-Lines Zoom In ---
+
+        class VHLinesZoomInProgram {
+            constructor() {
+                this.config = {
+                    cellSizePercent: 1,
+                    expandSoloCell: true,
+                    lineSpacing: 10,
+                    speed: 0.02,
+                    color: '#CCCC00', // Yellow
+                    exponent: 4,
+                    centerBrightness: 0.07
+                };
+
+                this.rgbColor = hexToRgb(this.config.color);
+
+                this.cols = 0;
+                this.rows = 0;
+                this.actualCellSize = 0;
+                this.cellWidth = 0;
+                this.cellHeight = 0;
+                this.gridOffsetX = 0;
+                this.gridOffsetY = 0;
+            }
+
+            getName() { return "V+H-Lines Zoom In"; }
+
+            resize(width, height) {
+                if (this.config.cellSizePercent === 1 && this.config.expandSoloCell) {
+                    this.cols = 1;
+                    this.rows = 1;
+                    this.cellWidth = width;
+                    this.cellHeight = height;
+                    this.actualCellSize = Math.min(width, height);
+                    this.gridOffsetX = 0;
+                    this.gridOffsetY = 0;
+                } else {
+                    const minDim = Math.min(width, height);
+                    let size = Math.floor(minDim * this.config.cellSizePercent);
+                    size = Math.max(size, 1);
+                    this.actualCellSize = size;
+                    this.cellWidth = size;
+                    this.cellHeight = size;
+                    this.cols = Math.floor(width / size);
+                    this.rows = Math.floor(height / size);
+                    this.gridOffsetX = Math.floor((width - this.cols * size) / 2);
+                    this.gridOffsetY = Math.floor((height - this.rows * size) / 2);
+                }
+            }
+
+            loop(ctx, width, height, timestamp) {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, width, height);
+                ctx.lineWidth = 2;
+
+                const virtualOffset = (timestamp * this.config.speed) % this.config.lineSpacing;
+
+                ctx.globalCompositeOperation = 'lighten';
+                for (let i = 0; i < this.cols; i++) {
+                    for (let j = 0; j < this.rows; j++) {
+                        const cellX = this.gridOffsetX + i * this.cellWidth;
+                        const cellY = this.gridOffsetY + j * this.cellHeight;
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(cellX, cellY, this.cellWidth, this.cellHeight);
+                        ctx.clip();
+
+                        ctx.beginPath();
+                        // Draw both
+                        drawZoomLines(
+                            ctx, cellX, cellY, this.cellWidth, this.cellHeight, virtualOffset,
+                            this.config.lineSpacing, this.config.exponent, false,
+                            this.rgbColor, this.config.centerBrightness
+                        );
+                        drawZoomLines(
+                            ctx, cellX, cellY, this.cellWidth, this.cellHeight, virtualOffset,
+                            this.config.lineSpacing, this.config.exponent, true,
+                            this.rgbColor, this.config.centerBrightness
+                        );
+
+                        ctx.restore();
+                    }
+                }
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+
+        // --- Program Manager ---
+
+        class ProgramManager {
+            constructor() {
+                this.programs = [];
+                this.currentIndex = 0;
+
+                // Double Buffering
+                this.offscreenCanvas = document.createElement('canvas');
+                this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+
+                // Pause and Time Control
+                this.paused = false;
+                this.animationTime = 0;
+                this.lastFrameTime = 0;
+            }
+
+            register(program) {
+                this.programs.push(program);
+            }
+
+            next() {
+                this.currentIndex = (this.currentIndex + 1) % this.programs.length;
+                this.triggerResize(); // Ensure new program fits
+                window.debugFrameCount = 0; // Reset debug counter so we catch the start of the new program
+                console.log("Switched to: " + this.programs[this.currentIndex].getName());
+            }
+
+            togglePause() {
+                this.paused = !this.paused;
+                console.log(this.paused ? "Paused" : "Resumed");
+            }
+
+            get currentProgram() {
+                return this.programs[this.currentIndex];
+            }
+
+            triggerResize() {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                canvas.width = w;
+                canvas.height = h;
+
+                // Resize offscreen buffer
+                this.offscreenCanvas.width = w;
+                this.offscreenCanvas.height = h;
+
+                if (this.currentProgram && this.currentProgram.resize) {
+                    this.currentProgram.resize(w, h);
+                }
+            }
+
+            start() {
+                window.addEventListener('resize', () => this.triggerResize());
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'n') {
+                        this.next();
+                    } else if (e.key === ' ') {
+                        // Prevent scrolling when pressing space
+                        e.preventDefault();
+                        this.togglePause();
+                    }
+                });
+
+                this.triggerResize();
+                this.loop(0);
+            }
+
+            loop(timestamp) {
+                // Initialize lastFrameTime
+                if (!this.lastFrameTime) this.lastFrameTime = timestamp;
+
+                const deltaTime = timestamp - this.lastFrameTime;
+                this.lastFrameTime = timestamp;
+
+                // Only advance animation time if not paused
+                if (!this.paused) {
+                    this.animationTime += deltaTime;
+                }
+
+                if (this.currentProgram) {
+                    // Pass the managed animationTime instead of wall-clock timestamp
+                    // Double Buffering: Draw to offscreen, then copy to screen
+                    this.currentProgram.loop(this.offscreenCtx, canvas.width, canvas.height, this.animationTime);
+                    ctx.drawImage(this.offscreenCanvas, 0, 0);
+                }
+
+                requestAnimationFrame((t) => this.loop(t));
+                window.debugFrameCount++;
+            }
+        }
+
+        // --- Init ---
+        const manager = new ProgramManager();
+        manager.register(new StackedGameOfLife());
+        manager.register(new SolidRectProgram());
+        manager.register(new HLinesZoomInProgram());
+        manager.register(new VLinesZoomInProgram());
+        manager.register(new VHLinesZoomInProgram());
+        manager.start();
+
+
 
     </script>
 </body>
