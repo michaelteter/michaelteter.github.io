@@ -1,1 +1,3 @@
 # michaelteter.com website/blog
+
+
