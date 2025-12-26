@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Tower Defense</title>
+    <style>
+        :root {
+            --bg-color: #0b0b0b;
+            --grid-line: #1a1a1a;
+            --text-color: #e0e0e0;
+            --accent-green: #00ff66;
+            --accent-red: #ff3333;
+            --accent-blue: #33ccff;
+            --panel-bg: #141414;
+            --ui-border: #333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: auto;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--ui-border);
+            cursor: crosshair;
+        }
+
+        #ui-panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--ui-border);
+            padding: 20px;
+            border-radius: 8px;
+            width: 800px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .tower-select {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tower-btn {
+            padding: 10px;
+            border: 2px solid transparent;
+            background-color: #222;
+            color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            white-space: normal;
+            line-height: 1.2;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .tower-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+        }
+
+        .tower-btn.selected {
+            border-color: #fff;
+            background-color: #333;
+        }
+
+        .btn-green { border-left: 4px solid var(--accent-green); }
+        .btn-red { border-left: 4px solid var(--accent-red); }
+        .btn-blue { border-left: 4px solid var(--accent-blue); }
+
+        .config-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            font-size: 11px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .config-group {
+            background: #1a1a1a;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .config-group h4 {
+            margin: 0 0 8px 0;
+            color: #ccc;
+            font-size: 12px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between; /* Space out label and input */
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .config-item label {
+            color: #888;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 8px;
+        }
+
+        /* Smaller inputs */
+        .config-item input {
+            background: #222;
+            border: 1px solid #333;
+            color: #ccc;
+            padding: 2px 4px;
+            border-radius: 3px;
+            width: 70px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .config-item label {
+            color: #888;
+        }
+
+        .config-item input {
+            background: #222;
+            border: 1px solid #333;
+            color: #ccc;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+
+        .config-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .config-col {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .config-col h5 {
+            margin: 0 0 5px 0;
+            color: var(--accent-green);
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 2px;
+        }
+
+        .config-col:nth-child(2) h5 { color: var(--accent-red); }
+        .config-col:nth-child(3) h5 { color: var(--accent-blue); }
+
+        .stats-bar {
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #888;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        #map-reference {
+            width: 800px;
+            border: 1px solid var(--ui-border);
+            border-radius: 4px;
+            background: var(--panel-bg);
+            margin-top: 0;
+            overflow: hidden;
+        }
+
+        #map-reference summary {
+            padding: 10px;
+            cursor: pointer;
+            background: #222;
+            color: #ccc;
+            user-select: none;
+            font-weight: bold;
+        }
+
+        #maps-container {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .map-entry {
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre;
+            background: #000;
+            padding: 10px;
+            border: 1px solid #333;
+            color: var(--accent-green);
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .map-title {
+            color: #888;
+            margin-bottom: 5px;
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+        .map-control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1a1a1a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .map-btn {
+            background: #333;
+            border: 1px solid #444;
+            color: #eee;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .map-btn:hover {
+            background: #444;
+            border-color: #fff;
+            color: #fff;
+        }
+
+        .map-btn:active {
+            transform: scale(0.95);
+        }
+
+        #map-current {
+            font-weight: bold;
+            color: var(--accent-green);
+            min-width: 20px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="stats-bar">
+            <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
+            <span>Wave: <span id="wave-display" class="stat-value">1</span></span>
+            <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+
+
+        <div id="ui-panel">
+            <div class="tower-select">
+                <h3>Towers</h3>
+                <button class="tower-btn btn-green" onclick="selectTower('green')">Laser Turret</button>
+                <button class="tower-btn btn-red" onclick="selectTower('red')">Missile Battery</button>
+                <button class="tower-btn btn-blue" onclick="selectTower('blue')">Pulse Disruptor</button>
+
+                <div class="map-section" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+                    <h3>Map</h3>
+                    <div class="map-control-row" style="justify-content: space-between;">
+                        <button id="map-prev" class="map-btn">&lt;</button>
+                        <span id="map-current" style="font-size: 16px;">1</span>
+                        <button id="map-next" class="map-btn">&gt;</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-panel" id="config-inputs">
+                <!-- Config inputs generated by JS -->
+            </div>
+        </div>
+
+        <details id="map-reference">
+            <summary>Map Reference (Debug)</summary>
+            <div id="maps-container"></div>
+        </details>
+    </div>
+
+<script src="maps.js"></script>
+<script src="enemies.js"></script>
+<script src="towers.js"></script>
+<script src="game.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('maps-container');
+        if (typeof Maps !== 'undefined') {
+            Maps.forEach((mapData, index) => {
+                const wrapper = document.createElement('div');
+
+                const title = document.createElement('div');
+                title.className = 'map-title';
+                title.textContent = `Map ${index}`;
+
+                const pre = document.createElement('div');
+                pre.className = 'map-entry';
+                pre.textContent = mapData.trim();
+
+                wrapper.appendChild(title);
+                wrapper.appendChild(pre);
+                container.appendChild(wrapper);
+            });
+        }
+    });
+</script>
+</body>
+</html>
