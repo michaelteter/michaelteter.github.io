@@ -2,7 +2,7 @@
 
 <resume@michaelteter.com> | +1-817-500-5607 | [LinkedIn](https://www.linkedin.com/in/michaelteter) | [GitHub](https://github.com/michaelteter) | US / Global / Remote
 
-## Technical Solutions Consultant | Sales Engineer
+## Forward Deployed Engineer | Technical Solutions Consultant
 
 Technical Solutions Consultant with extensive experience bridging business needs and engineering capabilities. I specialize in understanding unique customer scenarios, translating requirements into practical technical approaches, and guiding stakeholders toward clear, confident decisions. My strength is connecting the 'what' and the 'how', quickly grasping the structure of a system, mapping it to a customer’s goals, and communicating the best path forward.
 
@@ -22,17 +22,17 @@ With a background spanning software engineering, architecture, integration, syst
 
 ## Core Competencies
 
-- **Specialties:** Requirements Discovery, Solution Design, Systems Integration, Technical Troubleshooting, Architecture Review, API Analysis, Cross-Functional Collaboration, Client Communication, Technical Demos, Process Optimization
-- **Languages/Frameworks:** Ruby/Rails, Python, Elixir/Phoenix, Java/C++ (legacy experience), JavaScript
-- **Databases:** PostgreSQL, MySQL, Other RDBMSs
+- **Specialties:** Requirements Discovery, Solution Design, Systems Integration, Technical Troubleshooting, Architecture Review, Cross-Functional Collaboration, Client Communication, POC Creation, Technical Demos, Process Optimization
+- **Languages/Frameworks:** Elixir/Phoenix LiveView, Ruby/Rails, Python, JavaScript, Java/C++ (legacy experience)
+- **Databases:** PostgreSQL, MySQL, NoSQL
 
 ---
 
 ## Professional Experience
 
-### Technical Consultant / Solutions Engineer — Freelance Consulting
+### Software Engineer & IT Consultant — Freelance Consulting
 
-**Location:** Remote | **Dates:** 2015-09 – present
+**Location:** remote | **Dates:** 2015-09 – present
 
 - Partner with clients to clarify business goals, analyze workflows, and design technical approaches that address operational challenges.
 - Guide customers through the evaluation of system capabilities, explaining concepts clearly for both technical and non-technical stakeholders.
@@ -42,14 +42,14 @@ With a background spanning software engineering, architecture, integration, syst
 
 ### Senior Software Engineer — Biller.AI
 
-**Location:** Netherlands (Remote) | **Dates:** 2022-01 – 2022-07
+**Location:** Netherlands remote | **Dates:** 2022-01 – 2022-07
 
 - Worked closely with product, engineering, and business stakeholders to understand requirements and translate them into practical API-driven solutions.
 - Conducted architecture reviews and guided developers through design decisions that improved system clarity and maintainability.
 
 ### Senior Software Engineer / SCRUM Master — YoungCapital
 
-**Location:** Netherlands (Remote) | **Dates:** 2020-01 – 2021-09
+**Location:** Netherlands remote | **Dates:** 2020-01 – 2021-09
 
 - Partnered with product, UX, and business stakeholders to build and launch a workflow automation system that reduced HR onboarding timelines from weeks to days and eliminated candidate drop-off.
 - Analyzed backend data usage patterns to optimize cloud resource allocation, reducing operating costs while improving system responsiveness for internal users.
@@ -57,7 +57,7 @@ With a background spanning software engineering, architecture, integration, syst
 - Contributed to product and UX discussions, helping translate business needs into workable system designs and clear implementation plans.
 - Provided cross-functional leadership as SCRUM Master, aligning engineering efforts with business priorities and improving team communication.
 
-### Senior Software Engineer & Infrastructure Manager — IMC
+### Software Developer & Infrastructure Manager — IMC
 
 **Location:** Amsterdam, NL | **Dates:** 2012-09 – 2015-08
 
@@ -70,17 +70,17 @@ With a background spanning software engineering, architecture, integration, syst
 - Planned and designed server rooms and supporting infrastructure for offices in New York and Amsterdam, ensuring capacity, safety, and operational resilience.
 - Delivered a new infrastructure platform providing high availability across US and EU regions, improved compute performance for quantitative research, and near-zero downtime in the event of hardware failures.
 
-### Technical Consultant & Solutions Engineer — Freelance
+### Software Engineer & IT Generalist — Freelance
 
-**Location:** US (Remote) | **Dates:** 2011-03 – 2012-07
+**Location:** US remote | **Dates:** 2011-03 – 2012-07
 
 - Designed and delivered e-commerce and business workflow applications tailored to the requirements of small and midsize businesses.
 - Advised non-technical business owners on technical decisions, translating abstract requirements into clear implementation plans and long-term architecture considerations.
 - Helped organizations adopt new tools and platforms by providing structured onboarding support, documentation, and training.
 
-### Technical Consultant / Software Engineer — Martin Dawes Analytics (Lavastorm)
+### Software Engineer — Martin Dawes Analytics (Lavastorm)
 
-**Location:** Global (Remote) | **Dates:** 2008-03 – 2011-09
+**Location:** Global remote | **Dates:** 2008-03 – 2011-09
 
 - Served as a technical consultant for Fortune 100 and global telecom providers, identifying millions in revenue leakage through switch-to-bill reconciliation and data analysis.
 - Provided on-site and remote training for clients worldwide, equipping teams with the tools and understanding needed to analyze revenue assurance issues.
@@ -96,9 +96,9 @@ With a background spanning software engineering, architecture, integration, syst
 - Developed ETL workflows to unify disparate datasets from acquisitions, improving reporting accuracy and decision-making.
 - Supported leadership with technology evaluations, risk assessments, and long-term system planning.
 
-### Software Engineer — TeleCheck, IBM, NEC America, CompUSA, St. Gobain, Ensemble Studios, MCI/Worldcom
+### Software Engineer — Previous Work at TeleCheck, IBM, NEC America, CompUSA, St. Gobain, Ensemble Studios, MCI/Worldcom
 
-**Location:** United States | **Dates:** 1993 – 2001
+**Location:** US | **Dates:** 1993 – 2001
 
 - Contributed to development of tools and components for AAA game production environments.
 - Designed manufacturing monitoring and management systems supporting high-volume industrial operations.
@@ -112,4 +112,4 @@ With a background spanning software engineering, architecture, integration, syst
 **Principia College** — B.S., Computer Science
 Illinois, USA | 1989–1993
 
-<!-- ATS Keywords: Solutions Engineering, Pre-Sales Consulting, Systems Architecture, API Integration, Technical Discovery, Business Analysis, Data Workflows, Stakeholder Communication, Solution Design, Cross-Functional Leadership, Technical Consulting, Requirements Gathering, Technical Demos, Process Optimization, Presales -->
+<!-- ATS Keywords: Forward Deployed Engineer, Implementation Engineer, Solutions Engineering, Pre-Sales Consulting, Systems Architecture, API Integration, Technical Discovery, Business Analysis, Data Workflows, Stakeholder Communication, Solution Design, Cross-Functional Leadership, Technical Consulting, Requirements Gathering, Technical Demos, Process Optimization, Presales -->
