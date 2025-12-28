@@ -107,6 +107,8 @@ const bgMusic = new Audio(); // Start empty
 bgMusic.loop = false; // Playlist handling instead of loop
 bgMusic.volume = (typeof CONSTS !== 'undefined' && CONSTS.MUSIC_VOLUME !== undefined) ? CONSTS.MUSIC_VOLUME : 0.5;
 
+const ActiveSFX = [];
+
 let currentSongIndex = 0;
 
 function playNextSong() {
@@ -145,6 +147,7 @@ let EndCells = [];
 
 function loadMap(index) {
     if (index < 0 || index >= Maps.length) return;
+    stopAllSFX(); // Clear any lingering sounds from previous map/pause
     State.mapIndex = index;
     State.gameId++; // Invalidate previous session spawns
     // User requested to ignore the first newline if present
@@ -272,8 +275,44 @@ function playSound(filename, volumeScale = 1.0) {
 
     const baseVol = (typeof CONSTS !== 'undefined' && CONSTS.SFX_VOLUME) ? CONSTS.SFX_VOLUME : 0.5;
     audio.volume = Math.max(0, Math.min(1, baseVol * volumeScale)); // Clamp 0-1
-    audio.play().catch(e => { /* Ignore auto-play blocks or missing files */ });
+
+    // Register Active Sound
+    ActiveSFX.push(audio);
+    audio.onended = () => {
+        const idx = ActiveSFX.indexOf(audio);
+        if (idx !== -1) ActiveSFX.splice(idx, 1);
+    };
+
+    audio.play().catch(e => {
+        // Auto-play block or other error
+        const idx = ActiveSFX.indexOf(audio);
+        if (idx !== -1) ActiveSFX.splice(idx, 1);
+    });
     return audio;
+}
+
+function stopAllSFX() {
+    // Stop all standalone SFX
+    ActiveSFX.forEach(audio => {
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+        } catch (e) { /* ignore */ }
+    });
+    ActiveSFX.length = 0; // Clear Array
+
+    // Stop Tower Loops / States
+    State.towers.forEach(t => {
+        if (t.soundInstance) {
+            try {
+                t.soundInstance.pause();
+                t.soundInstance.currentTime = 0;
+            } catch (e) { }
+            t.soundInstance = null;
+        }
+        t.isEmitting = false;
+        // Don't reset firing state logical timers necessarily, just the sound
+    });
 }
 
 // --- Helpers ---
@@ -1631,6 +1670,7 @@ function triggerGameOver() {
 }
 
 function resetGame() {
+    stopAllSFX();
     const panelGameOver = document.getElementById('game-over-panel');
     if (panelGameOver) panelGameOver.style.display = 'none';
 
@@ -1875,6 +1915,9 @@ function gameLoop(timestamp) {
 function togglePause() {
     if (State.gameOver) return; // Locked
     State.paused = !State.paused;
+    if (State.paused) {
+        stopAllSFX();
+    }
     updatePauseButton();
     if (!State.paused && !State.roundActive && State.enemies.length === 0) {
         if (State.wave === 1 && State.enemiesSpawnedThisRound === 0) {

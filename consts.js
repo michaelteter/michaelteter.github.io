@@ -24,6 +24,7 @@ const CONSTS = {
     "MidnightVectorSiege_1.mp3",
     "MidnightVectorSiege_2.mp3",
     "NightfallGroove.mp3",
+    "VectorRamparts.mp3",
     "VectorGridDefensive.mp3",
     "VectorLinesLaserMines.mp3"
   ]
