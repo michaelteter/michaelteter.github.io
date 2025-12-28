@@ -113,9 +113,19 @@ let currentSongIndex = 0;
 
 function playNextSong() {
     if (typeof CONSTS === 'undefined' || !CONSTS.SONGS || CONSTS.SONGS.length === 0) return;
+
     currentSongIndex = (currentSongIndex + 1) % CONSTS.SONGS.length;
+
     bgMusic.src = CONSTS.SONGS[currentSongIndex];
     bgMusic.play().catch(e => console.log("Next song play failed:", e));
+
+    // Force State / UI Sync
+    State.musicPlaying = true;
+    const btn = document.getElementById('btn-music');
+    if (btn) {
+        btn.innerHTML = "&#10074;&#10074; Music";
+        btn.classList.add('active');
+    }
 }
 window.playNextSong = playNextSong;
 
