@@ -12,18 +12,19 @@ const CONSTS = {
   SHIPS_PER_WAVE: 10,
   START_MONEY: 100,
   START_LIVES: 10,
+  DIFFICULTY_INCREASE_FACTOR: 1.1,
   INITIAL_MUSIC_STATE: "off",
   MUSIC_VOLUME: 0.5,
   SFX_VOLUME: 0.8,
   RANDOM_FIRST_SONG: true,
   SONGS: [
-    "MidnightVectorSeige_1.mp3",
-    "MidnightVectorSeige_2.mp3",
-    "GeometricLinesofDefense_2.mp3",
-    "VectorGridDefensive.mp3",
     "ApocalypseDemoRun_2.mp3",
     "GeometricLinesofDefense_1.mp3",
+    "GeometricLinesofDefense_2.mp3",
+    "MidnightVectorSiege_1.mp3",
+    "MidnightVectorSiege_2.mp3",
     "NightfallGroove.mp3",
+    "VectorGridDefensive.mp3",
     "VectorLinesLaserMines.mp3"
   ]
 };

@@ -647,7 +647,7 @@ function toggleMusic() {
         // Ensure UI stays "Music On"
         const btn = document.getElementById('btn-music');
         if (btn) {
-            btn.innerText = "Music On";
+            btn.innerHTML = "&#10074;&#10074; Music";
             btn.classList.add('active');
         }
         return;
@@ -674,13 +674,13 @@ function toggleMusic() {
 
         bgMusic.play().catch(e => console.log("Audio play failed (user interaction needed?):", e));
         if (btn) {
-            btn.innerText = "Music On";
+            btn.innerHTML = "&#10074;&#10074; Music";
             btn.classList.add('active');
         }
     } else {
         bgMusic.pause();
         if (btn) {
-            btn.innerText = "Music Off";
+            btn.innerHTML = "&#9658; Music";
             btn.classList.remove('active');
         }
     }
@@ -1006,13 +1006,24 @@ function spawnEnemy(startPos) {
         // Properties are stored as "greenHP", "greenSpeed" etc.
         hp = GameConfig[type + 'HP'] !== undefined ? GameConfig[type + 'HP'] : def.hp;
         speed = GameConfig[type + 'Speed'] !== undefined ? GameConfig[type + 'Speed'] : def.speed;
+        value = GameConfig[type + 'Value'] !== undefined ? GameConfig[type + 'Value'] : (def.value || 10);
 
     } else {
         // Legacy Fallback
         speed = (type === 'green') ? GameConfig.greenSpeed : GameConfig.orangeSpeed;
         hp = (type === 'green') ? GameConfig.greenHP : GameConfig.orangeHP;
+        value = 10;
         color = (type === 'green') ? '#00ff66' : '#ffaa00';
     }
+
+    // Difficulty Scaling
+    const numEnemyTypes = (typeof ENEMIES !== 'undefined' ? ENEMIES.length : 2);
+    const setsCompleted = Math.floor((State.wave - 1) / numEnemyTypes);
+    const difficultyFactor = (typeof CONSTS !== 'undefined' && CONSTS.DIFFICULTY_INCREASE_FACTOR) ? CONSTS.DIFFICULTY_INCREASE_FACTOR : 1.1;
+    const scalingFactor = Math.pow(difficultyFactor, setsCompleted);
+
+    hp = hp * scalingFactor;
+    value = Math.floor(value * scalingFactor);
 
     // Determine Direction (Primitive: assumes edge entry)
     let vx = 0, vy = 0;
@@ -1031,6 +1042,7 @@ function spawnEnemy(startPos) {
         entryRow: row,
         hp: hp,
         maxHp: hp,
+        value: value,
         speed: speed, // Base speed
         vx: vx,
         vy: vy,
@@ -1215,7 +1227,7 @@ function update(dt) {
                  triggerGameOver();
              }
         } else if (e.hp <= 0) {
-            State.money += 10;
+            State.money += (e.value || 10);
             updateStats();
 
             if (typeof ENEMIES !== 'undefined') {
