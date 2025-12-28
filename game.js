@@ -234,14 +234,29 @@ function loadMap(index) {
 const SoundBank = {};
 
 function preloadSounds() {
-    if (typeof TOWER_TYPES === 'undefined') return;
-    Object.values(TOWER_TYPES).forEach(def => {
-        if (def.fire_sound) {
-            const a = new Audio(def.fire_sound);
-            a.preload = 'auto';
-            SoundBank[def.fire_sound] = a;
-        }
-    });
+    if (typeof TOWER_TYPES !== 'undefined') {
+        Object.values(TOWER_TYPES).forEach(def => {
+            if (def.fire_sound) {
+                const a = new Audio(def.fire_sound);
+                a.preload = 'auto';
+                SoundBank[def.fire_sound] = a;
+            }
+            if (def.explode_sound) {
+                const a = new Audio(def.explode_sound);
+                a.preload = 'auto';
+                SoundBank[def.explode_sound] = a;
+            }
+        });
+    }
+    if (typeof ENEMIES !== 'undefined') {
+        ENEMIES.forEach(def => {
+            if (def.explode_sound) {
+                const a = new Audio(def.explode_sound);
+                a.preload = 'auto';
+                SoundBank[def.explode_sound] = a;
+            }
+        });
+    }
 }
 
 function playSound(filename, volumeScale = 1.0) {
@@ -645,8 +660,12 @@ function toggleMusic() {
         // Initialize if src is empty
         if (!bgMusic.src || bgMusic.src === '') {
              if (typeof CONSTS !== 'undefined' && CONSTS.SONGS && CONSTS.SONGS.length > 0) {
-                 bgMusic.src = CONSTS.SONGS[0];
-                 currentSongIndex = 0;
+                 if (CONSTS.RANDOM_FIRST_SONG) {
+                     currentSongIndex = Math.floor(Math.random() * CONSTS.SONGS.length);
+                 } else {
+                     currentSongIndex = 0;
+                 }
+                 bgMusic.src = CONSTS.SONGS[currentSongIndex];
              } else {
                  // Fallback if no songs defined?
                  bgMusic.src = 'GeometricLinesofDefense_2.mp3';
@@ -758,9 +777,11 @@ function setupEvents() {
     // Export toggleMusic for global access
     window.toggleMusic = toggleMusic;
 
-    // Game Over / New Game
     const btnNewGame = document.getElementById('btn-new-game');
     if (btnNewGame) btnNewGame.addEventListener('click', resetGame);
+
+    const btnRestart = document.getElementById('btn-restart');
+    if (btnRestart) btnRestart.addEventListener('click', resetGame);
 }
 
 function renderStaticBackground() {
@@ -1183,6 +1204,9 @@ function update(dt) {
              // For now, assume any exit reduces lives
              State.lives--;
              State.flashLife = CONSTS.EXIT_FLASH_DURATION; // Trigger Flash
+             if (typeof CONSTS !== 'undefined' && CONSTS.EXIT_ALARM_SOUND) {
+                 playSound(CONSTS.EXIT_ALARM_SOUND, CONSTS.EXIT_ALARM_VOLUME || 1.0);
+             }
              updateStats();
 
              State.enemies.splice(i, 1);
@@ -1193,6 +1217,14 @@ function update(dt) {
         } else if (e.hp <= 0) {
             State.money += 10;
             updateStats();
+
+            if (typeof ENEMIES !== 'undefined') {
+                 const def = ENEMIES.find(def => def.id === e.type);
+                 if (def && def.explode_sound) {
+                     playSound(def.explode_sound, def.explode_sound_volume || 1.0);
+                 }
+            }
+
             State.enemies.splice(i, 1);
             spawnDebris(e.x, e.y, e.color, 20); // Use enemy color for death
         }
@@ -1549,6 +1581,10 @@ function triggerGameOver() {
             if (t.def && t.def.color) color = t.def.color;
             else if (TOWER_TYPES[t.type]) color = TOWER_TYPES[t.type].color;
 
+            if (t.def && t.def.explode_sound) {
+                 playSound(t.def.explode_sound, t.def.explode_sound_volume || 1.0);
+            }
+
             spawnDebris(t.x, t.y, color, 150, 5.0, 2.0);
             State.towers = State.towers.filter(activeT => activeT !== t);
         }, delay);
@@ -1559,6 +1595,13 @@ function triggerGameOver() {
     enemiesToExplode.forEach(e => {
         const delay = Math.random() * 1000;
         setTimeout(() => {
+            if (typeof ENEMIES !== 'undefined') {
+                 const def = ENEMIES.find(def => def.id === e.type);
+                 if (def && def.explode_sound) {
+                     playSound(def.explode_sound, def.explode_sound_volume || 1.0);
+                 }
+            }
+
             spawnDebris(e.x, e.y, e.color || '#ff8800', 100, 4.0, 1.5);
             State.enemies = State.enemies.filter(activeE => activeE !== e);
         }, delay);
@@ -1584,7 +1627,7 @@ function resetGame() {
     if(stats) stats.style.display = 'flex';
 
     const controls = document.querySelector('.controls-row');
-    if(controls) controls.style.display = 'block';
+    if(controls) controls.style.display = 'flex';
 
     const towerSelect = document.querySelector('.tower-select');
     if(towerSelect) towerSelect.style.display = 'grid';
@@ -1795,7 +1838,9 @@ function render() {
         ctx.globalAlpha = Math.max(0, State.flashLife / CONSTS.EXIT_FLASH_DURATION);
         ctx.strokeStyle = CONSTS.EXIT_FLASH_COLOR;
         ctx.lineWidth = 2; // Make it slightly thicker for visibility
-        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+        const flashW = COLS * TILE_SIZE * appScale;
+        const flashH = ROWS * TILE_SIZE * appScale;
+        ctx.strokeRect(1, 1, flashW - 2, flashH - 2);
         ctx.restore();
     }
 }
@@ -1838,6 +1883,7 @@ function updatePauseButton() {
         // Logic: State.paused is TRUE -> Button shows PLAY Icon -> Green.
         // Logic: State.paused is FALSE -> Button shows PAUSE Icon -> Orange.
         btn.style.color = State.paused ? 'var(--accent-green)' : '#ffaa00';
+        btn.style.borderColor = btn.style.color;
     }
 }
 
