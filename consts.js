@@ -10,7 +10,7 @@ const CONSTS = {
   SHIPS_PER_WAVE: 10,
   START_MONEY: 100,
   START_LIVES: 10,
-  INITIAL_MUSIC_STATE: "on",
+  INITIAL_MUSIC_STATE: "off",
   MUSIC_VOLUME: 0.5,
   SFX_VOLUME: 0.8,
   SONGS: [
@@ -115,7 +115,7 @@ const TOWER_TYPES = {
         shape: "three_pointed_star",
         targeting_mode: TARGETING_MODES.fixed,
         fire_sound: "sci-fi-launch-3-351238.wav",
-        fire_sound_volume: 1.0,
+        fire_sound_volume: 0.7,
         explode_sound: "",
         explode_sound_volume: 1.0,
         price: 40,

@@ -47,10 +47,10 @@ const LayoutGroups = [
         title: "Towers",
         type: "columns",
         columns: [
-            { title: "Green", keys: ['greenDamage', 'greenRange', 'greenDelay'] },
-            { title: "Red", keys: ['redDamage', 'redRange', 'redDelay'] },
-            { title: "Blue", keys: ['blueDamage', 'blueRadius', 'blueDelay', 'blueSlowFactor', 'blueDuration'] },
-            { title: "Purple", keys: ['purpleDamage', 'purpleRange', 'purpleDelay'] }
+            { title: "Green", id: 'green', keys: ['greenDamage', 'greenRange', 'greenDelay'] },
+            { title: "Red", id: 'red', keys: ['redDamage', 'redRange', 'redDelay'] },
+            { title: "Blue", id: 'blue', keys: ['blueDamage', 'blueRadius', 'blueDelay', 'blueSlowFactor', 'blueDuration'] },
+            { title: "Purple", id: 'purple', keys: ['purpleDamage', 'purpleRange', 'purpleDelay'] }
         ]
     },
     {
@@ -58,6 +58,7 @@ const LayoutGroups = [
         type: "columns",
         columns: (typeof ENEMIES !== 'undefined' ? ENEMIES.map(e => ({
             title: e.name,
+            color: e.color,
             keys: [`${e.id}HP`, `${e.id}Speed`]
         })) : [])
     },
@@ -67,6 +68,14 @@ const LayoutGroups = [
         keys: ['particleLife']
     }
 ];
+
+// --- State Management ---
+// ... (Lines 71-454 omitted for brevity, ensure context match if replacing large chunk or stick to small chunks)
+// Actually I need to be careful with replace_file_content. It replaces the TargetContent.
+// I should split this into two calls or ensure I match the large block perfectly.
+// Since LayoutGroups is separate from setupInputs in the file, I should do them separately or assume I can't reach both in one block if they are far apart.
+// LayoutGroups is lines 44-69. setupInputs is line 451.
+// They are far apart. I will do LayoutGroups first, then setupInputs.
 
 // --- State Management ---
 const State = {
@@ -414,10 +423,33 @@ function init() {
     loadMap(0); // Load default map BEFORE events (resize)
     setupEvents();
 
-    if (typeof CONSTS !== 'undefined' && CONSTS.INITIAL_MUSIC_STATE && CONSTS.INITIAL_MUSIC_STATE.toLowerCase() === 'on') {
-        // Attempt to start music
-        if (!State.musicPlaying) {
-             toggleMusic();
+    const splash = document.getElementById('splash-screen');
+    const startBtn = document.getElementById('btn-start-game');
+    const container = document.getElementById('game-container');
+
+    if (splash && startBtn) {
+        // Splash Mode
+        if (container) container.classList.add('blurred');
+
+        startBtn.addEventListener('click', () => {
+             splash.style.display = 'none';
+             if (container) container.classList.remove('blurred');
+
+             // Unlock Audio / Start Music on Interaction
+             if (typeof CONSTS !== 'undefined' && CONSTS.INITIAL_MUSIC_STATE && CONSTS.INITIAL_MUSIC_STATE.toLowerCase() === 'on') {
+                if (!State.musicPlaying) {
+                    toggleMusic();
+                }
+             }
+        });
+
+    } else {
+        // Legacy / No Splash Mode
+        if (typeof CONSTS !== 'undefined' && CONSTS.INITIAL_MUSIC_STATE && CONSTS.INITIAL_MUSIC_STATE.toLowerCase() === 'on') {
+            // Attempt to start music (might be blocked by browser)
+            if (!State.musicPlaying) {
+                 toggleMusic();
+            }
         }
     }
 
@@ -427,15 +459,62 @@ function init() {
 
 function setupInputs() {
     const panel = document.getElementById('config-inputs');
+    if (!panel) return; // Guard against missing panel
     panel.innerHTML = '';
 
-    LayoutGroups.forEach(group => {
+    // Create Tab Bar
+    const tabBar = document.createElement('div');
+    tabBar.className = 'config-tabs';
+    panel.appendChild(tabBar);
+
+    // Container for all sections
+    const contentContainer = document.createElement('div');
+    panel.appendChild(contentContainer);
+
+    const sections = [];
+    const buttons = [];
+
+    LayoutGroups.forEach((group, index) => {
+        // Map titles if needed (Ships -> Enemies)
+        let tabTitle = group.title;
+        if (tabTitle === 'Ships') tabTitle = 'Enemies';
+
+        // Create Button
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn';
+        if (index === 0) btn.classList.add('active');
+        btn.textContent = tabTitle;
+        tabBar.appendChild(btn);
+        buttons.push(btn);
+
+        // Create Section
+        const section = document.createElement('div');
+        section.className = 'config-section';
+        if (index === 0) section.classList.add('active');
+        contentContainer.appendChild(section);
+        sections.push(section);
+
+        // Click Handler
+        btn.addEventListener('click', () => {
+            // Deactivate all
+            buttons.forEach(b => b.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
+
+            // Activate current
+            btn.classList.add('active');
+            section.classList.add('active');
+        });
+
+        // Fill Section Content (Original Logic)
         const groupDiv = document.createElement('div');
         groupDiv.className = 'config-group';
+        // groupDiv.style.border = 'none'; // Optional cleanup since tabs handle separation
+        // groupDiv.style.background = 'transparent';
 
-        const header = document.createElement('h4');
-        header.textContent = group.title;
-        groupDiv.appendChild(header);
+        // We don't need the header h4 inside the section anymore since we have tabs
+        // const header = document.createElement('h4');
+        // header.textContent = group.title;
+        // groupDiv.appendChild(header);
 
         if (group.type === 'columns') {
             const rowDiv = document.createElement('div');
@@ -447,6 +526,14 @@ function setupInputs() {
 
                 const colTitle = document.createElement('h5');
                 colTitle.textContent = col.title;
+
+                // Dynamic Color Application
+                let color = col.color;
+                if (!color && col.id && typeof TOWER_TYPES !== 'undefined' && TOWER_TYPES[col.id]) {
+                     color = TOWER_TYPES[col.id].color;
+                }
+                if (color) colTitle.style.color = color;
+
                 colDiv.appendChild(colTitle);
 
                 col.keys.forEach(key => createInput(colDiv, key));
@@ -457,10 +544,7 @@ function setupInputs() {
             // Simple list
             group.keys.forEach(key => createInput(groupDiv, key));
         }
-
-        // Inject Map Control into Misc (REMOVED - Moved to static UI)
-
-        panel.appendChild(groupDiv);
+        section.appendChild(groupDiv);
     });
 }
 
@@ -468,7 +552,7 @@ function createInput(container, key) {
     const div = document.createElement('div');
     div.className = 'config-item';
     // Beautify label
-    let label = key.replace(/green|red|blue|orange|Enemy/g, '');
+    let label = key.replace(/green|red|blue|orange|yellow|purple|Enemy/g, '');
     if(label === 'HP') label = 'HP';
     else label = label.charAt(0).toUpperCase() + label.slice(1);
 
@@ -538,6 +622,22 @@ function handleResize() {
 
 function toggleMusic() {
     window.toggleMusic = toggleMusic; // Ensure global access
+
+    // Fix for Autoplay Policy:
+    // If logically "On" but physically "Paused", this click is the user interaction we need to start it.
+    // Don't toggle off; just play.
+    if (State.musicPlaying && bgMusic.paused) {
+        bgMusic.play().catch(e => console.log("Resuming audio failed:", e));
+
+        // Ensure UI stays "Music On"
+        const btn = document.getElementById('btn-music');
+        if (btn) {
+            btn.innerText = "Music On";
+            btn.classList.add('active');
+        }
+        return;
+    }
+
     State.musicPlaying = !State.musicPlaying;
     const btn = document.getElementById('btn-music');
 
@@ -1425,13 +1525,13 @@ function triggerGameOver() {
     deselectTowerInstance();
 
     // UI Updates
-    const panelSelect = document.querySelector('.tower-select');
-    const panelContext = document.querySelector('.tower-context-panel');
+    // Hide ALL standard panels
+    const uiElements = document.querySelectorAll('.stats-bar, .controls-row, .tower-select, .tower-context-panel, .config-panel');
+    uiElements.forEach(el => { if(el) el.style.display = 'none'; });
+
     const panelGameOver = document.getElementById('game-over-panel');
     const survivedWavesLbl = document.getElementById('survived-waves');
 
-    if (panelSelect) panelSelect.style.display = 'none';
-    if (panelContext) panelContext.style.display = 'none';
     if (panelGameOver) {
         panelGameOver.style.display = 'flex';
         // Survived waves is current wave - 1 (completed waves)
@@ -1476,11 +1576,25 @@ function triggerGameOver() {
 }
 
 function resetGame() {
-    const panelSelect = document.querySelector('.tower-select');
     const panelGameOver = document.getElementById('game-over-panel');
-
     if (panelGameOver) panelGameOver.style.display = 'none';
-    if (panelSelect) panelSelect.style.display = 'grid'; // Restore grid layout
+
+    // Restore Standard UI
+    const stats = document.querySelector('.stats-bar');
+    if(stats) stats.style.display = 'flex';
+
+    const controls = document.querySelector('.controls-row');
+    if(controls) controls.style.display = 'block';
+
+    const towerSelect = document.querySelector('.tower-select');
+    if(towerSelect) towerSelect.style.display = 'grid';
+
+    const config = document.querySelector('.config-panel');
+    if(config) config.style.display = 'flex';
+
+    // Check if tower context should be hidden (it's hidden by default, and we deselected)
+    const towerCtx = document.querySelector('.tower-context-panel');
+    if(towerCtx) towerCtx.style.display = 'none';
 
     // Reload current map to reset logic state
     loadMap(State.mapIndex);
@@ -1715,8 +1829,15 @@ function togglePause() {
 function updatePauseButton() {
     const btn = document.getElementById('btn-play-pause');
     if (btn) {
-        btn.innerHTML = State.paused ? '&#9658;' : '&#10074;&#10074;';
-        btn.style.color = State.paused ? 'var(--accent-green)' : 'var(--accent-red)';
+        // Use a fixed-width span for the icon to prevent shifting
+        const icon = State.paused ? '&#9658;' : '&#10074;&#10074;';
+        btn.innerHTML = `<span style="display:inline-block; width: 24px; text-align:center;">${icon}</span> Game`;
+
+        // Change color: Green for Play (when paused), Orange for Pause (when playing)
+        // Original request: "Pause color be orange instead of red".
+        // Logic: State.paused is TRUE -> Button shows PLAY Icon -> Green.
+        // Logic: State.paused is FALSE -> Button shows PAUSE Icon -> Orange.
+        btn.style.color = State.paused ? 'var(--accent-green)' : '#ffaa00';
     }
 }
 

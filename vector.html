@@ -151,33 +151,35 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 2px; /* Compact */
         }
 
         .config-item label {
             color: #888;
             flex: 1;
-            white-space: nowrap;
+            white-space: normal; /* Allow wrap */
             overflow: hidden;
-            text-overflow: ellipsis;
-            margin-right: 8px;
+            font-size: 10px; /* Smaller */
+            margin-right: 4px;
+            line-height: 1.1;
         }
 
         .config-item input {
             background: #222;
             border: 1px solid #333;
             color: #ccc;
-            padding: 2px 4px;
+            padding: 1px 4px;
             border-radius: 3px;
-            width: 70px;
+            width: 45px; /* Compact */
             text-align: right;
             font-family: monospace;
+            font-size: 10px;
         }
 
         .config-row {
-            display: flex;
-            flex-direction: column; /* Stack columns vertically for sidebar */
-            gap: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px 0; /* Vertical Gap between rows | Horizontal Gap */
         }
 
         .config-col {
@@ -186,20 +188,27 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            box-sizing: border-box;
+        }
+
+        /* Divider & Spacing Controls */
+        .config-col:nth-child(odd) {
+            padding-right: 12px; /* Spacing between Left Column and Divider */
+        }
+
+        .config-col:nth-child(even) {
+            border-left: 1px solid #333; /* The Vertical Divider Line */
+            padding-left: 12px; /* Spacing between Divider and Right Column */
         }
 
         .config-col h5 {
             margin: 0 0 5px 0;
-            color: var(--accent-green);
+            color: #ccc; /* Default neutral, JS will override */
             font-size: 11px;
             text-transform: uppercase;
             border-bottom: 1px solid #333;
             padding-bottom: 2px;
         }
-
-        .config-col:nth-child(2) h5 { color: var(--accent-red); }
-        .config-col:nth-child(3) h5 { color: var(--accent-blue); }
-        .config-col:nth-child(4) h5 { color: var(--accent-purple); }
 
         .stats-bar {
             width: 100%;
@@ -306,6 +315,79 @@
             font-family: monospace;
             font-size: 14px;
         }
+
+        /* Splash Screen & Blur */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6); /* Semi-transparent overlay */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px); /* Additional blur on overlay itself */
+        }
+
+        #splash-content {
+            background: rgba(20, 20, 20, 0.9);
+            padding: 40px 60px;
+            border: 1px solid var(--accent-green);
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #splash-title {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+            margin: 0;
+        }
+
+        #splash-subtitle {
+            font-size: 18px;
+            color: #ccc;
+            margin-top: -10px;
+            font-style: italic;
+        }
+
+        #btn-start-game {
+            background: transparent;
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        #btn-start-game:hover {
+            background: var(--accent-green);
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.6);
+            transform: scale(1.05);
+        }
+
+        /* Blur Target */
+        #game-container.blurred {
+            filter: blur(5px);
+            pointer-events: none; /* Prevent clicking game through splash */
+            transition: filter 0.5s ease;
+        }
     </style>
 </head>
     <style>
@@ -314,14 +396,16 @@
             border: 1px solid #444;
             color: var(--accent-green);
             cursor: pointer;
-            font-size: 14px;
-            padding: 2px 8px;
+            font-size: 16px;
+            padding: 12px;
             border-radius: 4px;
-            margin-right: 10px;
-            min-width: 30px;
+            width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
         }
         .play-pause-btn:hover { background: #333; border-color: #fff; }
         .play-pause-btn:hover { background: #333; border-color: #fff; }
@@ -386,9 +470,69 @@
             transform: scale(1.05);
             box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
         }
+
+        /* Config Tabs */
+        .config-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 0px;
+            /* border-bottom: 1px solid #333; Removed per request */
+            padding-bottom: 0px;
+            margin-top: 10px;
+        }
+
+        .tab-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #888;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: bold;
+            flex: 1;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background: #333;
+            color: #ccc;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+            background: #1a1a1a;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.1);
+        }
+
+        .config-section {
+            display: none;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .config-section.active {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
+
+    <div id="splash-screen">
+        <div id="splash-content">
+            <h1 id="splash-title">Vector Defense</h1>
+            <div id="splash-subtitle">by Michael Teter</div>
+            <button id="btn-start-game">Play Game</button>
+        </div>
+    </div>
 
     <div id="game-container">
         <div class="main-layout">
@@ -400,10 +544,13 @@
 
             <div id="ui-panel">
                 <div class="stats-bar">
-                    <button id="btn-play-pause" class="play-pause-btn">&#9658;</button>
                     <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
                     <span>Wave: <span id="wave-display" class="stat-value">1</span></span>
                     <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
+                </div>
+
+                <div class="controls-row">
+                    <button id="btn-play-pause" class="play-pause-btn">&#9658; Game</button>
                 </div>
 
                 <div id="game-over-panel">
@@ -419,7 +566,7 @@
                     <button class="tower-btn btn-blue" onclick="selectTower('blue')">Pulse Disruptor ($30)</button>
                     <button class="tower-btn btn-purple" onclick="selectTower('purple')">Artillary ($40)</button>
 
-                    <div class="map-section" style="grid-column: 1 / -1; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+                    <div class="map-section" style="grid-column: 1 / -1; margin-top: 20px; padding-top: 15px;">
                         <div class="map-control-row" style="justify-content: space-between;">
                             <button id="map-prev" class="map-btn">&lt;</button>
                             <span id="map-current" style="font-size: 16px;">Map 1</span>
