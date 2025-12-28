@@ -23,16 +23,23 @@ const GameConfig = {
     blueSlowFactor: (typeof Towers !== 'undefined' ? Towers.blueSlowFactor : 0.5),
     blueDuration: (typeof Towers !== 'undefined' ? Towers.blueDuration : 1000),
 
-    // Enemies (Load from enemies.js if available, else default)
-    greenHP: (typeof Enemies !== 'undefined' ? Enemies.greenHP : 100),
-    greenSpeed: (typeof Enemies !== 'undefined' ? Enemies.greenSpeed : 100),
-
-    orangeHP: (typeof Enemies !== 'undefined' ? Enemies.orangeHP : 60),
-    orangeSpeed: (typeof Enemies !== 'undefined' ? Enemies.orangeSpeed : 140),
+    // Purple Tower (Artillary)
+    purpleDamage: (typeof Towers !== 'undefined' && Towers.purpleDamage ? Towers.purpleDamage : 150),
+    purpleRange: (typeof Towers !== 'undefined' && Towers.purpleRange ? Towers.purpleRange : 150),
+    purpleDelay: (typeof Towers !== 'undefined' && Towers.purpleDelay ? Towers.purpleDelay : 1000),
 
     // Misc
     particleLife: 500
 };
+
+// Dynamically inject Enemy defaults into GameConfig
+if (typeof ENEMIES !== 'undefined') {
+    ENEMIES.forEach(e => {
+        GameConfig[e.id + 'HP'] = e.hp;
+        GameConfig[e.id + 'Speed'] = e.speed;
+        GameConfig[e.id + 'Value'] = e.value; // Reward
+    });
+}
 
 // UI Grouping Configuration
 const LayoutGroups = [
@@ -42,16 +49,17 @@ const LayoutGroups = [
         columns: [
             { title: "Green", keys: ['greenDamage', 'greenRange', 'greenDelay'] },
             { title: "Red", keys: ['redDamage', 'redRange', 'redDelay'] },
-            { title: "Blue", keys: ['blueDamage', 'blueRadius', 'blueDelay', 'blueSlowFactor', 'blueDuration'] }
+            { title: "Blue", keys: ['blueDamage', 'blueRadius', 'blueDelay', 'blueSlowFactor', 'blueDuration'] },
+            { title: "Purple", keys: ['purpleDamage', 'purpleRange', 'purpleDelay'] }
         ]
     },
     {
         title: "Ships",
         type: "columns",
-        columns: [
-            { title: "Green", keys: ['greenHP', 'greenSpeed'] },
-            { title: "Orange", keys: ['orangeHP', 'orangeSpeed'] }
-        ]
+        columns: (typeof ENEMIES !== 'undefined' ? ENEMIES.map(e => ({
+            title: e.name,
+            keys: [`${e.id}HP`, `${e.id}Speed`]
+        })) : [])
     },
     {
         title: "Misc",
@@ -62,22 +70,54 @@ const LayoutGroups = [
 
 // --- State Management ---
 const State = {
-    money: 1000,
-    lives: 20,
+    money: (typeof CONSTS !== 'undefined' && CONSTS.START_MONEY) ? CONSTS.START_MONEY : 1000,
+    lives: (typeof CONSTS !== 'undefined' && CONSTS.START_LIVES) ? CONSTS.START_LIVES : 20,
     wave: 1,
-    selectedTower: null,
+    selectedTower: null, // "placement mode" type (string)
+    selectedTowerInstance: null, // "context mode" instance (object)
     towers: [],
     enemies: [],
     projectiles: [],
     particles: [],
     lastTime: 0,
-    mouse: { x: 0, y: 0, tileX: 0, tileY: 0 },
+    mouse: { x: 0, y: 0, tileX: 0, tileY: 0, inCanvas: false },
     mapIndex: 0,
     roundActive: false,
     enemiesSpawnedThisRound: 0,
     totalEnemiesToSpawn: 0,
-    gameId: 0 // To invalidate pending spawns on reset
+    spawnTimer: 0,
+    nextSpawnDelay: 0,
+    gameId: 0, // To invalidate pending spawns on reset
+    flashLife: 0, // For exit flash effect
+    paused: true,
+    gameOver: false,
+    musicPlaying: false
 };
+
+const bgMusic = new Audio(); // Start empty
+bgMusic.loop = false; // Playlist handling instead of loop
+bgMusic.volume = (typeof CONSTS !== 'undefined' && CONSTS.MUSIC_VOLUME !== undefined) ? CONSTS.MUSIC_VOLUME : 0.5;
+
+let currentSongIndex = 0;
+
+function playNextSong() {
+    if (typeof CONSTS === 'undefined' || !CONSTS.SONGS || CONSTS.SONGS.length === 0) return;
+    currentSongIndex = (currentSongIndex + 1) % CONSTS.SONGS.length;
+    bgMusic.src = CONSTS.SONGS[currentSongIndex];
+    bgMusic.play().catch(e => console.log("Next song play failed:", e));
+}
+window.playNextSong = playNextSong;
+
+bgMusic.addEventListener('ended', playNextSong);
+
+function unlockAudio() {
+    if (State.musicPlaying && bgMusic.paused) {
+        bgMusic.play().catch(e => console.log("Unlock play failed", e));
+    }
+    // Remove from both to ensure we only try once
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+}
 
 // --- Core Systems ---
 const canvas = document.getElementById('gameCanvas');
@@ -125,13 +165,18 @@ function loadMap(index) {
     State.enemies = [];
     State.projectiles = [];
     State.particles = [];
-    State.money = 1000;
-    State.lives = 20;
+    State.money = (typeof CONSTS !== 'undefined' && CONSTS.START_MONEY) ? CONSTS.START_MONEY : 1000;
+    State.lives = (typeof CONSTS !== 'undefined' && CONSTS.START_LIVES) ? CONSTS.START_LIVES : 20;
     State.wave = 1;
     State.roundActive = false;
     State.enemiesSpawnedThisRound = 0;
     State.totalEnemiesToSpawn = 0;
+    State.spawnTimer = 0;
+    State.nextSpawnDelay = 0;
+    State.paused = true; // Pause on map load
+    State.gameOver = false;
     updateStats();
+    updatePauseButton();
 
     for (let r = 0; r < ROWS; r++) {
         const row = [];
@@ -147,11 +192,11 @@ function loadMap(index) {
             else if (char === 'X') row.push(2);
             else if (char === ' ') row.push(1);
             else if (char === 'S') {
-                row.push(1);
+                row.push(7); // 7: Start
                 StartCells.push({c, r});
             }
             else if (char === 'E') {
-                row.push(1);
+                row.push(8); // 8: End
                 EndCells.push({c, r});
             }
             else if (char === 'n') row.push(3);
@@ -166,17 +211,45 @@ function loadMap(index) {
     }
 
     // Adjust UI Panel width if needed, or keep fixed
-    const uiPanel = document.getElementById('ui-panel');
-    if (uiPanel) uiPanel.style.width = canvas.width + "px";
+    // Width adjustment removed for horizontal layout
 
-    const statsBar = document.querySelector('.stats-bar');
-    if (statsBar) statsBar.style.width = canvas.width + "px";
 
     // Update Map Label
     const mapLbl = document.getElementById('map-current');
-    if (mapLbl) mapLbl.textContent = (index + 1);
+    if (mapLbl) mapLbl.textContent = `Map ${index + 1}`;
 
-    renderStaticBackground();
+    handleResize();
+}
+
+// --- Sound Helper ---
+const SoundBank = {};
+
+function preloadSounds() {
+    if (typeof TOWER_TYPES === 'undefined') return;
+    Object.values(TOWER_TYPES).forEach(def => {
+        if (def.fire_sound) {
+            const a = new Audio(def.fire_sound);
+            a.preload = 'auto';
+            SoundBank[def.fire_sound] = a;
+        }
+    });
+}
+
+function playSound(filename, volumeScale = 1.0) {
+    if (!filename) return null;
+    let audio;
+
+    if (SoundBank[filename]) {
+        // Clone for overlapping playback
+        audio = SoundBank[filename].cloneNode();
+    } else {
+        audio = new Audio(filename); // Fallback
+    }
+
+    const baseVol = (typeof CONSTS !== 'undefined' && CONSTS.SFX_VOLUME) ? CONSTS.SFX_VOLUME : 0.5;
+    audio.volume = Math.max(0, Math.min(1, baseVol * volumeScale)); // Clamp 0-1
+    audio.play().catch(e => { /* Ignore auto-play blocks or missing files */ });
+    return audio;
 }
 
 // --- Helpers ---
@@ -198,9 +271,138 @@ function getNearestEnemy(x, y, range, enemies) {
     return nearest;
 }
 
+function getWeakestEnemy(x, y, range, enemies) {
+    let target = null;
+    let minHP = Infinity;
+
+    for (const e of enemies) {
+        if (pointDistance(x, y, e.x, e.y) <= range) {
+            if (e.hp < minHP) {
+                minHP = e.hp;
+                target = e;
+            }
+        }
+    }
+    return target;
+}
+
+function getStrongestEnemy(x, y, range, enemies) {
+    let target = null;
+    let maxHP = -Infinity;
+
+    for (const e of enemies) {
+        if (pointDistance(x, y, e.x, e.y) <= range) {
+            if (e.hp > maxHP) {
+                maxHP = e.hp;
+                target = e;
+            }
+        }
+    }
+    return target;
+}
+
 function shadeColor(color, percent) {
     var f=parseInt(color.slice(1),16),t=percent<0?0:255,p=percent<0?percent*-1:percent,R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
     return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
+}
+
+// Helper to parse hex
+function hexToRb(hex) {
+    hex = hex.replace(/^#/, '');
+    if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    const num = parseInt(hex, 16);
+    return [num >> 16, num >> 8 & 255, num & 255];
+}
+
+function drawShape(ctx, shapeName, scale) {
+    const shapeData = SHAPES[shapeName] || SHAPES.triangle;
+    if (shapeData && shapeData.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(shapeData[0].x * scale, shapeData[0].y * scale);
+        for (let i = 1; i < shapeData.length; i++) {
+            ctx.lineTo(shapeData[i].x * scale, shapeData[i].y * scale);
+        }
+        ctx.closePath();
+    } else {
+        // Fallback
+        ctx.beginPath();
+        ctx.moveTo(scale, 0);
+        ctx.lineTo(-scale/2, scale/2);
+        ctx.lineTo(-scale/2, -scale/2);
+        ctx.closePath();
+    }
+}
+
+function rgbToHsl(r, g, b) {
+    r /= 255, g /= 255, b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+        h = s = 0; // achromatic
+    } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return [h, s, l];
+}
+
+function hslToRgb(h, s, l) {
+    let r, g, b;
+    if (s === 0) {
+        r = g = b = l; // achromatic
+    } else {
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function blendColors(c1, c2, ratio) {
+    // HSL Blend for "human" midpoint
+    ratio = Math.max(0, Math.min(1, ratio));
+
+    // Ensure valid fallback
+    if (!c1) c1 = '#ffffff';
+    if (!c2) c2 = '#ffffff';
+
+    const [r1, g1, b1] = hexToRb(c1);
+    const [r2, g2, b2] = hexToRb(c2);
+
+    const [h1, s1, l1] = rgbToHsl(r1, g1, b1);
+    const [h2, s2, l2] = rgbToHsl(r2, g2, b2);
+
+    // Hue Interpolation (Shortest path)
+    let dH = h2 - h1;
+    if (dH > 0.5) dH -= 1;
+    if (dH < -0.5) dH += 1;
+    let h = h1 + dH * ratio;
+    if (h < 0) h += 1;
+    if (h > 1) h -= 1;
+
+    // Saturation and Lightness
+    let s = s1 + (s2 - s1) * ratio;
+    let l = l1 + (l2 - l1) * ratio;
+
+    const [r, g, b] = hslToRgb(h, s, l);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
 let enemyIdCounter = 0;
@@ -208,9 +410,18 @@ let enemyIdCounter = 0;
 // --- Initialization ---
 function init() {
     setupInputs();
+    preloadSounds();
+    loadMap(0); // Load default map BEFORE events (resize)
     setupEvents();
-    loadMap(0); // Load default map
-    startNextRound();
+
+    if (typeof CONSTS !== 'undefined' && CONSTS.INITIAL_MUSIC_STATE && CONSTS.INITIAL_MUSIC_STATE.toLowerCase() === 'on') {
+        // Attempt to start music
+        if (!State.musicPlaying) {
+             toggleMusic();
+        }
+    }
+
+    // startNextRound(); // Don't auto-start round, let user play first
     requestAnimationFrame(gameLoop);
 }
 
@@ -275,28 +486,146 @@ function createInput(container, key) {
     });
 }
 
+// Global Scale Factor
+let appScale = 1;
+
+function handleResize() {
+    const container = document.getElementById('game-container');
+    const layout = document.querySelector('.main-layout');
+    const view = document.querySelector('.game-view');
+
+    if (!layout || !view) return;
+
+    // Available space from container (minus some padding for safety/aesthetics)
+    const availW = view.offsetWidth - 40;
+    const availH = view.offsetHeight - 40;
+
+    // Logic Dimensions
+    // Logic Dimensions
+    const logicW = COLS * TILE_SIZE + 2; // +2 for right border
+    const logicH = ROWS * TILE_SIZE + 2; // +2 for bottom border
+
+    // Calculate Scale
+    const scaleW = availW / logicW;
+    const scaleH = availH / logicH;
+    appScale = Math.min(scaleW, scaleH);
+
+    // Minimum scale to prevent tiny canvas
+    if (appScale < 0.1) appScale = 0.1;
+
+    console.log("--- Resize Debug ---");
+    console.log(`Container: ${view.offsetWidth}x${view.offsetHeight}`);
+    console.log(`Available: ${availW}x${availH}`);
+    console.log(`Logic: ${logicW}x${logicH}`);
+    console.log(`Scales: W=${scaleW.toFixed(3)}, H=${scaleH.toFixed(3)}`);
+    console.log(`Final Scale: ${appScale}`);
+    console.log(`Canvas: ${logicW * appScale}x${logicH * appScale}`);
+
+    // Update Canvas Size
+    canvas.width = logicW * appScale;
+    canvas.height = logicH * appScale;
+    bgCanvas.width = canvas.width;
+    bgCanvas.height = canvas.height;
+
+    // Apply Context Scale
+    ctx.setTransform(appScale, 0, 0, appScale, 0, 0);
+    bgCtx.setTransform(appScale, 0, 0, appScale, 0, 0);
+
+    // Redraw Static Background
+    renderStaticBackground();
+}
+
+
+function toggleMusic() {
+    window.toggleMusic = toggleMusic; // Ensure global access
+    State.musicPlaying = !State.musicPlaying;
+    const btn = document.getElementById('btn-music');
+
+    if (State.musicPlaying) {
+        // Initialize if src is empty
+        if (!bgMusic.src || bgMusic.src === '') {
+             if (typeof CONSTS !== 'undefined' && CONSTS.SONGS && CONSTS.SONGS.length > 0) {
+                 bgMusic.src = CONSTS.SONGS[0];
+                 currentSongIndex = 0;
+             } else {
+                 // Fallback if no songs defined?
+                 bgMusic.src = 'GeometricLinesofDefense_2.mp3';
+             }
+        }
+
+        bgMusic.play().catch(e => console.log("Audio play failed (user interaction needed?):", e));
+        if (btn) {
+            btn.innerText = "Music On";
+            btn.classList.add('active');
+        }
+    } else {
+        bgMusic.pause();
+        if (btn) {
+            btn.innerText = "Music Off";
+            btn.classList.remove('active');
+        }
+    }
+}
+
 function setupEvents() {
+    window.addEventListener('resize', handleResize);
+
+    // Initial Resize
+    handleResize();
+
     canvas.addEventListener('mousemove', e => {
         const rect = canvas.getBoundingClientRect();
-        State.mouse.x = e.clientX - rect.left;
-        State.mouse.y = e.clientY - rect.top;
+        State.mouse.x = (e.clientX - rect.left) / appScale;
+        State.mouse.y = (e.clientY - rect.top) / appScale;
         State.mouse.tileX = Math.floor(State.mouse.x / TILE_SIZE);
         State.mouse.tileY = Math.floor(State.mouse.y / TILE_SIZE);
+        State.mouse.inCanvas = true;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        State.mouse.inCanvas = false;
     });
 
     canvas.addEventListener('click', e => {
-        if (State.selectedTower) {
+        const c = State.mouse.tileX;
+        const r = State.mouse.tileY;
+
+        // check for existing tower
+        const existing = State.towers.find(t => t.c === c && t.r === r);
+
+        if (existing) {
+            selectTowerInstance(existing);
+        } else if (State.selectedTower) {
             tryPlaceTower();
+        } else {
+            deselectTowerInstance();
         }
     });
 
+    // Sell / Context Buttons
+    const btnSell = document.getElementById('btn-sell');
+    if(btnSell) btnSell.addEventListener('click', sellSelectedTower);
+
+    const btnCancel = document.getElementById('btn-cancel');
+    if(btnCancel) btnCancel.addEventListener('click', deselectTowerInstance);
+
+
     // Expose selectTower to window for buttons
     window.selectTower = function(type) {
+        deselectTowerInstance(); // Clear context if switching to build
         State.selectedTower = type;
-        document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
         const btn = document.querySelector(`.btn-${type}`);
         if(btn) btn.classList.add('selected');
     }
+
+    // Audio Unlock for Autoplay Policy
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    // Play/Pause
+    const btnPlayPause = document.getElementById('btn-play-pause');
+    if (btnPlayPause) btnPlayPause.addEventListener('click', togglePause);
 
     // Map Controls
     const prevBtn = document.getElementById('map-prev');
@@ -323,74 +652,94 @@ function setupEvents() {
              }
         });
     }
+
+    // Music Control
+    // Note: Event listener is handled via onclick in HTML to ensure reliability
+    // Export toggleMusic for global access
+    window.toggleMusic = toggleMusic;
+
+    // Game Over / New Game
+    const btnNewGame = document.getElementById('btn-new-game');
+    if (btnNewGame) btnNewGame.addEventListener('click', resetGame);
 }
 
 function renderStaticBackground() {
-    bgCtx.fillStyle = '#111';
+    // Switch to Screen Space for sharp lines
+    bgCtx.save();
+    bgCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform logic
+
+    // Fill Background
+    bgCtx.fillStyle = CONSTS.BG_COLOR;
     bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
-            const x = c * TILE_SIZE;
-            const y = r * TILE_SIZE;
+            if (!Grid[r]) continue;
             const type = Grid[r][c];
-            // Path types: 1, 3(N), 4(E), 5(S), 6(W)
-            const isPath = (type === 1 || type >= 3);
-            const isBuildable = type === 0;
-            const isStructure = type === 2;
 
-            // Wireframe: Only stroke
-            bgCtx.strokeStyle = isPath ? '#111' : '#333';
+            // Calculate Screen Coordinates (Integer Snapped)
+            const x1 = Math.floor(c * TILE_SIZE * appScale);
+            const y1 = Math.floor(r * TILE_SIZE * appScale);
+            const x2 = Math.floor((c + 1) * TILE_SIZE * appScale);
+            const y2 = Math.floor((r + 1) * TILE_SIZE * appScale);
+
+            const w = x2 - x1;
+            const h = y2 - y1;
+
+            // Path types: 1, 3(N), 4(E), 5(S), 6(W), 7(Start), 8(End)
+            const isPath = (type === 1 || (type >= 3 && type !== 7 && type !== 8));
+            const isStructure = type === 2; // X (Non-buildable)
+
+            // Wireframe Grid
             bgCtx.lineWidth = 1;
-            bgCtx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
 
-            // Structure (X and O)
-            if (!isPath) {
-                bgCtx.beginPath();
-                bgCtx.moveTo(x, y);
-                bgCtx.lineTo(x + TILE_SIZE, y + TILE_SIZE);
-                bgCtx.moveTo(x + TILE_SIZE, y);
-                bgCtx.lineTo(x, y + TILE_SIZE);
-
-                // Distinguish O (Buildable) vs X (Non-Buildable)
-                if (isStructure) { // X
-                     bgCtx.strokeStyle = '#551111'; // Dark red for blocked
-                } else { // O
-                     bgCtx.strokeStyle = '#333';
-                }
-                bgCtx.stroke();
-
-                if (isStructure) {
-                    // Double cross for X
-                    bgCtx.strokeRect(x+10, y+10, TILE_SIZE-20, TILE_SIZE-20);
-                }
+            if (type === 7 || type === 8) {
+                 // Start/End: Draw NOTHING.
+            } else {
+                 // Standard Cell
+                 bgCtx.strokeStyle = isPath ? CONSTS.BG_COLOR : CONSTS.GAME_BORDER_COLOR;
+                 if (!isPath) {
+                    // Draw centered on pixel grid (+0.5)
+                    // Use x1+0.5, y1+0.5, w, h to ensure adjacent borders overlap exactly
+                    bgCtx.strokeRect(x1 + 0.5, y1 + 0.5, w, h);
+                 }
             }
 
-            // Draw S and E labels?
-            // Draw S and E labels? (Removed per user request)
+            // Structure (X only) - Draw diagonal lines
+            if (isStructure) {
+                bgCtx.beginPath();
+                bgCtx.moveTo(x1, y1);
+                bgCtx.lineTo(x2, y2);
+                bgCtx.moveTo(x2, y1);
+                bgCtx.lineTo(x1, y2);
+
+                bgCtx.strokeStyle = CONSTS.WALL_COLOR;
+                bgCtx.stroke();
+            }
         }
     }
 
-    // Draw path center lines for debug
-    /*
-    bgCtx.strokeStyle = '#00ff66';
-    bgCtx.lineWidth = 2;
-    bgCtx.shadowBlur = 5;
-    bgCtx.shadowColor = '#00ff66';
-    bgCtx.beginPath();
-    // Hardcoded lines removed as they don't match L-shape
-    bgCtx.stroke();
-    */
+    bgCtx.restore();
 }
+
+
 
 function tryPlaceTower() {
     const c = State.mouse.tileX;
     const r = State.mouse.tileY;
 
     if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
-    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
     if (Grid[r][c] !== 0) return; // Must be Buildable Wall (0) [O]
     if (State.towers.find(t => t.c === c && t.r === r)) return;
+
+    // Check Cost
+    let cost = 0;
+    if (State.selectedTower === 'green') cost = Towers.greenPrice;
+    if (State.selectedTower === 'red') cost = Towers.redPrice;
+    if (State.selectedTower === 'blue') cost = Towers.bluePrice;
+    if (State.selectedTower === 'purple') cost = (Towers.purplePrice || 40); // Fallback if missing shim
+
+    if (State.money < cost) return;
 
     const x = c * TILE_SIZE + TILE_SIZE/2;
     const y = r * TILE_SIZE + TILE_SIZE/2;
@@ -398,23 +747,96 @@ function tryPlaceTower() {
     State.towers.push({
         type: State.selectedTower,
         c, r, x, y,
+        angle: 0, // Default East
         lastShot: 0
     });
+
+    State.money -= cost;
+    updateStats();
 }
+
+// --- Context UI ---
+function selectTowerInstance(tower) {
+    State.selectedTowerInstance = tower;
+    State.selectedTower = null; // Clear build mode
+    document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
+
+    const panelSelect = document.querySelector('.tower-select');
+    const panelContext = document.querySelector('.tower-context-panel');
+    const nameLbl = document.getElementById('ctx-tower-name');
+    const infoLbl = document.getElementById('ctx-tower-info');
+    const sellBtn = document.getElementById('btn-sell');
+
+    if(panelSelect) panelSelect.style.display = 'none';
+    if(panelContext) panelContext.style.display = 'flex';
+
+    // Update Labels
+    let name = "Unknown Tower";
+    let basePrice = 0;
+
+    if (tower.type === 'green') { name="Laser Turret"; basePrice=Towers.greenPrice; }
+    else if (tower.type === 'red') { name="Missile Battery"; basePrice=Towers.redPrice; }
+    else if (tower.type === 'blue') { name="Pulse Disruptor"; basePrice=Towers.bluePrice; }
+    else if (tower.type === 'purple') { name="Artillary"; basePrice=(Towers.purplePrice || 40); }
+
+    if(nameLbl) nameLbl.textContent = name;
+
+    const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
+    if(sellBtn) sellBtn.textContent = `Sell ($${sellVal})`;
+    if(infoLbl) infoLbl.textContent = `Location: ${tower.c},${tower.r}`;
+}
+
+function deselectTowerInstance() {
+    State.selectedTowerInstance = null;
+    const panelSelect = document.querySelector('.tower-select');
+    const panelContext = document.querySelector('.tower-context-panel');
+
+    if(panelSelect) panelSelect.style.display = '';
+    if(panelContext) panelContext.style.display = 'none';
+}
+
+function sellSelectedTower() {
+    if (!State.selectedTowerInstance) return;
+
+    const t = State.selectedTowerInstance;
+    let basePrice = 0;
+    if (t.type === 'green') basePrice = Towers.greenPrice;
+    else if (t.type === 'red') basePrice = Towers.redPrice;
+    else if (t.type === 'blue') basePrice = Towers.bluePrice;
+    else if (t.type === 'purple') basePrice = (Towers.purplePrice || 40);
+
+    const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
+    State.money += sellVal;
+
+    // Remove from array
+    const idx = State.towers.indexOf(t);
+    if (idx !== -1) State.towers.splice(idx, 1);
+
+    deselectTowerInstance();
+    updateStats();
+}
+
 
 // --- Wave Logic ---
 // --- Wave Logic ---
 function startNextRound() {
     if (StartCells.length === 0) return;
     State.roundActive = true;
-    State.totalEnemiesToSpawn = 20; // Fixed 20 per round
+    State.totalEnemiesToSpawn = (typeof CONSTS !== 'undefined' && CONSTS.SHIPS_PER_WAVE) ? CONSTS.SHIPS_PER_WAVE : 20;
     State.enemiesSpawnedThisRound = 0;
+    State.spawnTimer = 0; // Reset timer
+    State.nextSpawnDelay = 0; // First spawn is immediate
 
     // Determine Wave Type
-    // Odd waves = Green, Even waves = Orange
-    State.waveType = (State.wave % 2 !== 0) ? 'green' : 'orange';
+    // Cycle through defined enemies
+    if (typeof ENEMIES !== 'undefined' && ENEMIES.length > 0) {
+        const idx = (State.wave - 1) % ENEMIES.length;
+        State.waveType = ENEMIES[idx].id;
+    } else {
+        State.waveType = (State.wave % 2 !== 0) ? 'green' : 'orange'; // Fallback
+    }
 
-    spawnNextEnemy();
+    // Don't call spawnNextEnemy here; update loop will handle it immediately since timer >= delay
 }
 
 function spawnNextEnemy() {
@@ -429,17 +851,10 @@ function spawnNextEnemy() {
 
     // Calculate delay for NEXT spawn based on THIS enemy's speed
     // Formula: Delay = 80000 / Speed
-    // Speed 100 -> 800ms
-    // Speed 200 -> 400ms
     const delay = 80000 / enemy.speed;
 
-    const scheduledGameId = State.gameId;
-    if (State.enemiesSpawnedThisRound < State.totalEnemiesToSpawn) {
-        setTimeout(() => {
-            if (State.gameId !== scheduledGameId) return; // Game reset, abort spawn
-            spawnNextEnemy();
-        }, delay);
-    }
+    State.nextSpawnDelay = delay;
+    State.spawnTimer = 0;
 }
 
 function spawnEnemy(startPos) {
@@ -455,9 +870,28 @@ function spawnEnemy(startPos) {
     const type = State.waveType || 'green';
 
     // Stats based on type
-    const speed = (type === 'green') ? GameConfig.greenSpeed : GameConfig.orangeSpeed;
-    const hp = (type === 'green') ? GameConfig.greenHP : GameConfig.orangeHP;
-    const color = (type === 'green') ? '#00ff66' : '#ffaa00';
+    // Stats based on type (Data-Driven)
+    let speed = 100;
+    let hp = 100;
+    let color = '#ffffff';
+
+    let def = null;
+    if (typeof ENEMIES !== 'undefined') {
+        // Find static definition for Color, Name, etc.
+        def = ENEMIES.find(e => e.id === type) || ENEMIES[0];
+        color = def.color;
+
+        // Fetch dynamic stats from GameConfig (UI bound)
+        // Properties are stored as "greenHP", "greenSpeed" etc.
+        hp = GameConfig[type + 'HP'] !== undefined ? GameConfig[type + 'HP'] : def.hp;
+        speed = GameConfig[type + 'Speed'] !== undefined ? GameConfig[type + 'Speed'] : def.speed;
+
+    } else {
+        // Legacy Fallback
+        speed = (type === 'green') ? GameConfig.greenSpeed : GameConfig.orangeSpeed;
+        hp = (type === 'green') ? GameConfig.greenHP : GameConfig.orangeHP;
+        color = (type === 'green') ? '#00ff66' : '#ffaa00';
+    }
 
     // Determine Direction (Primitive: assumes edge entry)
     let vx = 0, vy = 0;
@@ -481,31 +915,34 @@ function spawnEnemy(startPos) {
         vy: vy,
         frozen: 0,
         slowFactor: 1,
-        color: color
+        color: color,
+        shape: def ? def.shape : 'triangle',
+        draw_scale: def ? (def.draw_scale || 1.0) : 1.0,
+        resistance: def ? (def.resistance || {laser:1, projectile:1, pulse:1}) : {laser:1, projectile:1, pulse:1}
     };
     State.enemies.push(e);
     return e;
 }
 
-function spawnDebris(x, y, color, count) {
+function spawnDebris(x, y, color, count, speedMulti=1, lifeMulti=1) {
     for(let i=0; i<count; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 20 + Math.random() * 60; // Pixels per second
+        const speed = (20 + Math.random() * 60) * speedMulti; // Pixels per second
         State.particles.push({
             type: 'debris',
             x, y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             life: 0,
-            maxLife: GameConfig.particleLife,
+            maxLife: GameConfig.particleLife * lifeMulti,
             color: color
         });
     }
 }
 
-function spawnProjectile(x, y, target, damage, speed) {
+function spawnProjectile(x, y, target, damage, speed, color) {
     State.projectiles.push({
-        x, y, target, damage, speed,
+        x, y, target, damage, speed, color,
         active: true
     });
 }
@@ -514,6 +951,44 @@ function spawnProjectile(x, y, target, damage, speed) {
 function update(dt) {
     const dtSec = dt / 1000;
     const now = Date.now();
+
+    // Reset loop (e.g. particles) if Game Over
+    if (State.gameOver) {
+        // Only update particles
+        for (let i = State.particles.length - 1; i >= 0; i--) {
+            const p = State.particles[i];
+            if(p.type === 'pulse') {
+                p.life += dt;
+                if(p.life >= p.duration) State.particles.splice(i, 1);
+                else p.r = (p.life / p.duration) * p.maxR;
+            } else if (p.type === 'debris') {
+                p.life += dt;
+                if (p.life >= p.maxLife) {
+                    State.particles.splice(i, 1);
+                } else {
+                    p.x += p.vx * dtSec;
+                    p.y += p.vy * dtSec;
+                }
+            } else {
+                p.life--;
+                if(p.life <= 0) State.particles.splice(i, 1);
+            }
+        }
+        return; // Skip rest of update
+    }
+
+    // Decrement flash life
+    if (State.flashLife > 0) {
+        State.flashLife -= dt;
+    }
+
+    // Round Spawning Logic
+    if (State.roundActive && State.enemiesSpawnedThisRound < State.totalEnemiesToSpawn) {
+        State.spawnTimer += dt;
+        if (State.spawnTimer >= State.nextSpawnDelay) {
+            spawnNextEnemy();
+        }
+    }
 
     // Enemies
     for (let i = State.enemies.length - 1; i >= 0; i--) {
@@ -602,104 +1077,282 @@ function update(dt) {
         e.y += (e.vy / currentSpeed) * moveDist;
 
         // Out of bounds cleanup
-        if (e.x < -50 || e.x > canvas.width + 50 || e.y < -50 || e.y > canvas.height + 50) {
-             // Only count leaks if not moving towards Center (spawn)?
-             // Actually, if we are OB, we are deleted.
-             // If we traveled through the map and exited, e.g. at E.
+        // Trigger exit immediately when the center of the ship leaves the canvas area
+        // Use Logical Dimensions (COLS*TILE_SIZE) not canvas width (which is scaled)
+        if (e.x < 0 || e.x > (COLS * TILE_SIZE) || e.y < 0 || e.y > (ROWS * TILE_SIZE)) {
+             // For now, assume any exit reduces lives
+             State.lives--;
+             State.flashLife = CONSTS.EXIT_FLASH_DURATION; // Trigger Flash
+             updateStats();
 
-             // Check if we legitimate exited.
-             // Logic: If on 'E', we continue straight. Eventually we hit OB.
-             // Do we lose a life?
-             // "The exit/end cells will be E." - implying successful traversing.
-             // Usually in TD, reaching the end deletes life.
-
-             if (e.x > canvas.width || e.y > canvas.height || e.x < 0 || e.y < 0) {
-                 // For now, assume any exit reduces lives
-                  State.lives--;
-                  updateStats();
-             }
              State.enemies.splice(i, 1);
+
+             if (State.lives < 0 && !State.gameOver) {
+                 triggerGameOver();
+             }
         } else if (e.hp <= 0) {
             State.money += 10;
             updateStats();
             State.enemies.splice(i, 1);
-            spawnDebris(e.x, e.y, (e.frozen > 0 ? '#ccffff' : '#00ff66'), 20);
+            spawnDebris(e.x, e.y, e.color, 20); // Use enemy color for death
         }
     }
 
     // Towers
+    // Towers
     State.towers.forEach(t => {
-        let range = 0;
-        if (t.type === 'green') range = GameConfig.greenRange;
-        else if (t.type === 'red') range = GameConfig.redRange;
-        else if (t.type === 'blue') range = GameConfig.blueRadius;
+        // Ensure def exists (for legacy/live reload safety)
+        if (!t.def) t.def = TOWER_TYPES[t.type];
+        const def = t.def;
 
-        const target = getNearestEnemy(t.x, t.y, range, State.enemies);
-        t.hasTarget = !!target; // For rendering laser
+        // Dynamic Stats (from UI or Default)
+        // Access keys dynamically: 'greenRange', 'redDelay', etc.
+        const range = GameConfig[t.type + 'Range'] !== undefined ? GameConfig[t.type + 'Range'] : def.range;
+        const cooldown = GameConfig[t.type + 'Delay'] !== undefined ? GameConfig[t.type + 'Delay'] : def.cooldown;
+        const damage = GameConfig[t.type + 'Damage'] !== undefined ? GameConfig[t.type + 'Damage'] : def.damage;
 
-        if (t.type === 'green' && target) {
-                target.hp -= GameConfig.greenDamage * dtSec;
-                t.targetPos = {x: target.x, y: target.y}; // Cache for rendering
+        // Target Selection
+        let target = null;
+        if (def.type === 'pulse') {
+             // Pulse hits all in range, but we might still want 'a' target for consistency if needed,
+             // though pulse logic iterates all.
+        } else {
 
-                // Continuous debris for laser
-                if (Math.random() < 0.3) {
-                    spawnDebris(target.x, target.y, (target.frozen > 0 ? '#ccffff' : '#00ff66'), 1);
+             // Determine Targeting Mode
+             const mode = def.targeting_mode || (typeof TARGETING_MODES !== 'undefined' ? TARGETING_MODES.nearest : 'nearest');
+
+             // Check if current target is still valid
+             let keepingCurrent = false;
+             if (t.currentTarget) {
+                 // Must exist, be alive, and be in range
+                 const stillExists = State.enemies.includes(t.currentTarget);
+                 const alive = t.currentTarget.hp > 0;
+                 const inRange = stillExists && (pointDistance(t.x, t.y, t.currentTarget.x, t.currentTarget.y) <= range);
+
+                 if (stillExists && alive && inRange) {
+                     keepingCurrent = true;
+                 } else {
+                     t.currentTarget = null; // Lost target
+                 }
+             }
+
+             // Selection Logic
+             // Sticky modes: fixed, weakest, strongest.
+             // If we have a valid current target and mode is sticky, keep it.
+             // 'nearest' is NOT sticky (always dynamic).
+             const isSticky = (mode !== 'nearest' && mode !== (typeof TARGETING_MODES !== 'undefined' ? TARGETING_MODES.nearest : 'nearest')); // strict check against value string
+
+             if (isSticky && keepingCurrent) {
+                 target = t.currentTarget;
+             } else {
+                 // Find new target based on criteria
+                 // Note: 'fixed' basically behaves like sticky nearest (locks onto nearest, then holds)
+                 // 'weakest' / 'strongest' find new specific targets if sticky failed or initial search.
+                 // Actually, if 'weakest' is sticky, does it switch if a WEAKER one enters?
+                 // Plan says: "stay on target until it explodes or goes out of range" -> Implies strict stickiness.
+
+                 if (mode === (typeof TARGETING_MODES !== 'undefined' ? TARGETING_MODES.strongest : 'strongest')) {
+                     target = getStrongestEnemy(t.x, t.y, range, State.enemies);
+                 } else if (mode === (typeof TARGETING_MODES !== 'undefined' ? TARGETING_MODES.weakest : 'weakest')) {
+                     target = getWeakestEnemy(t.x, t.y, range, State.enemies);
+                 } else {
+                     // Default / Nearest / Fixed (initial acquisition)
+                     target = getNearestEnemy(t.x, t.y, range, State.enemies);
+                 }
+
+                 // Update current sticky target
+                 t.currentTarget = target;
+             }
+        }
+
+        t.hasTarget = !!target;
+        if (target) {
+            t.targetPos = {x: target.x, y: target.y};
+
+            // Smooth Rotation
+            const targetAngle = Math.atan2(target.y - t.y, target.x - t.x);
+            let diff = targetAngle - t.angle;
+
+            // Normalize diff to -PI...PI (Shortest path)
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+
+            // Apply Rotation
+            const maxRot = (CONSTS.TOWER_RETARGET_ROTATION_RATE || 5.0) * dtSec;
+
+            if (Math.abs(diff) <= maxRot) {
+                t.angle = targetAngle; // Snap if close
+            } else {
+                t.angle += Math.sign(diff) * maxRot;
+            }
+
+            // Check Lock
+            const threshold = CONSTS.FIRING_ANGLE_THRESHOLD !== undefined ? CONSTS.FIRING_ANGLE_THRESHOLD : 0.1;
+            t.locked = (Math.abs(diff) < threshold);
+        } else {
+            t.locked = false; // No target = no lock (or true if we want them to fire blindly, but they need a target to fire anyway)
+        }
+
+        // Firing Logic
+        if (def.type === 'laser') {
+            const shotDur = GameConfig['greenShotDuration'] || def.shot_duration_ms || 2000;
+            const pauseDur = GameConfig['greenFiringPause'] || def.firing_pause_ms || 1000;
+
+            // Pulse Cycle
+            if (t.isFiring === undefined) { t.isFiring = true; t.fireTimer = 0; } // Safety init
+
+            t.fireTimer += dt;
+            if (t.isFiring) {
+                 if (t.fireTimer >= shotDur) {
+                     t.isFiring = false;
+                     t.fireTimer = 0;
+                 }
+            } else {
+                 if (t.fireTimer >= pauseDur) {
+
+
+                     t.isFiring = true;
+                     t.fireTimer = 0;
+                 }
+            }
+
+            // Laser Sound Control
+            // Emit if: Firing in cycle AND locked on target
+            const shouldEmit = (t.isFiring && target && t.locked);
+
+            if (shouldEmit) {
+                if (!t.isEmitting) {
+                     // Start Sound
+                     t.soundInstance = playSound(def.fire_sound, def.fire_sound_volume);
+                     t.isEmitting = true;
                 }
-        }
-        else if (t.type === 'red') {
-            if (target && now - t.lastShot >= GameConfig.redDelay) {
-                t.lastShot = now;
-                spawnProjectile(t.x - 5, t.y, target, GameConfig.redDamage, GameConfig.redSpeed);
-                setTimeout(() => { // Second shot logic
-                        if(target.hp > 0) // Very rough check if target still vaguely valid
-                            spawnProjectile(t.x + 5, t.y, target, GameConfig.redDamage, GameConfig.redSpeed);
-                }, 150);
+            } else {
+                if (t.isEmitting) {
+                     // Stop Sound
+                     if (t.soundInstance) {
+                         t.soundInstance.pause();
+                         t.soundInstance.currentTime = 0;
+                     }
+                     t.isEmitting = false;
+                     t.soundInstance = null;
+                }
+            }
+
+            // Fire only if active cycle AND locked
+            if (shouldEmit) {
+                const res = (target.resistance && target.resistance.laser) || 1.0;
+                target.hp -= (damage * res) * dtSec;
+
+                // Visuals: Impact Particles
+                if (Math.random() < 0.3) {
+                     const debrisColor = blendColors(def.color, target.color || '#fff', 0.5);
+                     spawnDebris(target.x, target.y, debrisColor, Math.max(1, 1 * CONSTS.IMPACT_PARTICLE_MULTIPLIER));
+                }
             }
         }
-        else if (t.type === 'blue') {
-            if (now - t.lastShot >= GameConfig.blueDelay) {
+        else if (def.type === 'projectile' || def.type === 'artillary') {
+            if (target && t.locked && now - t.lastShot >= cooldown) {
                 t.lastShot = now;
-                // Pulse Effect
+                playSound(def.fire_sound, def.fire_sound_volume);
+
+                // Fire from all outlets
+                def.outlets.forEach(outlet => {
+                    setTimeout(() => {
+                         // Re-check target existence/validity inside timeout?
+                         // Simple check: is target still alive?
+                         if (target && target.hp > 0) {
+                             // Calc spawn pos relative to tower
+                             // If rotated (artillary), need to rotate outlet pos too?
+                             // For now, simple offset (or implement rotation math if needed)
+                             // Given Artillary has 0,0 outlet, rotation doesn't matter for origin.
+                             // Red tower has offset, but doesn't rotate.
+                             // So we can stick to simple logic for now.
+
+                             const sx = t.x + outlet.x;
+                             const sy = t.y + outlet.y;
+                             spawnProjectile(sx, sy, target, damage, def.projectile.speed, def.projectile.color);
+                         }
+                    }, outlet.delay);
+                });
+            }
+        }
+        else if (def.type === 'pulse') {
+             if (now - t.lastShot >= cooldown && (!target || t.locked)) { // Allow pulse if no target req (but here logic implies targeting)? Pulse usually fires if *any* enemy in range.
+                 // Actually, standard Pulse behavior in this codebase finds 'target' = nearest enemy.
+                 // If we enforce locking, Pulse must face nearest enemy to fire.
+                 // Let's enforce it for consistency per user request "prevent a tower from firing while it is rotating"
+                 if (target && !t.locked) return; // Skip if tracking but not locked
+
+                 t.lastShot = now;
+                 playSound(def.fire_sound, def.fire_sound_volume);
+
+                // Visual Pulse
                 State.particles.push({
-                    type: 'pulse', x: t.x, y: t.y, r: 0, maxR: range, life: 0, duration: 500
+                    type: 'pulse', x: t.x, y: t.y, r: 0, maxR: range, life: 0, duration: 500, color: def.color
                 });
-                // Apply Slow & Damage
-                State.enemies.forEach(e => {
-                    if (pointDistance(t.x, t.y, e.x, e.y) <= range) {
-                        e.frozen = GameConfig.blueDuration;
-                        e.slowFactor = GameConfig.blueSlowFactor;
-                        e.hp -= GameConfig.blueDamage;
-                    }
-                });
-            }
+
+                // Apply Effect to ALL in range
+                if (def.effect && def.effect.type === 'slow') {
+                    State.enemies.forEach(e => {
+                        if (pointDistance(t.x, t.y, e.x, e.y) <= range) {
+                            e.frozen = def.effect.duration; // 'frozen' is actually slow duration
+                            e.slowFactor = def.effect.factor;
+                            const res = (e.resistance && e.resistance.pulse) || 1.0;
+                            e.hp -= (damage * res);
+                        }
+                    });
+                }
+             }
         }
     });
 
     // Projectiles
     for (let i = State.projectiles.length - 1; i >= 0; i--) {
         const p = State.projectiles[i];
-        if (!p.target || (p.target.hp <= 0 && !State.enemies.includes(p.target))) {
-            // Target lost, kill missile
-            spawnDebris(p.x, p.y, '#aaa', 5);
-            State.projectiles.splice(i, 1);
+        // Check target validity
+        const targetValid = p.target && p.target.hp > 0 && State.enemies.includes(p.target);
+
+        if (!targetValid) {
+            // Target lost: Continue in last known direction (dumb fire)
+            if (p.vx && p.vy) {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Remove if off screen
+                if (p.x < 0 || p.x > (COLS * TILE_SIZE) || p.y < 0 || p.y > (ROWS * TILE_SIZE)) {
+                    State.projectiles.splice(i, 1);
+                }
+            } else {
+                // Never started moving? Kill it.
+                spawnDebris(p.x, p.y, '#aaa', 5);
+                State.projectiles.splice(i, 1);
+            }
             continue;
         }
 
+        // Target Homing Logic
         const dx = p.target.x - p.x;
         const dy = p.target.y - p.y;
         const dist = Math.hypot(dx, dy);
-        const move = p.speed * 60 * dtSec; // Speed config seems high? RedSpeed 6.
-        // If RedSpeed is 6 pixels per frame? Then 6 * 60 = 360 px/sec.
+        const move = p.speed * 60 * dtSec;
 
         if (dist <= move) {
-            p.target.hp -= p.damage;
-            // Debris on impact
-            spawnDebris(p.target.x, p.target.y, (p.target.frozen > 0 ? '#ccffff' : '#00ff66'), 5);
-
+            // Impact
+            const res = (p.target.resistance && p.target.resistance.projectile) || 1.0;
+            p.target.hp -= (p.damage * res);
+            // Mix Red (#ff3333) + Target Color
+            const debrisColor = blendColors('#ff3333', p.target.color || '#fff', 0.5);
+            spawnDebris(p.target.x, p.target.y, debrisColor, Math.max(1, 5 * CONSTS.IMPACT_PARTICLE_MULTIPLIER));
             State.projectiles.splice(i, 1);
         } else {
-            p.x += (dx/dist) * move;
-            p.y += (dy/dist) * move;
+            // Move & Update Velocity (for dumb fire persistence)
+            const vx = (dx/dist) * move;
+            const vy = (dy/dist) * move;
+
+            p.x += vx;
+            p.y += vy;
+            p.vx = vx;
+            p.vy = vy;
             p.angle = Math.atan2(dy, dx);
         }
     }
@@ -728,7 +1381,6 @@ function update(dt) {
     // Check Round End
     if (State.roundActive) {
         // Wait until enemies spawned? (We spawn simultaneously/instantly in startNextRound)
-        // Check if any enemies remain
         // Check if any enemies remain AND we are done spawning
         if (State.enemies.length === 0 && State.enemiesSpawnedThisRound >= State.totalEnemiesToSpawn) {
             // Round Complte
@@ -741,57 +1393,154 @@ function update(dt) {
 }
 
 function updateStats() {
-    document.getElementById('lives-display').innerText = State.lives;
+    document.getElementById('lives-display').innerText = Math.max(0, State.lives);
     document.getElementById('wave-display').innerText = State.wave;
     document.getElementById('money-display').innerText = '$' + State.money;
+
+    // Dynamic Tower Buttons
+    if (typeof TOWER_TYPES !== 'undefined') {
+        Object.keys(TOWER_TYPES).forEach(type => {
+            const btn = document.querySelector(`.btn-${type}`);
+            if (btn) {
+                const def = TOWER_TYPES[type];
+                if (State.money < def.price) {
+                     btn.disabled = true;
+                     btn.classList.add('disabled');
+                     // If currently selected and we can't afford it, deselect?
+                     // Probably annoying if user is just waiting for money.
+                     // But strictly speaking they can't place it.
+                     // Let's just disable the button. The place logic also checks cost.
+                } else {
+                     btn.disabled = false;
+                     btn.classList.remove('disabled');
+                }
+            }
+        });
+    }
+}
+
+function triggerGameOver() {
+    State.gameOver = true;
+    State.flashLife = 0; // Clear any pending exit flash
+    deselectTowerInstance();
+
+    // UI Updates
+    const panelSelect = document.querySelector('.tower-select');
+    const panelContext = document.querySelector('.tower-context-panel');
+    const panelGameOver = document.getElementById('game-over-panel');
+    const survivedWavesLbl = document.getElementById('survived-waves');
+
+    if (panelSelect) panelSelect.style.display = 'none';
+    if (panelContext) panelContext.style.display = 'none';
+    if (panelGameOver) {
+        panelGameOver.style.display = 'flex';
+        // Survived waves is current wave - 1 (completed waves)
+        // If died on wave 1, survived 0.
+        const survived = Math.max(0, State.wave - 1);
+        if (survivedWavesLbl) survivedWavesLbl.innerText = survived;
+    }
+
+    // Explode Towers
+    const towersToExplode = [...State.towers];
+    towersToExplode.forEach(t => {
+        const delay = Math.random() * 1000;
+        setTimeout(() => {
+            let color = '#fff';
+            if (t.def && t.def.color) color = t.def.color;
+            else if (TOWER_TYPES[t.type]) color = TOWER_TYPES[t.type].color;
+
+            spawnDebris(t.x, t.y, color, 150, 5.0, 2.0);
+            State.towers = State.towers.filter(activeT => activeT !== t);
+        }, delay);
+    });
+
+    // Explode Enemies
+    const enemiesToExplode = [...State.enemies];
+    enemiesToExplode.forEach(e => {
+        const delay = Math.random() * 1000;
+        setTimeout(() => {
+            spawnDebris(e.x, e.y, e.color || '#ff8800', 100, 4.0, 1.5);
+            State.enemies = State.enemies.filter(activeE => activeE !== e);
+        }, delay);
+    });
+
+    // Explode Projectiles
+    const projectilesToExplode = [...State.projectiles];
+    projectilesToExplode.forEach(p => {
+        const delay = Math.random() * 500;
+        setTimeout(() => {
+            spawnDebris(p.x, p.y, p.color || '#ffff00', 30, 2.0, 0.5);
+            State.projectiles = State.projectiles.filter(activeP => activeP !== p);
+        }, delay);
+    });
+}
+
+function resetGame() {
+    const panelSelect = document.querySelector('.tower-select');
+    const panelGameOver = document.getElementById('game-over-panel');
+
+    if (panelGameOver) panelGameOver.style.display = 'none';
+    if (panelSelect) panelSelect.style.display = 'grid'; // Restore grid layout
+
+    // Reload current map to reset logic state
+    loadMap(State.mapIndex);
+    // Note: loadMap does not stop music, which is desired.
 }
 
 // --- Rendering ---
 function render() {
     // Clear Screen (Fixes ghosting/trails)
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, COLS * TILE_SIZE, ROWS * TILE_SIZE);
 
-    // Draw Static
+    // Draw Static scaled (bgCanvas is already scaled, so draw it 1:1 in screen coords)
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(bgCanvas, 0, 0);
+    ctx.restore();
 
     // Towers
+    // Towers
     State.towers.forEach(t => {
+        // Ensure def exists
+        if (!t.def) t.def = TOWER_TYPES[t.type];
+        const def = t.def;
+
         ctx.save();
         ctx.translate(t.x, t.y);
         ctx.lineWidth = 2;
 
-        if (t.type === 'green') {
-            ctx.strokeStyle = '#00ff66';
-            ctx.shadowColor = '#00ff66';
-            ctx.shadowBlur = 10;
-            ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.stroke();
+        // Generic Color Selection
+        const color = def.color || '#fff';
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
 
-            // Center dot
-            ctx.fillStyle = '#00ff66';
-            ctx.beginPath(); ctx.arc(0,0, 2, 0, Math.PI*2); ctx.fill();
+        // Global Rotation (Persistent)
+        if (t.angle !== undefined) {
+             ctx.rotate(t.angle);
+        }
 
-            if (t.hasTarget && t.targetPos) {
+        ctx.fillStyle = CONSTS.BG_COLOR; // Fill black to hide grid lines underneath
+        drawShape(ctx, def.shape, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        // Overlay Effects
+        if (def.type === 'laser') {
+            // Draw Laser
+            if (t.hasTarget && t.targetPos && t.locked && t.isFiring) {
                 ctx.restore(); ctx.save(); // Global space
-                ctx.strokeStyle = '#00ff66';
+                ctx.strokeStyle = color;
                 ctx.lineWidth = 2;
-                ctx.shadowColor = '#00ff66';
+                ctx.shadowColor = color;
                 ctx.shadowBlur = 10;
                 ctx.beginPath();
                 ctx.moveTo(t.x, t.y);
                 ctx.lineTo(t.targetPos.x, t.targetPos.y);
                 ctx.stroke();
             }
-        } else if (t.type === 'red') {
-            ctx.strokeStyle = '#ff3333';
-            ctx.shadowColor = '#ff3333';
-            ctx.shadowBlur = 10;
-            ctx.strokeRect(-8, -8, 16, 16);
-        } else if (t.type === 'blue') {
-            ctx.strokeStyle = '#33ccff';
-            ctx.shadowColor = '#33ccff';
-            ctx.shadowBlur = 10;
-            ctx.beginPath(); ctx.arc(0,0, 8, 0, Math.PI*2); ctx.stroke();
         }
+
         ctx.restore();
     });
 
@@ -803,6 +1552,7 @@ function render() {
         // Rotate to velocity direction
         const angle = Math.atan2(e.vy, e.vx);
         ctx.rotate(angle);
+        if (e.draw_scale) ctx.scale(e.draw_scale, e.draw_scale);
 
         ctx.beginPath();
 
@@ -814,26 +1564,9 @@ function render() {
         ctx.shadowBlur = 5;
         ctx.lineWidth = 2;
 
-        if (e.type === 'orange') {
-            // Orange line with a small isosceles triangle tail (like a dart)
-
-            // Main Line
-            ctx.moveTo(-10, 0);
-            ctx.lineTo(10, 0);
-
-            // Tail Triangle
-            ctx.moveTo(-10, 0);
-            ctx.lineTo(-16, -4);
-            ctx.lineTo(-16, 4);
-            ctx.lineTo(-10, 0);
-        } else {
-            // Default Green Triangle pointing right
-            ctx.moveTo(15, 0);
-            ctx.lineTo(-10, 10);
-            ctx.lineTo(-10, -10);
-            ctx.closePath();
-        }
-
+        // Data-Driven Shape Rendering
+        const shapeName = e.shape || 'triangle';
+        drawShape(ctx, shapeName, 10);
         ctx.stroke();
 
         ctx.restore();
@@ -844,9 +1577,10 @@ function render() {
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(p.angle);
-            ctx.strokeStyle = '#ffaa33';
+            const pColor = p.color || '#ff3333';
+            ctx.strokeStyle = pColor;
             ctx.lineWidth = 2;
-            ctx.shadowColor = '#ffaa33';
+            ctx.shadowColor = pColor;
             ctx.shadowBlur = 5;
             ctx.beginPath();
             ctx.moveTo(-6, 0);
@@ -860,7 +1594,12 @@ function render() {
         if(p.type === 'pulse'){
             ctx.save();
             ctx.translate(p.x, p.y);
-            ctx.strokeStyle = `rgba(51, 204, 255, ${1 - p.r/p.maxR})`;
+            // Use particle specific color if available, else default blue
+            const col = p.color || '#33ccff';
+            ctx.strokeStyle = col;
+            // Manual alpha setting since it's hard to parse hex to rgba here easily without helper,
+            // but we can just use globalAlpha
+            ctx.globalAlpha = 1 - p.r/p.maxR;
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(0,0, p.r, 0, Math.PI*2); ctx.stroke();
             ctx.restore();
@@ -879,28 +1618,71 @@ function render() {
             const tx = State.mouse.tileX * TILE_SIZE + TILE_SIZE/2;
             const ty = State.mouse.tileY * TILE_SIZE + TILE_SIZE/2;
 
-            if(tx > 0 && tx < canvas.width && ty > 0 && ty < canvas.height) {
-                let range = (State.selectedTower === 'green') ? GameConfig.greenRange :
-                            (State.selectedTower === 'blue') ? GameConfig.blueRadius : GameConfig.redRange;
-
-                ctx.beginPath();
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.setLineDash([5,5]);
-                ctx.arc(tx, ty, range, 0, Math.PI*2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Valid placement?
+            if(State.mouse.inCanvas && tx > 0 && tx < canvas.width && ty > 0 && ty < canvas.height) {
+                // Check validity first
                 const r = State.mouse.tileY;
                 const c = State.mouse.tileX;
-                const valid = (r>=0 && r<ROWS && c>=0 && c<COLS && Grid[r][c]===0 && !State.towers.find(t=>t.c===c && t.r===r));
 
-                ctx.strokeStyle = valid ? '#fff' : '#f00';
-                ctx.lineWidth = 2;
-                ctx.globalAlpha = 0.5;
-                ctx.beginPath(); ctx.arc(tx, ty, 10, 0, Math.PI*2); ctx.stroke();
+                const type = State.selectedTower;
+                const def = TOWER_TYPES[type];
+                if (!def) return; // safety
+
+                // Calculate Validity
+                let valid = (r>=0 && r<ROWS && c>=0 && c<COLS && Grid[r][c]===0 && !State.towers.find(t=>t.c===c && t.r===r));
+
+                // Check Funds
+                if (valid && State.money < def.price) valid = false;
+
+                let range = GameConfig[type + 'Range'] || def.range;
+                if (!range) range = def.range;
+
+                let color = def.color || '#fff';
+
+                // Determine drawing color based on validity
+
+                // Determine drawing color based on validity
+                let drawColor = valid ? color : CONSTS.UNAVAILABLE_PLACEMENT_COLOR;
+
+                // Draw Radius (Always, using drawColor)
+                ctx.beginPath();
+                ctx.strokeStyle = drawColor;
+                ctx.globalAlpha = 0.3;
+                ctx.lineWidth = 1;
+                ctx.arc(tx, ty, range, 0, Math.PI*2);
+                ctx.stroke();
                 ctx.globalAlpha = 1.0;
+
+                // Draw Ghost Tower (Always, using drawColor)
+                ctx.save();
+                ctx.translate(tx, ty);
+
+                // Opacity: Valid = 1.0 (Not dimmed), Invalid = 0.8
+                ctx.globalAlpha = valid ? 1.0 : 0.8;
+
+                ctx.strokeStyle = drawColor;
+                ctx.lineWidth = 2;
+
+                if (def.type === 'artillary') {
+                     // For ghost, default rotation
+                     // (Optional: could rotate to mouse or center, but keep simple)
+                }
+
+                drawShape(ctx, def.shape, 10);
+                ctx.stroke();
+
+                ctx.restore();
             }
+    }
+
+    // Exit Flash Effect
+    if (State.flashLife > 0) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to draw in screen space
+        ctx.globalAlpha = Math.max(0, State.flashLife / CONSTS.EXIT_FLASH_DURATION);
+        ctx.strokeStyle = CONSTS.EXIT_FLASH_COLOR;
+        ctx.lineWidth = 2; // Make it slightly thicker for visibility
+        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+        ctx.restore();
     }
 }
 
@@ -909,10 +1691,33 @@ function gameLoop(timestamp) {
     const dt = timestamp - State.lastTime;
     State.lastTime = timestamp;
 
-    // Cap dt to prevent massive jumps
-    update(Math.min(dt, 100));
+    if (!State.paused || State.gameOver) {
+        // Cap dt to prevent massive jumps
+        const safeDt = Math.min(dt, 100);
+        update(safeDt);
+    }
+
     render();
     requestAnimationFrame(gameLoop);
+}
+
+function togglePause() {
+    if (State.gameOver) return; // Locked
+    State.paused = !State.paused;
+    updatePauseButton();
+    if (!State.paused && !State.roundActive && State.enemies.length === 0) {
+        if (State.wave === 1 && State.enemiesSpawnedThisRound === 0) {
+             startNextRound();
+        }
+    }
+}
+
+function updatePauseButton() {
+    const btn = document.getElementById('btn-play-pause');
+    if (btn) {
+        btn.innerHTML = State.paused ? '&#9658;' : '&#10074;&#10074;';
+        btn.style.color = State.paused ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
 }
 
 init();

@@ -12,6 +12,7 @@
             --accent-green: #00ff66;
             --accent-red: #ff3333;
             --accent-blue: #33ccff;
+            --accent-purple: #aa00ff;
             --panel-bg: #141414;
             --ui-border: #333;
         }
@@ -25,40 +26,60 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow: hidden; /* Prevent body scroll */
             height: 100vh;
-            overflow: auto;
         }
 
         #game-container {
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            padding: 20px;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+        }
+
+        .main-layout {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .game-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+            overflow: hidden;
         }
 
         canvas {
-            background-color: #000;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--ui-border);
             cursor: crosshair;
         }
 
         #ui-panel {
             background-color: var(--panel-bg);
-            border: 1px solid var(--ui-border);
+            border-left: 1px solid var(--ui-border);
             padding: 20px;
-            border-radius: 8px;
-            width: 800px;
-            display: grid;
-            grid-template-columns: 1fr 2fr;
+            width: 340px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
             gap: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: -4px 0 6px rgba(0,0,0,0.3);
+            height: 100%;
+            overflow-y: auto;
+            z-index: 10;
         }
 
         .tower-select {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
 
@@ -89,17 +110,25 @@
             background-color: #333;
         }
 
+        .tower-btn:disabled, .tower-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+            border-color: #444;
+            color: #666;
+            pointer-events: none;
+        }
+
         .btn-green { border-left: 4px solid var(--accent-green); }
         .btn-red { border-left: 4px solid var(--accent-red); }
         .btn-blue { border-left: 4px solid var(--accent-blue); }
+        .btn-purple { border-left: 4px solid var(--accent-purple); }
 
         .config-panel {
             display: flex;
             flex-direction: column;
             gap: 15px;
             font-size: 11px;
-            max-height: 600px;
-            overflow-y: auto;
         }
 
         .config-group {
@@ -120,7 +149,7 @@
 
         .config-item {
             display: flex;
-            justify-content: space-between; /* Space out label and input */
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 4px;
         }
@@ -134,7 +163,6 @@
             margin-right: 8px;
         }
 
-        /* Smaller inputs */
         .config-item input {
             background: #222;
             border: 1px solid #333;
@@ -146,27 +174,10 @@
             font-family: monospace;
         }
 
-        .config-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .config-item label {
-            color: #888;
-        }
-
-        .config-item input {
-            background: #222;
-            border: 1px solid #333;
-            color: #ccc;
-            padding: 4px 8px;
-            border-radius: 3px;
-        }
-
         .config-row {
             display: flex;
-            gap: 15px;
+            flex-direction: column; /* Stack columns vertically for sidebar */
+            gap: 10px;
         }
 
         .config-col {
@@ -188,13 +199,17 @@
 
         .config-col:nth-child(2) h5 { color: var(--accent-red); }
         .config-col:nth-child(3) h5 { color: var(--accent-blue); }
+        .config-col:nth-child(4) h5 { color: var(--accent-purple); }
 
         .stats-bar {
-            width: 800px;
+            width: 100%;
             display: flex;
             justify-content: space-between;
             font-size: 14px;
             color: #888;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--ui-border);
         }
 
         .stat-value {
@@ -203,7 +218,8 @@
         }
 
         #map-reference {
-            width: 800px;
+            width: 100%;
+            max-width: 1200px;
             border: 1px solid var(--ui-border);
             border-radius: 4px;
             background: var(--panel-bg);
@@ -292,72 +308,145 @@
         }
     </style>
 </head>
+    <style>
+        .play-pause-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: var(--accent-green);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 10px;
+            min-width: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .play-pause-btn:hover { background: #333; border-color: #fff; }
+        .play-pause-btn:hover { background: #333; border-color: #fff; }
+
+        .music-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+            margin-top: 10px;
+            width: 100%;
+            border-radius: 4px;
+        }
+        .music-btn:hover { background: #333; color: #fff; }
+        .music-btn.active { color: var(--accent-green); border-color: var(--accent-green); }
+
+        #game-over-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        #game-over-panel h2 {
+            font-size: 32px;
+            color: var(--accent-red);
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #game-over-panel p {
+            font-size: 16px;
+            color: #ccc;
+            margin: 0 0 30px 0;
+        }
+
+        #survived-waves {
+            color: #fff;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        #btn-new-game {
+            background-color: var(--accent-green);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        #btn-new-game:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+        }
+    </style>
+</head>
 <body>
 
     <div id="game-container">
-        <div class="stats-bar">
-            <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
-            <span>Wave: <span id="wave-display" class="stat-value">1</span></span>
-            <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
-        </div>
-
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="main-layout">
+            <div class="game-view">
 
 
+                <canvas id="gameCanvas" width="800" height="400"></canvas>
+            </div>
 
-        <div id="ui-panel">
-            <div class="tower-select">
-                <h3>Towers</h3>
-                <button class="tower-btn btn-green" onclick="selectTower('green')">Laser Turret</button>
-                <button class="tower-btn btn-red" onclick="selectTower('red')">Missile Battery</button>
-                <button class="tower-btn btn-blue" onclick="selectTower('blue')">Pulse Disruptor</button>
+            <div id="ui-panel">
+                <div class="stats-bar">
+                    <button id="btn-play-pause" class="play-pause-btn">&#9658;</button>
+                    <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
+                    <span>Wave: <span id="wave-display" class="stat-value">1</span></span>
+                    <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
+                </div>
 
-                <div class="map-section" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
-                    <h3>Map</h3>
-                    <div class="map-control-row" style="justify-content: space-between;">
-                        <button id="map-prev" class="map-btn">&lt;</button>
-                        <span id="map-current" style="font-size: 16px;">1</span>
-                        <button id="map-next" class="map-btn">&gt;</button>
+                <div id="game-over-panel">
+                    <h2>GAME<br>OVER</h2>
+                    <p>Survived <span id="survived-waves">0</span> Waves</p>
+                    <button id="btn-new-game">New Game</button>
+                </div>
+
+                <div class="tower-select">
+                    <!-- <h3>Towers</h3> Removed per request -->
+                    <button class="tower-btn btn-green" onclick="selectTower('green')">Laser Turret ($10)</button>
+                    <button class="tower-btn btn-red" onclick="selectTower('red')">Missile Battery ($20)</button>
+                    <button class="tower-btn btn-blue" onclick="selectTower('blue')">Pulse Disruptor ($30)</button>
+                    <button class="tower-btn btn-purple" onclick="selectTower('purple')">Artillary ($40)</button>
+
+                    <div class="map-section" style="grid-column: 1 / -1; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+                        <div class="map-control-row" style="justify-content: space-between;">
+                            <button id="map-prev" class="map-btn">&lt;</button>
+                            <span id="map-current" style="font-size: 16px;">Map 1</span>
+                            <button id="map-next" class="map-btn">&gt;</button>
+                            <button id="btn-music" class="music-btn" style="width: auto; margin-left: 10px; margin-top: 0;" onclick="toggleMusic()">Music Off</button>
+                            <button id="btn-next-song" class="music-btn" style="width: auto; margin-left: 5px; margin-top: 0; padding: 5px 10px;" onclick="playNextSong()" title="Next Track">&gt;&gt;</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="config-panel" id="config-inputs">
-                <!-- Config inputs generated by JS -->
+                <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px;">
+                    <h3 id="ctx-tower-name">Tower</h3>
+                    <div id="ctx-tower-info" style="color: #888; font-size: 12px; margin-bottom: 10px;"></div>
+                    <button id="btn-sell" class="tower-btn" style="border-color: #555; background: #222; color: #aaa;">Sell</button>
+                    <button id="btn-cancel" class="tower-btn" style="margin-top: 5px; background: transparent; border: 1px solid #333;">Back</button>
+                </div>
+
+                <div class="config-panel" id="config-inputs">
+                    <!-- Config inputs generated by JS -->
+                </div>
             </div>
         </div>
 
-        <details id="map-reference">
-            <summary>Map Reference (Debug)</summary>
-            <div id="maps-container"></div>
-        </details>
     </div>
 
+<script src="consts.js"></script>
 <script src="maps.js"></script>
-<script src="enemies.js"></script>
-<script src="towers.js"></script>
 <script src="game.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const container = document.getElementById('maps-container');
-        if (typeof Maps !== 'undefined') {
-            Maps.forEach((mapData, index) => {
-                const wrapper = document.createElement('div');
-
-                const title = document.createElement('div');
-                title.className = 'map-title';
-                title.textContent = `Map ${index}`;
-
-                const pre = document.createElement('div');
-                pre.className = 'map-entry';
-                pre.textContent = mapData.trim();
-
-                wrapper.appendChild(title);
-                wrapper.appendChild(pre);
-                container.appendChild(wrapper);
-            });
-        }
-    });
-</script>
 </body>
 </html>
