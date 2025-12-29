@@ -100,7 +100,8 @@ const State = {
     flashLife: 0, // For exit flash effect
     paused: true,
     gameOver: false,
-    musicPlaying: false
+    musicPlaying: false,
+    uiMouse: { x: 0, y: 0 }
 };
 
 const bgMusic = new Audio(); // Start empty
@@ -737,6 +738,10 @@ function toggleMusic() {
 
 function setupEvents() {
     window.addEventListener('resize', handleResize);
+    window.addEventListener('mousemove', e => {
+        State.uiMouse.x = e.clientX;
+        State.uiMouse.y = e.clientY;
+    });
 
     // Initial Resize
     handleResize();
@@ -762,7 +767,12 @@ function setupEvents() {
         const existing = State.towers.find(t => t.c === c && t.r === r);
 
         if (existing) {
-            selectTowerInstance(existing);
+            // Toggle off if clicking the currently selected tower again
+            if (State.selectedTowerInstance === existing) {
+                deselectTowerInstance();
+            } else {
+                selectTowerInstance(existing);
+            }
         } else if (State.selectedTower) {
             tryPlaceTower();
         } else {
@@ -774,17 +784,26 @@ function setupEvents() {
     const btnSell = document.getElementById('btn-sell');
     if(btnSell) btnSell.addEventListener('click', sellSelectedTower);
 
-    const btnCancel = document.getElementById('btn-cancel');
-    if(btnCancel) btnCancel.addEventListener('click', deselectTowerInstance);
-
 
     // Expose selectTower to window for buttons
     window.selectTower = function(type) {
-        deselectTowerInstance(); // Clear context if switching to build
+        // Toggle off if already selected
+        if (State.selectedTower === type) {
+            deselectTowerInstance(); // Handles full deselect and UI update
+            return;
+        }
+
+        // Standard Selection
+        State.selectedTowerInstance = null; // Clear instance selection
         State.selectedTower = type;
+
+        // Visual Selection
         document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
         const btn = document.querySelector(`.btn-${type}`);
         if(btn) btn.classList.add('selected');
+
+        // Update UI
+        updatePanelVisibility();
     }
 
     // Audio Unlock for Autoplay Policy
@@ -926,43 +945,108 @@ function tryPlaceTower() {
 }
 
 // --- Context UI ---
+// --- Context UI ---
+function updatePanelVisibility() {
+    const panelConfig = document.getElementById('config-inputs');
+    const panelContext = document.querySelector('.tower-context-panel');
+    const panelSelect = document.querySelector('.tower-select'); // Buttons always visible now?
+
+    // User requirement: "This lower panel [Context] will be displayed INSTEAD of the existing towers/enemies/misc buttons [Config Panel/Tabs]"
+    // Tower Select Buttons (the 4 icons) should probably stay visible to allow changing selection?
+    // "Then when a tower button is unselected, we return the UI panel to normal."
+    // So:
+    // If (SelectedTower OR SelectedInstance) -> Show Context, Hide Config
+    // Else -> Show Config, Hide Context
+
+    // panelSelect (Top buttons) - logic implies they stay, but maybe we just ensure config is swapped.
+    if(panelSelect) panelSelect.style.display = 'grid'; // Ensure visible (was hidden by old logic)
+
+    const active = State.selectedTower || State.selectedTowerInstance;
+
+    if (active) {
+        if(panelConfig) panelConfig.style.display = 'none';
+        if(panelContext) panelContext.style.display = 'flex';
+        populateTowerInfo(active);
+    } else {
+        if(panelConfig) panelConfig.style.display = 'flex';
+        if(panelContext) panelContext.style.display = 'none';
+    }
+}
+
+function populateTowerInfo(target) {
+    const nameLbl = document.getElementById('ctx-tower-name');
+    const infoLbl = document.getElementById('ctx-tower-info');
+    const sellBtn = document.getElementById('btn-sell');
+    const actionsDiv = document.getElementById('ctx-tower-actions');
+
+    let type, def, isInstance = false;
+
+    if (typeof target === 'string') {
+        type = target;
+        def = TOWER_TYPES[type];
+        isInstance = false;
+    } else {
+        type = target.type;
+        def = target.def || TOWER_TYPES[type];
+        isInstance = true;
+    }
+
+    if (!def) return;
+
+    if(nameLbl) nameLbl.textContent = def.name;
+
+    // Info String
+    let info = [];
+    const damage = GameConfig[type + 'Damage'] || def.damage;
+    const range = GameConfig[type + 'Range'] || def.range;
+    const cooldown = GameConfig[type + 'Delay'] || def.cooldown;
+
+    info.push(`Damage: ${damage}`);
+    info.push(`Range: ${range}`);
+    info.push(`Cooldown: ${(cooldown/1000).toFixed(1)}s`);
+
+    if (def.type === 'pulse') {
+        // Special Pulse Info
+         const slow = GameConfig[type + 'SlowFactor'] || (def.effect ? def.effect.factor : 0.5);
+         info.push(`Slow: ${(100 - slow*100).toFixed(0)}%`);
+    }
+
+    if (isInstance) {
+        info.push(`Location: [${target.c}, ${target.r}]`);
+        // Future: Kills, Total Damage
+    } else {
+        info.push(`Price: $${def.price}`);
+    }
+
+    if(infoLbl) infoLbl.innerHTML = info.join('<br>');
+
+    // Actions
+    if (isInstance) {
+        if(actionsDiv) actionsDiv.style.display = 'flex';
+        const basePrice = def.price;
+        const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
+        if(sellBtn) sellBtn.textContent = `Sell ($${sellVal})`;
+    } else {
+        // Placement mode - No actions (Sell)
+        if(actionsDiv) actionsDiv.style.display = 'none';
+    }
+}
+
 function selectTowerInstance(tower) {
     State.selectedTowerInstance = tower;
     State.selectedTower = null; // Clear build mode
     document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
 
-    const panelSelect = document.querySelector('.tower-select');
-    const panelContext = document.querySelector('.tower-context-panel');
-    const nameLbl = document.getElementById('ctx-tower-name');
-    const infoLbl = document.getElementById('ctx-tower-info');
-    const sellBtn = document.getElementById('btn-sell');
-
-    if(panelSelect) panelSelect.style.display = 'none';
-    if(panelContext) panelContext.style.display = 'flex';
-
-    // Update Labels
-    let name = "Unknown Tower";
-    let basePrice = 0;
-
-    if (tower.type === 'green') { name="Laser Turret"; basePrice=Towers.greenPrice; }
-    else if (tower.type === 'red') { name="Missile Battery"; basePrice=Towers.redPrice; }
-    else if (tower.type === 'blue') { name="Pulse Disruptor"; basePrice=Towers.bluePrice; }
-    else if (tower.type === 'purple') { name="Artillary"; basePrice=(Towers.purplePrice || 40); }
-
-    if(nameLbl) nameLbl.textContent = name;
-
-    const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
-    if(sellBtn) sellBtn.textContent = `Sell ($${sellVal})`;
-    if(infoLbl) infoLbl.textContent = `Location: ${tower.c},${tower.r}`;
+    updatePanelVisibility();
 }
 
 function deselectTowerInstance() {
     State.selectedTowerInstance = null;
-    const panelSelect = document.querySelector('.tower-select');
-    const panelContext = document.querySelector('.tower-context-panel');
+    State.selectedTower = null; // Also clear placement state if cancelling
+    // Clear button selection visually
+    document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
 
-    if(panelSelect) panelSelect.style.display = '';
-    if(panelContext) panelContext.style.display = 'none';
+    updatePanelVisibility();
 }
 
 function sellSelectedTower() {
@@ -1180,6 +1264,13 @@ function update(dt) {
         if (e.frozen > 0) {
             currentSpeed *= e.slowFactor;
             e.frozen -= dt;
+        }
+
+        // Fix: Update velocity vector magnitude immediately to reflect speed changes
+        // This ensures ships slow down instantly, not just at the next corner.
+        if (currentSpeed > 0) {
+             if (e.vx !== 0) e.vx = Math.sign(e.vx) * currentSpeed;
+             if (e.vy !== 0) e.vy = Math.sign(e.vy) * currentSpeed;
         }
 
         // Calculate move distance for this frame
@@ -1724,6 +1815,22 @@ function render() {
         if (!t.def) t.def = TOWER_TYPES[t.type];
         const def = t.def;
 
+        // Selection Highlight
+        if (State.selectedTowerInstance === t) {
+             ctx.save();
+             const color = def.color || '#fff';
+             ctx.strokeStyle = color;
+             ctx.lineWidth = 2;
+             ctx.shadowBlur = 10;
+             ctx.shadowColor = color;
+
+             // Draw border around the tile
+             const tx = t.c * TILE_SIZE;
+             const ty = t.r * TILE_SIZE;
+             ctx.strokeRect(tx + 1, ty + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+             ctx.restore();
+        }
+
         ctx.save();
         ctx.translate(t.x, t.y);
         ctx.lineWidth = 2;
@@ -1837,7 +1944,10 @@ function render() {
             const tx = State.mouse.tileX * TILE_SIZE + TILE_SIZE/2;
             const ty = State.mouse.tileY * TILE_SIZE + TILE_SIZE/2;
 
-            if(State.mouse.inCanvas && tx > 0 && tx < canvas.width && ty > 0 && ty < canvas.height) {
+            // Fix: Do not check against canvas.width/height directly as they are scaled pixels,
+            // whereas tx/ty are logical. We just need to check if mouse is in canvas (to start)
+            // and rely on tile coordinate validity.
+            if(State.mouse.inCanvas) {
                 // Check validity first
                 const r = State.mouse.tileY;
                 const c = State.mouse.tileX;
@@ -1860,7 +1970,22 @@ function render() {
                 // Determine drawing color based on validity
 
                 // Determine drawing color based on validity
+                // Determine drawing color based on validity
                 let drawColor = valid ? color : CONSTS.UNAVAILABLE_PLACEMENT_COLOR;
+
+                // Highlight Valid Placement Cell (User Request)
+                if (valid) {
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = color;
+
+                    const cellX = c * TILE_SIZE;
+                    const cellY = r * TILE_SIZE;
+                    ctx.strokeRect(cellX + 1, cellY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                    ctx.restore();
+                }
 
                 // Draw Radius (Always, using drawColor)
                 ctx.beginPath();
@@ -1919,7 +2044,55 @@ function gameLoop(timestamp) {
     }
 
     render();
+    renderTowerButtons();
     requestAnimationFrame(gameLoop);
+}
+
+function renderTowerButtons() {
+    const types = ['green', 'red', 'blue', 'purple'];
+    types.forEach(type => {
+        const btnCanvas = document.getElementById(`btn-canvas-${type}`);
+        if (!btnCanvas) return;
+
+        const bCtx = btnCanvas.getContext('2d', { alpha: true });
+        const rect = btnCanvas.getBoundingClientRect();
+
+        // Clear
+        bCtx.clearRect(0, 0, btnCanvas.width, btnCanvas.height);
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let angle = -Math.PI / 2; // Default Up for fixed
+        if (type !== 'blue') {
+            angle = Math.atan2(State.uiMouse.y - centerY, State.uiMouse.x - centerX);
+        }
+
+        bCtx.save();
+        bCtx.translate(btnCanvas.width/2, btnCanvas.height/2);
+        bCtx.rotate(angle);
+
+        // Color
+        let color = '#fff';
+        if (TOWER_TYPES[type]) color = TOWER_TYPES[type].color;
+
+        bCtx.strokeStyle = color;
+        bCtx.lineWidth = 2;
+        bCtx.lineCap = 'round';
+        bCtx.lineJoin = 'round';
+        bCtx.shadowColor = color;
+        bCtx.shadowBlur = 5;
+
+        drawShape(bCtx, TOWER_TYPES[type].shape, 12); // Scale 12 fits 40x40
+        bCtx.stroke();
+
+        // Add a center dot or detail?
+        if (type === 'laser') {
+             // specific detail?
+        }
+
+        bCtx.restore();
+    });
 }
 
 function togglePause() {
