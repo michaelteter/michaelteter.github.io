@@ -79,7 +79,7 @@
 
         .tower-select {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
         }
 
@@ -549,6 +549,17 @@
                     <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
                 </div>
 
+
+                <div class="map-section" style="width: 100%;">
+                    <div class="map-control-row" style="justify-content: space-between;">
+                        <button id="map-prev" class="map-btn">&lt;</button>
+                        <span id="map-current" style="font-size: 16px;">Map 1</span>
+                        <button id="map-next" class="map-btn">&gt;</button>
+                        <button id="btn-music" class="music-btn" style="width: auto; margin-left: 10px; margin-top: 0;" onclick="toggleMusic()">&#9658; Music</button>
+                        <button id="btn-next-song" class="music-btn" style="width: auto; margin-left: 5px; margin-top: 0; padding: 5px 10px;" onclick="playNextSong()" title="Next Track">&gt;&gt;</button>
+                    </div>
+                </div>
+
                 <div class="controls-row" style="display: flex; gap: 10px;">
                     <button id="btn-play-pause" class="play-pause-btn" style="flex: 1;">&#9658; Game</button>
                     <button id="btn-restart" class="play-pause-btn" style="flex: 1; color: #ccc; border-color: #555;">Restart</button>
@@ -562,30 +573,33 @@
 
                 <div class="tower-select">
                     <!-- <h3>Towers</h3> Removed per request -->
-                    <button class="tower-btn btn-green" onclick="selectTower('green')">Laser Turret ($10)</button>
-                    <button class="tower-btn btn-red" onclick="selectTower('red')">Missile Battery ($20)</button>
-                    <button class="tower-btn btn-blue" onclick="selectTower('blue')">Pulse Disruptor ($30)</button>
-                    <button class="tower-btn btn-purple" onclick="selectTower('purple')">Artillary ($40)</button>
+                    <button class="tower-btn btn-green" onclick="selectTower('green')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                        <canvas id="btn-canvas-green" width="40" height="40"></canvas>
+                        <div style="font-size:10px; margin-top:2px;">$10</div>
+                    </button>
+                    <button class="tower-btn btn-red" onclick="selectTower('red')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                        <canvas id="btn-canvas-red" width="40" height="40"></canvas>
+                        <div style="font-size:10px; margin-top:2px;">$20</div>
+                    </button>
+                    <button class="tower-btn btn-blue" onclick="selectTower('blue')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                        <canvas id="btn-canvas-blue" width="40" height="40"></canvas>
+                        <div style="font-size:10px; margin-top:2px;">$30</div>
+                    </button>
+                    <button class="tower-btn btn-purple" onclick="selectTower('purple')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                        <canvas id="btn-canvas-purple" width="40" height="40"></canvas>
+                        <div style="font-size:10px; margin-top:2px;">$40</div>
+                    </button>
+                </div>
 
-                    <div class="map-section" style="grid-column: 1 / -1; margin-top: 20px; padding-top: 15px;">
-                        <div class="map-control-row" style="justify-content: space-between;">
-                            <button id="map-prev" class="map-btn">&lt;</button>
-                            <span id="map-current" style="font-size: 16px;">Map 1</span>
-                            <button id="map-next" class="map-btn">&gt;</button>
-                            <button id="btn-music" class="music-btn" style="width: auto; margin-left: 10px; margin-top: 0;" onclick="toggleMusic()">Music Off</button>
-                            <button id="btn-next-song" class="music-btn" style="width: auto; margin-left: 5px; margin-top: 0; padding: 5px 10px;" onclick="playNextSong()" title="Next Track">&gt;&gt;</button>
-                        </div>
+                <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 4px; margin-top: 10px;">
+                    <h3 id="ctx-tower-name" style="margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Tower</h3>
+                    <div id="ctx-tower-info" style="color: #ccc; font-size: 12px; line-height: 1.4;"></div>
+                    <div id="ctx-tower-actions" style="display: flex; gap: 5px; margin-top: 5px;">
+                        <button id="btn-sell" class="tower-btn" style="flex: 1; border-color: #555; background: #222; color: #aaa;">Sell</button>
                     </div>
                 </div>
 
-                <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px;">
-                    <h3 id="ctx-tower-name">Tower</h3>
-                    <div id="ctx-tower-info" style="color: #888; font-size: 12px; margin-bottom: 10px;"></div>
-                    <button id="btn-sell" class="tower-btn" style="border-color: #555; background: #222; color: #aaa;">Sell</button>
-                    <button id="btn-cancel" class="tower-btn" style="margin-top: 5px; background: transparent; border: 1px solid #333;">Back</button>
-                </div>
-
-                <div class="config-panel" id="config-inputs">
+                <div class="config-panel" id="config-inputs" style="display: flex;">
                     <!-- Config inputs generated by JS -->
                 </div>
             </div>
@@ -593,8 +607,8 @@
 
     </div>
 
-<script src="consts.js"></script>
-<script src="maps.js"></script>
-<script src="game.js"></script>
+<script src="consts.js?v=1"></script>
+<script src="maps.js?v=1"></script>
+<script src="game.js?v=1"></script>
 </body>
 </html>
