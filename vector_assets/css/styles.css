@@ -653,3 +653,12 @@ body {
 .dir-btn:hover { background: #444; color: #fff; border-color: #fff; }
 .dir-btn.active { background: #4b0082; color: #fff; border-color: #aa00ff; }
 
+a {
+    color: #FFFF00;
+    text-decoration: underline;
+    font-weight: bold;
+    line-height: 1.1;
+    padding: 0.5rem;
+}
+
+
