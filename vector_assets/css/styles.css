@@ -350,8 +350,8 @@ body {
 #splash-subtitle {
     font-size: 18px;
     color: #ccc;
-    margin-top: -10px;
-    font-style: italic;
+    margin-top: 10px;
+    /* font-style: italic; */
 }
 
 #btn-start-game {

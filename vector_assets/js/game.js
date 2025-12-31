@@ -1019,8 +1019,8 @@ function spawnNextEnemy() {
     State.enemiesSpawnedThisRound++;
 
     // Calculate delay for NEXT spawn based on THIS enemy's speed
-    // Formula: Delay = 80000 / Speed
-    const delay = 80000 / enemy.speed;
+    // Use constant gap
+    const delay = (typeof CONSTS !== 'undefined' && CONSTS.SHIP_SPAWN_GAP_MS !== undefined) ? CONSTS.SHIP_SPAWN_GAP_MS : 1000;
 
     State.nextSpawnDelay = delay;
     State.spawnTimer = 0;
@@ -1183,7 +1183,8 @@ function update(dt) {
         } else if (State.spawningState === 'cooldown') {
             // Wait between groups
             State.groupCooldownTimer += dt;
-            if (State.groupCooldownTimer >= 2000) { // 2 Seconds Pause
+            const groupGap = (typeof CONSTS !== 'undefined' && CONSTS.GROUP_SPAWN_GAP_MS !== undefined) ? CONSTS.GROUP_SPAWN_GAP_MS : 3000;
+            if (State.groupCooldownTimer >= groupGap) { // Configurable Pause
                 // Next Group
                 State.wave++; // Increase internal difficulty counter
 
@@ -1646,6 +1647,7 @@ function updateStats() {
 }
 
 function triggerGameOver() {
+    stopAllSFX(); // Stop active loops (lasers) before explosions start
     State.gameOver = true;
     State.flashLife = 0; // Clear any pending exit flash
     deselectTowerInstance();
