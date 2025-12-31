@@ -352,6 +352,12 @@ body {
     /* font-style: italic; */
 }
 
+#splash-note {
+    font-size: 14px;
+    color: #ccc;
+    margin-top: 10px;
+}
+
 #btn-start-game {
     background: transparent;
     color: var(--accent-green);
