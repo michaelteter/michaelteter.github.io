@@ -4,525 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vector Tower Defense</title>
-    <style>
-        :root {
-            --bg-color: #0b0b0b;
-            --grid-line: #1a1a1a;
-            --text-color: #e0e0e0;
-            --accent-green: #00ff66;
-            --accent-red: #ff3333;
-            --accent-blue: #33ccff;
-            --accent-purple: #aa00ff;
-            --panel-bg: #141414;
-            --ui-border: #333;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow: hidden; /* Prevent body scroll */
-            height: 100vh;
-        }
-
-        #game-container {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            height: 100%;
-            padding: 0;
-        }
-
-        .main-layout {
-            display: flex;
-            flex-direction: row;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .game-view {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            background: #000;
-            overflow: hidden;
-        }
-
-        canvas {
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            cursor: crosshair;
-        }
-
-        #ui-panel {
-            background-color: var(--panel-bg);
-            border-left: 1px solid var(--ui-border);
-            padding: 20px;
-            width: 340px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            box-shadow: -4px 0 6px rgba(0,0,0,0.3);
-            height: 100%;
-            overflow-y: auto;
-            z-index: 10;
-        }
-
-        .tower-select {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        .tower-btn {
-            padding: 10px;
-            border: 2px solid transparent;
-            background-color: #222;
-            color: #fff;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-radius: 4px;
-            white-space: normal;
-            line-height: 1.2;
-            font-size: 11px;
-            text-align: center;
-        }
-
-        .tower-btn:hover {
-            transform: translateY(-2px);
-            filter: brightness(1.2);
-        }
-
-        .tower-btn.selected {
-            border-color: #fff;
-            background-color: #333;
-        }
-
-        .tower-btn:disabled, .tower-btn.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-            filter: grayscale(100%);
-            border-color: #444;
-            color: #666;
-            pointer-events: none;
-        }
-
-        .btn-green { border-left: 4px solid var(--accent-green); }
-        .btn-red { border-left: 4px solid var(--accent-red); }
-        .btn-blue { border-left: 4px solid var(--accent-blue); }
-        .btn-purple { border-left: 4px solid var(--accent-purple); }
-
-        .config-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            font-size: 11px;
-        }
-
-        .config-group {
-            background: #1a1a1a;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #333;
-        }
-
-        .config-group h4 {
-            margin: 0 0 8px 0;
-            color: #ccc;
-            font-size: 12px;
-            border-bottom: 1px solid #444;
-            padding-bottom: 4px;
-            text-transform: uppercase;
-        }
-
-        .config-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2px; /* Compact */
-        }
-
-        .config-item label {
-            color: #888;
-            flex: 1;
-            white-space: normal; /* Allow wrap */
-            overflow: hidden;
-            font-size: 10px; /* Smaller */
-            margin-right: 4px;
-            line-height: 1.1;
-        }
-
-        .config-item input {
-            background: #222;
-            border: 1px solid #333;
-            color: #ccc;
-            padding: 1px 4px;
-            border-radius: 3px;
-            width: 45px; /* Compact */
-            text-align: right;
-            font-family: monospace;
-            font-size: 10px;
-        }
-
-        .config-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px 0; /* Vertical Gap between rows | Horizontal Gap */
-        }
-
-        .config-col {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            box-sizing: border-box;
-        }
-
-        /* Divider & Spacing Controls */
-        .config-col:nth-child(odd) {
-            padding-right: 12px; /* Spacing between Left Column and Divider */
-        }
-
-        .config-col:nth-child(even) {
-            border-left: 1px solid #333; /* The Vertical Divider Line */
-            padding-left: 12px; /* Spacing between Divider and Right Column */
-        }
-
-        .config-col h5 {
-            margin: 0 0 5px 0;
-            color: #ccc; /* Default neutral, JS will override */
-            font-size: 11px;
-            text-transform: uppercase;
-            border-bottom: 1px solid #333;
-            padding-bottom: 2px;
-        }
-
-        .stats-bar {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-            color: #888;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--ui-border);
-        }
-
-        .stat-value {
-            color: #fff;
-            font-weight: bold;
-        }
-
-        #map-reference {
-            width: 100%;
-            max-width: 1200px;
-            border: 1px solid var(--ui-border);
-            border-radius: 4px;
-            background: var(--panel-bg);
-            margin-top: 0;
-            overflow: hidden;
-        }
-
-        #map-reference summary {
-            padding: 10px;
-            cursor: pointer;
-            background: #222;
-            color: #ccc;
-            user-select: none;
-            font-weight: bold;
-        }
-
-        #maps-container {
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .map-entry {
-            font-family: 'Courier New', Courier, monospace;
-            white-space: pre;
-            background: #000;
-            padding: 10px;
-            border: 1px solid #333;
-            color: var(--accent-green);
-            font-size: 12px;
-            line-height: 1.2;
-        }
-
-        .map-title {
-            color: #888;
-            margin-bottom: 5px;
-            font-family: sans-serif;
-            font-size: 14px;
-        }
-        .map-control-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: #1a1a1a;
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #333;
-        }
-
-        .map-btn {
-            background: #333;
-            border: 1px solid #444;
-            color: #eee;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            transition: all 0.2s;
-            user-select: none;
-        }
-
-        .map-btn:hover {
-            background: #444;
-            border-color: #fff;
-            color: #fff;
-        }
-
-        .map-btn:active {
-            transform: scale(0.95);
-        }
-
-        #map-current {
-            font-weight: bold;
-            color: var(--accent-green);
-            min-width: 20px;
-            text-align: center;
-            font-family: monospace;
-            font-size: 14px;
-        }
-
-        /* Splash Screen & Blur */
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6); /* Semi-transparent overlay */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            backdrop-filter: blur(2px); /* Additional blur on overlay itself */
-        }
-
-        #splash-content {
-            background: rgba(20, 20, 20, 0.9);
-            padding: 40px 60px;
-            border: 1px solid var(--accent-green);
-            border-radius: 8px;
-            box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        #splash-title {
-            font-size: 48px;
-            font-weight: bold;
-            color: var(--accent-green);
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
-            margin: 0;
-        }
-
-        #splash-subtitle {
-            font-size: 18px;
-            color: #ccc;
-            margin-top: -10px;
-            font-style: italic;
-        }
-
-        #btn-start-game {
-            background: transparent;
-            color: var(--accent-green);
-            border: 2px solid var(--accent-green);
-            padding: 15px 40px;
-            font-size: 20px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 20px;
-            border-radius: 4px;
-        }
-
-        #btn-start-game:hover {
-            background: var(--accent-green);
-            color: #000;
-            box-shadow: 0 0 20px rgba(0, 255, 102, 0.6);
-            transform: scale(1.05);
-        }
-
-        /* Blur Target */
-        #game-container.blurred {
-            filter: blur(5px);
-            pointer-events: none; /* Prevent clicking game through splash */
-            transition: filter 0.5s ease;
-        }
-    </style>
-</head>
-    <style>
-        .play-pause-btn {
-            background: #222;
-            border: 1px solid #444;
-            color: var(--accent-green);
-            cursor: pointer;
-            font-size: 16px;
-            padding: 12px;
-            border-radius: 4px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-transform: uppercase;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        .play-pause-btn:hover { background: #333; border-color: #fff; }
-        .play-pause-btn:hover { background: #333; border-color: #fff; }
-
-        .music-btn {
-            background: #222;
-            border: 1px solid #444;
-            color: #aaa;
-            cursor: pointer;
-            font-size: 12px;
-            padding: 4px 8px;
-            margin-top: 10px;
-            width: 100%;
-            border-radius: 4px;
-        }
-        .music-btn:hover { background: #333; color: #fff; }
-        .music-btn.active { color: var(--accent-green); border-color: var(--accent-green); }
-
-        #game-over-panel {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            text-align: center;
-        }
-
-        #game-over-panel h2 {
-            font-size: 32px;
-            color: var(--accent-red);
-            margin: 0 0 20px 0;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        #game-over-panel p {
-            font-size: 16px;
-            color: #ccc;
-            margin: 0 0 30px 0;
-        }
-
-        #survived-waves {
-            color: #fff;
-            font-weight: bold;
-            font-size: 18px;
-        }
-
-        #btn-new-game {
-            background-color: var(--accent-green);
-            color: #000;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-
-        #btn-new-game:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
-        }
-
-        /* Config Tabs */
-        .config-tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 0px;
-            /* border-bottom: 1px solid #333; Removed per request */
-            padding-bottom: 0px;
-            margin-top: 10px;
-        }
-
-        .tab-btn {
-            background: #222;
-            border: 1px solid #444;
-            color: #888;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            text-transform: uppercase;
-            font-weight: bold;
-            flex: 1;
-            transition: all 0.2s;
-        }
-
-        .tab-btn:hover {
-            background: #333;
-            color: #ccc;
-        }
-
-        .tab-btn.active {
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-            background: #1a1a1a;
-            box-shadow: 0 0 10px rgba(0, 255, 102, 0.1);
-        }
-
-        .config-section {
-            display: none;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-
-        .config-section.active {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <link rel="stylesheet" href="vector_assets/css/styles.css">
 </head>
 <body>
 
@@ -543,72 +25,94 @@
             </div>
 
             <div id="ui-panel">
-                <div class="stats-bar">
-                    <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
-                    <span>Wave: <span id="wave-display" class="stat-value">1</span></span>
-                    <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
-                </div>
+                <!-- Top Audio Control Row -->
+                <div id="audio-panel">
+                    <button id="btn-music" class="music-btn" onclick="toggleMusic()" title="Play/Pause Music"><span class="audio-icon">&#9658;</span> Music</button>
+                    <button id="btn-next-song" class="music-btn" onclick="playNextSong()" title="Next Track">&#10095;&#10095;</button>
 
+                    <div class="vol-group">
+                        <div class="vol-label">Music</div>
+                        <div class="vol-btns">
+                            <button id="btn-music-vol-down" class="vol-btn" onclick="adjustMusic(-1)">&#9660;</button>
+                            <button id="btn-music-vol-up" class="vol-btn" onclick="adjustMusic(1)">&#9650;</button>
+                        </div>
+                    </div>
 
-                <div class="map-section" style="width: 100%;">
-                    <div class="map-control-row" style="justify-content: space-between;">
-                        <button id="map-prev" class="map-btn">&lt;</button>
-                        <span id="map-current" style="font-size: 16px;">Map 1</span>
-                        <button id="map-next" class="map-btn">&gt;</button>
-                        <button id="btn-music" class="music-btn" style="width: auto; margin-left: 10px; margin-top: 0;" onclick="toggleMusic()">&#9658; Music</button>
-                        <button id="btn-next-song" class="music-btn" style="width: auto; margin-left: 5px; margin-top: 0; padding: 5px 10px;" onclick="playNextSong()" title="Next Track">&gt;&gt;</button>
+                    <div class="vol-group">
+                        <div class="vol-label">SFX</div>
+                        <div class="vol-btns">
+                            <button id="btn-sfx-down" class="vol-btn" onclick="adjustSFX(-1)">&#9660;</button>
+                            <button id="btn-sfx-up" class="vol-btn" onclick="adjustSFX(1)">&#9650;</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="controls-row" style="display: flex; gap: 10px;">
-                    <button id="btn-play-pause" class="play-pause-btn" style="flex: 1;">&#9658; Game</button>
-                    <button id="btn-restart" class="play-pause-btn" style="flex: 1; color: #ccc; border-color: #555;">Restart</button>
-                </div>
+                <!-- Scrollable/Main Content Area -->
+                <div id="ui-content-wrapper">
 
-                <div id="game-over-panel">
-                    <h2>GAME<br>OVER</h2>
-                    <p>Survived <span id="survived-waves">0</span> Waves</p>
-                    <button id="btn-new-game">New Game</button>
-                </div>
+                    <div id="game-over-panel">
+                        <div class="game-over-content">
+                            <h2>GAME<br>OVER</h2>
+                            <p>Final Score: <span id="final-score">0</span></p>
+                            <button id="btn-new-game">New Game</button>
+                        </div>
+                    </div>
 
-                <div class="tower-select">
-                    <!-- <h3>Towers</h3> Removed per request -->
-                    <button class="tower-btn btn-green" onclick="selectTower('green')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                        <canvas id="btn-canvas-green" width="40" height="40"></canvas>
-                        <div style="font-size:10px; margin-top:2px;">$10</div>
-                    </button>
-                    <button class="tower-btn btn-red" onclick="selectTower('red')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                        <canvas id="btn-canvas-red" width="40" height="40"></canvas>
-                        <div style="font-size:10px; margin-top:2px;">$20</div>
-                    </button>
-                    <button class="tower-btn btn-blue" onclick="selectTower('blue')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                        <canvas id="btn-canvas-blue" width="40" height="40"></canvas>
-                        <div style="font-size:10px; margin-top:2px;">$30</div>
-                    </button>
-                    <button class="tower-btn btn-purple" onclick="selectTower('purple')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                        <canvas id="btn-canvas-purple" width="40" height="40"></canvas>
-                        <div style="font-size:10px; margin-top:2px;">$40</div>
-                    </button>
-                </div>
+                    <div class="stats-bar">
+                        <span>Lives: <span id="lives-display" class="stat-value">20</span></span>
+                        <span>Score: <span id="score-display" class="stat-value">0</span></span>
+                        <span>Money: <span id="money-display" class="stat-value">$1000</span></span>
+                    </div>
 
-                <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 4px; margin-top: 10px;">
-                    <h3 id="ctx-tower-name" style="margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Tower</h3>
-                    <div id="ctx-tower-info" style="color: #ccc; font-size: 12px; line-height: 1.4;"></div>
-                    <div id="ctx-tower-actions" style="display: flex; gap: 5px; margin-top: 5px;">
-                        <button id="btn-sell" class="tower-btn" style="flex: 1; border-color: #555; background: #222; color: #aaa;">Sell</button>
+                    <div class="map-section" style="width: 100%;">
+                        <div class="map-control-row" style="justify-content: space-between;">
+                            <button id="map-prev" class="map-btn">&lt;</button>
+                            <span id="map-current" style="font-size: 16px;">Map 1</span>
+                            <button id="map-next" class="map-btn">&gt;</button>
+                        </div>
+                    </div>
+
+                    <div class="controls-row" style="display: flex; gap: 10px;">
+                        <button id="btn-play-pause" class="play-pause-btn" style="flex: 1;">&#9658; Game</button>
+                        <button id="btn-restart" class="play-pause-btn" style="flex: 1; color: #ccc; border-color: #555;">Restart</button>
+                    </div>
+
+                    <div class="tower-select">
+                        <!-- <h3>Towers</h3> Removed per request -->
+                        <button class="tower-btn btn-green" onclick="selectTower('green')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-green" width="40" height="40"></canvas>
+                            <div style="font-size:10px; margin-top:2px;">$10</div>
+                        </button>
+                        <button class="tower-btn btn-red" onclick="selectTower('red')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-red" width="40" height="40"></canvas>
+                            <div style="font-size:10px; margin-top:2px;">$20</div>
+                        </button>
+                        <button class="tower-btn btn-blue" onclick="selectTower('blue')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-blue" width="40" height="40"></canvas>
+                            <div style="font-size:10px; margin-top:2px;">$30</div>
+                        </button>
+                        <button class="tower-btn btn-purple" onclick="selectTower('purple')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-purple" width="40" height="40"></canvas>
+                            <div style="font-size:10px; margin-top:2px;">$40</div>
+                        </button>
+                    </div>
+
+                    <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 4px; margin-top: 10px;">
+                        <h3 id="ctx-tower-name" style="margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Tower</h3>
+                        <div id="ctx-tower-info" style="color: #ccc; font-size: 12px; line-height: 1.4;"></div>
+                        <div id="ctx-tower-actions" style="display: flex; gap: 5px; margin-top: 5px;">
+                            <button id="btn-sell" class="tower-btn" style="flex: 1; border-color: #555; background: #222; color: #aaa;">Sell</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="config-panel" id="config-inputs" style="display: flex;">
-                    <!-- Config inputs generated by JS -->
-                </div>
             </div>
         </div>
 
     </div>
 
-<script src="consts.js?v=1"></script>
-<script src="maps.js?v=1"></script>
-<script src="game.js?v=1"></script>
+<script src="vector_assets/js/consts.js?v=2"></script>
+<script src="vector_assets/js/maps.js?v=2"></script>
+<script src="vector_assets/js/game.js?v=2"></script>
 </body>
 </html>
