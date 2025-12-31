@@ -25,6 +25,8 @@ const CONSTS = {
     "vector_assets/audio/GeometricLinesofDefense_1.mp3",
     "vector_assets/audio/MidnightVectorSiege_1.mp3",
     "vector_assets/audio/BossRoomBloodrush.mp3",
+    "vector_assets/audio/MidnightSoftCurrents.mp3",
+    "vector_assets/audio/TerminalLockdown.mp3",
     "vector_assets/audio/GeometricLinesofDefense_2.mp3",
     "vector_assets/audio/MidnightVectorSiege_2.mp3",
     "vector_assets/audio/NightfallGroove.mp3",
@@ -64,7 +66,7 @@ const SHAPES = {
       {x: -1, y: -1},
       {x: 1, y: -1}
   ],
-    green_tower: [
+    laser_tower: [
       { x: 0.8, y: 0.3 },
       { x: 0.7, y: 0.4 },
       { x: -0.5, y: 0.4 },
@@ -81,7 +83,7 @@ const SHAPES = {
         {x: -0.809, y: -0.588},
         {x: 0.309, y: -0.951}
   ],
-    red_tower: [
+    missile_tower: [
       { x: 0.5, y: 0.6 },
       { x: 0.5, y: 0.8 },
       { x: -0.5, y: 0.8 },
@@ -98,8 +100,19 @@ const SHAPES = {
         {x: -1, y: 0},
         {x: -0.5, y: -0.866},
         {x: 0.5, y: -0.866}
-    ],
-    three_pointed_star: [
+  ],
+  railgun_tower: [
+    { x: -0.7, y: -0.7 },
+    { x: 0.0, y: -0.7 },
+    { x: 0.2, y: -0.2 },
+    { x: 0.8, y: -0.2 },
+    { x: 0.8, y: 0.2 },
+    { x: 0.2, y: 0.2 },
+    { x: 0.0, y: 0.7 },
+    { x: -0.7, y: 0.7 },
+    { x: -0.7, y: -0.7 }
+  ],
+    artillery_tower: [
         {x: 1, y: 0},
         {x: -0.2, y: 0.3},
         {x: -0.6, y: 0.9},
@@ -107,7 +120,7 @@ const SHAPES = {
         {x: -0.6, y: -0.9},
         {x: -0.2, y: -0.3}
     ],
-    asterisk: [
+    emp_tower: [
         // 8-point starish shape
         {x: 1, y: 0}, {x: 0.3, y: 0.3},
         {x: 0, y: 1}, {x: -0.3, y: 0.3},
@@ -117,17 +130,52 @@ const SHAPES = {
 };
 
 const TARGETING_MODES = {
-  fixed: "maintain current target until it explodes or goes out of range",
-  nearest: "always target nearest enemy, changing targets as needed",
-  weakest: "target weakest enemy in range, then stay on target until it explodes or goes out of range",
-  strongest: "target strongest enemy in range, then stay on target until it explodes or goes out of range",
-}
+    nearest: 'nearest',
+    weakest: 'weakest',
+    strongest: 'strongest',
+    fixed: 'fixed'
+};
+
+const TOWER_DAMAGE_TYPES = {
+    LASER: 'laser',
+    EXPLOSIVE: 'explosive',
+    ELECTROMAGNETIC: 'electromagnetic',
+    HIGH_ENERGY: 'high_energy'
+};
 
 const TOWER_TYPES = {
-    purple: {
-        name: "Artillary Turret",
-        type: "artillary",
-        shape: "three_pointed_star",
+    LASER: 'laser',
+    MISSILE: 'missile',
+    EMP: 'emp',
+    ARTILLERY: 'artillery',
+    RAILGUN: 'railgun'
+};
+
+const TOWERS = {
+    [TOWER_TYPES.RAILGUN]: {
+        name: "Railgun",
+        type: TOWER_TYPES.RAILGUN,
+        damage_type: TOWER_DAMAGE_TYPES.HIGH_ENERGY,
+        shape: "railgun_tower",
+        targeting_mode: TARGETING_MODES.fixed,
+        fire_sound: "vector_assets/audio/sci-fi-launch-3-351238.wav",
+        fire_sound_volume: 0.7,
+        explode_sound: "vector_assets/audio/cinematic-boom-171285.wav",
+        explode_sound_volume: 1.0,
+        price: 100,
+        range: 250, // Detection range
+        cooldown: 3000,
+        damage: 100,
+        retarget_rotation_rate: 0.0, // Fixed direction
+        firing_angle_threshold: 0.1,
+        outlets: [{ x: 0, y: 0, delay: 0 }],
+        color: '#FFFF00'
+    },
+    [TOWER_TYPES.ARTILLERY]: { // was purple
+        name: "Artillery Turret", // Typo fixed
+        type: TOWER_TYPES.ARTILLERY,
+        damage_type: TOWER_DAMAGE_TYPES.EXPLOSIVE,
+        shape: "artillery_tower",
         targeting_mode: TARGETING_MODES.fixed,
         fire_sound: "vector_assets/audio/sci-fi-launch-3-351238.wav",
         fire_sound_volume: 0.7,
@@ -143,10 +191,11 @@ const TOWER_TYPES = {
         projectile: { speed: 10, color: '#aa00ff' },
         color: '#aa00ff'
     },
-    green: {
+    [TOWER_TYPES.LASER]: { // was green
         name: "Laser Turret",
-        type: "laser",
-        shape: "green_tower",
+        type: TOWER_TYPES.LASER,
+        damage_type: TOWER_DAMAGE_TYPES.LASER,
+        shape: "laser_tower",
         targeting_mode: TARGETING_MODES.fixed,
         fire_sound: "vector_assets/audio/laser-weld-103309.wav",
         fire_sound_volume: 1.0,
@@ -163,10 +212,11 @@ const TOWER_TYPES = {
         firing_pause_ms: 500,
         color: '#00ff66'
     },
-    red: {
-        name: "Missile Battery",
-        type: "projectile",
-        shape: "red_tower",
+    [TOWER_TYPES.MISSILE]: { // was red
+        name: "Missile Launcher",
+        type: TOWER_TYPES.MISSILE,
+        damage_type: TOWER_DAMAGE_TYPES.EXPLOSIVE,
+        shape: "missile_tower",
         targeting_mode: TARGETING_MODES.fixed,
         fire_sound: "vector_assets/audio/missile-blast-2-95177.wav",
         fire_sound_volume: 0.8,
@@ -182,10 +232,11 @@ const TOWER_TYPES = {
         projectile: { speed: 6, color: '#ff3333' },
         color: '#ff3333'
     },
-    blue: {
+    [TOWER_TYPES.EMP]: { // was blue
         name: "Pulse Disruptor",
-        type: "pulse",
-        shape: "asterisk",
+        type: TOWER_TYPES.EMP,
+        damage_type: TOWER_DAMAGE_TYPES.ELECTROMAGNETIC,
+        shape: "emp_tower",
         targeting_mode: TARGETING_MODES.fixed, // irrelevant for pulse
         fire_sound: "vector_assets/audio/electronic-pulse-8bit-293075.wav",
         fire_sound_volume: 0.5,
@@ -203,31 +254,7 @@ const TOWER_TYPES = {
     }
 };
 
-// Legacy shim if needed by game.js initialization before full refactor
-const Towers = {
-    greenDamage: TOWER_TYPES.green.damage,
-    greenRange: TOWER_TYPES.green.range,
-    greenDelay: TOWER_TYPES.green.cooldown,
-    greenPrice: TOWER_TYPES.green.price,
 
-    redDamage: TOWER_TYPES.red.damage,
-    redRange: TOWER_TYPES.red.range,
-    redDelay: TOWER_TYPES.red.cooldown,
-    redSpeed: TOWER_TYPES.red.projectile ? TOWER_TYPES.red.projectile.speed : 0,
-    redPrice: TOWER_TYPES.red.price,
-
-    blueDamage: TOWER_TYPES.blue.damage,
-    blueRadius: TOWER_TYPES.blue.range,
-    blueDelay: TOWER_TYPES.blue.cooldown,
-    blueSlowFactor: TOWER_TYPES.blue.effect ? TOWER_TYPES.blue.effect.factor : 0,
-    blueDuration: TOWER_TYPES.blue.effect ? TOWER_TYPES.blue.effect.duration : 0,
-    bluePrice: TOWER_TYPES.blue.price,
-
-    purpleDamage: TOWER_TYPES.purple.damage,
-    purpleRange: TOWER_TYPES.purple.range,
-    purpleDelay: TOWER_TYPES.purple.cooldown,
-    purplePrice: TOWER_TYPES.purple.price
-};
 
 const ENEMIES = [
     {
@@ -242,9 +269,10 @@ const ENEMIES = [
         shape: 'triangle',
         draw_scale: 0.8,
         resistance: {
-            laser: 1.0,
-            projectile: 1.0,
-            pulse: 1.0
+            [TOWER_DAMAGE_TYPES.LASER]: 1.0,
+            [TOWER_DAMAGE_TYPES.EXPLOSIVE]: 1.0,
+            [TOWER_DAMAGE_TYPES.ELECTROMAGNETIC]: 1.0,
+            [TOWER_DAMAGE_TYPES.HIGH_ENERGY]: 1.0
         }
     },
     {
@@ -259,9 +287,10 @@ const ENEMIES = [
         shape: 'dart',
         draw_scale: 0.8,
         resistance: {
-            laser: 1.0,
-            projectile: 0.8, // Slightly resistant to explosions?
-            pulse: 1.0
+            [TOWER_DAMAGE_TYPES.LASER]: 1.0,
+            [TOWER_DAMAGE_TYPES.EXPLOSIVE]: 0.8, // Slightly resistant to explosions?
+            [TOWER_DAMAGE_TYPES.ELECTROMAGNETIC]: 1.0,
+            [TOWER_DAMAGE_TYPES.HIGH_ENERGY]: 1.0
         }
     },
     {
@@ -277,9 +306,10 @@ const ENEMIES = [
       shape: 'trapezoid',
         draw_scale: 1.0,
         resistance: {
-            laser: 0.8,
-            projectile: 0.2, // Very resistant to explosions
-            pulse: 1.0
+            [TOWER_DAMAGE_TYPES.LASER]: 0.8,
+            [TOWER_DAMAGE_TYPES.EXPLOSIVE]: 0.2, // Very resistant to explosions
+            [TOWER_DAMAGE_TYPES.ELECTROMAGNETIC]: 1.0,
+            [TOWER_DAMAGE_TYPES.HIGH_ENERGY]: 1.0
         }
     }
 ];

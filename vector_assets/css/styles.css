@@ -99,7 +99,7 @@ body {
 }
 
 .tower-btn.selected {
-    border-color: #fff;
+    border-color: var(--selected-color, #fff);
     background-color: #333;
 }
 
@@ -112,10 +112,8 @@ body {
     pointer-events: none;
 }
 
-.btn-green { border-left: 4px solid var(--accent-green); }
-.btn-red { border-left: 4px solid var(--accent-red); }
-.btn-blue { border-left: 4px solid var(--accent-blue); }
-.btn-purple { border-left: 4px solid var(--accent-purple); }
+/* Dynamic borders handled by JS */
+
 
 .config-panel {
     display: flex;
@@ -632,3 +630,20 @@ body {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+.dir-btn {
+    background: #333;
+    border: 1px solid #555;
+    color: #ccc;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.dir-btn:hover { background: #444; color: #fff; border-color: #fff; }
+.dir-btn.active { background: #4b0082; color: #fff; border-color: #aa00ff; }
+

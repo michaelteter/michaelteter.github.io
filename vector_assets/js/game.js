@@ -5,28 +5,32 @@ let COLS = 20;
 
 // Mutable configuration object (bound to UI)
 const GameConfig = {
-    // Green Tower
-    greenDamage: (typeof Towers !== 'undefined' ? Towers.greenDamage : 80),
-    greenRange: (typeof Towers !== 'undefined' ? Towers.greenRange : 150),
-    greenDelay: (typeof Towers !== 'undefined' ? Towers.greenDelay : 0),
+    // Laser Tower (was Green)
+    laserDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.LASER].damage : 80),
+    laserRange: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.LASER].range : 150),
+    laserDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.LASER].cooldown : 0),
 
-    // Red Tower
-    redDamage: (typeof Towers !== 'undefined' ? Towers.redDamage : 50),
-    redRange: (typeof Towers !== 'undefined' ? Towers.redRange : 250),
-    redSpeed: (typeof Towers !== 'undefined' ? Towers.redSpeed : 6),
-    redDelay: (typeof Towers !== 'undefined' ? Towers.redDelay : 1500),
+    // Missile Tower (was Red)
+    missileDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.MISSILE].damage : 50),
+    missileRange: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.MISSILE].range : 250),
+    missileSpeed: (typeof TOWERS !== 'undefined' && TOWERS[TOWER_TYPES.MISSILE].projectile ? TOWERS[TOWER_TYPES.MISSILE].projectile.speed : 6),
+    missileDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.MISSILE].cooldown : 1500),
 
-    // Blue Tower
-    blueDamage: (typeof Towers !== 'undefined' ? Towers.blueDamage : 10),
-    blueRadius: (typeof Towers !== 'undefined' ? Towers.blueRadius : 100),
-    blueDelay: (typeof Towers !== 'undefined' ? Towers.blueDelay : 2000),
-    blueSlowFactor: (typeof Towers !== 'undefined' ? Towers.blueSlowFactor : 0.5),
-    blueDuration: (typeof Towers !== 'undefined' ? Towers.blueDuration : 1000),
+    // EMP Tower (was Blue)
+    empDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.EMP].damage : 10),
+    empRadius: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.EMP].range : 100),
+    empDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.EMP].cooldown : 2000),
+    empSlowFactor: (typeof TOWERS !== 'undefined' && TOWERS[TOWER_TYPES.EMP].effect ? TOWERS[TOWER_TYPES.EMP].effect.factor : 0.5),
+    empDuration: (typeof TOWERS !== 'undefined' && TOWERS[TOWER_TYPES.EMP].effect ? TOWERS[TOWER_TYPES.EMP].effect.duration : 1000),
 
-    // Purple Tower (Artillary)
-    purpleDamage: (typeof Towers !== 'undefined' && Towers.purpleDamage ? Towers.purpleDamage : 150),
-    purpleRange: (typeof Towers !== 'undefined' && Towers.purpleRange ? Towers.purpleRange : 150),
-    purpleDelay: (typeof Towers !== 'undefined' && Towers.purpleDelay ? Towers.purpleDelay : 1000),
+    // Artillery Tower (was Purple)
+    artilleryDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.ARTILLERY].damage : 150),
+    artilleryRange: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.ARTILLERY].range : 150),
+    artilleryDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.ARTILLERY].cooldown : 1000),
+
+    // Railgun
+    railgunDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.RAILGUN].damage : 150),
+    railgunDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.RAILGUN].cooldown : 2000),
 
     // Misc
     particleLife: 500
@@ -237,8 +241,8 @@ const POOL_SIZE = 8;
 function preloadSounds() {
     const soundUrls = new Set();
 
-    if (typeof TOWER_TYPES !== 'undefined') {
-        Object.values(TOWER_TYPES).forEach(def => {
+    if (typeof TOWERS !== 'undefined') {
+        Object.values(TOWERS).forEach(def => {
             if (def.fire_sound) soundUrls.add(def.fire_sound);
             if (def.explode_sound) soundUrls.add(def.explode_sound);
         });
@@ -709,6 +713,11 @@ function setupEvents() {
         // Standard Selection
         State.selectedTowerInstance = null; // Clear instance selection
         State.selectedTower = type;
+        if (type === 'railgun') {
+            State.placementAngle = Math.PI; // Default West
+        } else {
+            State.placementAngle = 0;
+        }
 
         // Visual Selection
         document.querySelectorAll('.tower-select .tower-btn').forEach(b => b.classList.remove('selected'));
@@ -763,6 +772,28 @@ function setupEvents() {
 
     const btnRestart = document.getElementById('btn-restart');
     if (btnRestart) btnRestart.addEventListener('click', resetGame);
+
+    // Context Controls (Railgun Direction)
+    document.querySelectorAll('.dir-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const dir = parseInt(e.target.dataset.dir);
+            // 3:N (-PI/2), 4:E (0), 5:S (PI/2), 6:W (PI)
+            let angle = 0;
+            if (dir === 3) angle = -Math.PI/2;
+            if (dir === 4) angle = 0;
+            if (dir === 5) angle = Math.PI/2;
+            if (dir === 6) angle = Math.PI;
+
+            if (State.selectedTowerInstance && State.selectedTowerInstance.type === 'railgun') {
+                State.selectedTowerInstance.angle = angle;
+                State.selectedTowerInstance.lastShot = Date.now(); // Reset Cooldown
+                populateTowerInfo(State.selectedTowerInstance); // Update visuals
+            } else if (State.selectedTower === 'railgun') {
+                State.placementAngle = angle;
+                populateTowerInfo('railgun'); // Update visuals
+            }
+        });
+    });
 }
 
 function renderStaticBackground() {
@@ -835,11 +866,17 @@ function tryPlaceTower() {
     if (State.towers.find(t => t.c === c && t.r === r)) return;
 
     // Check Cost
+    // Check Cost
     let cost = 0;
-    if (State.selectedTower === 'green') cost = Towers.greenPrice;
-    if (State.selectedTower === 'red') cost = Towers.redPrice;
-    if (State.selectedTower === 'blue') cost = Towers.bluePrice;
-    if (State.selectedTower === 'purple') cost = (Towers.purplePrice || 40); // Fallback if missing shim
+    if (State.selectedTower && TOWERS[State.selectedTower]) {
+        cost = TOWERS[State.selectedTower].price;
+    } else {
+        // Fallback or explicit checks if needed, but generic approach is better now
+        if (State.selectedTower === 'green') cost = 10;
+        if (State.selectedTower === 'red') cost = 20;
+        if (State.selectedTower === 'blue') cost = 30;
+        if (State.selectedTower === 'purple') cost = 40;
+    }
 
     if (State.money < cost) return;
 
@@ -849,7 +886,10 @@ function tryPlaceTower() {
     State.towers.push({
         type: State.selectedTower,
         c, r, x, y,
-        angle: 0, // Default East
+        c, r, x, y,
+        type: State.selectedTower,
+        c, r, x, y,
+        angle: (State.selectedTower === 'railgun' ? (State.placementAngle !== undefined ? State.placementAngle : Math.PI) : 0),
         lastShot: 0
     });
 
@@ -896,11 +936,11 @@ function populateTowerInfo(target) {
 
     if (typeof target === 'string') {
         type = target;
-        def = TOWER_TYPES[type];
-        isInstance = false;
+        def = TOWERS[type];
     } else {
-        type = target.type;
-        def = target.def || TOWER_TYPES[type];
+        // From existing tower instance (Context Menu)
+        type = target.type; // Use the type from the instance
+        def = target.def || TOWERS[type];
         isInstance = true;
     }
 
@@ -914,11 +954,13 @@ function populateTowerInfo(target) {
     const range = GameConfig[type + 'Range'] || def.range;
     const cooldown = GameConfig[type + 'Delay'] || def.cooldown;
 
+    let dps = (cooldown > 0) ? (damage * (1000/cooldown)) : (damage * (1000/60)); // rough est
+
     info.push(`Damage: ${damage}`);
     info.push(`Range: ${range}`);
     info.push(`Cooldown: ${(cooldown/1000).toFixed(1)}s`);
 
-    if (def.type === 'pulse') {
+    if (def.type === TOWER_TYPES.EMP) {
         // Special Pulse Info
          const slow = GameConfig[type + 'SlowFactor'] || (def.effect ? def.effect.factor : 0.5);
          info.push(`Slow: ${(100 - slow*100).toFixed(0)}%`);
@@ -941,6 +983,33 @@ function populateTowerInfo(target) {
     } else {
         // Placement mode - No actions (Sell)
         if(actionsDiv) actionsDiv.style.display = 'none';
+    }
+
+    // Controls (Railgun)
+    const ctrlDiv = document.getElementById('ctx-tower-controls');
+    if (ctrlDiv) {
+        if (type === 'railgun') { // Show for both instance and placement
+            ctrlDiv.style.display = 'flex';
+            // Update active state
+            const angle = isInstance ? target.angle : (State.placementAngle !== undefined ? State.placementAngle : Math.PI);
+
+            // Normalize angle to roughly match direction
+            // 3:N (-1.57), 4:E (0), 5:S (1.57), 6:W (3.14) or (-3.14)
+            // Fuzzy match
+            document.querySelectorAll('.dir-btn').forEach(btn => {
+                btn.classList.remove('active');
+                const dir = parseInt(btn.dataset.dir);
+                let match = false;
+                if (dir === 4 && Math.abs(angle) < 0.1) match = true;
+                if (dir === 3 && Math.abs(angle + Math.PI/2) < 0.1) match = true;
+                if (dir === 5 && Math.abs(angle - Math.PI/2) < 0.1) match = true;
+                if (dir === 6 && (Math.abs(angle - Math.PI) < 0.1 || Math.abs(angle + Math.PI) < 0.1)) match = true;
+                if (match) btn.classList.add('active');
+            });
+
+        } else {
+            ctrlDiv.style.display = 'none';
+        }
     }
 }
 
@@ -966,10 +1035,14 @@ function sellSelectedTower() {
 
     const t = State.selectedTowerInstance;
     let basePrice = 0;
-    if (t.type === 'green') basePrice = Towers.greenPrice;
-    else if (t.type === 'red') basePrice = Towers.redPrice;
-    else if (t.type === 'blue') basePrice = Towers.bluePrice;
-    else if (t.type === 'purple') basePrice = (Towers.purplePrice || 40);
+    if (t.type && TOWERS[t.type]) {
+        basePrice = TOWERS[t.type].price;
+    } else {
+       if (t.type === 'green') basePrice = 10;
+       else if (t.type === 'red') basePrice = 20;
+       else if (t.type === 'blue') basePrice = 30;
+       else if (t.type === 'purple') basePrice = 40;
+    }
 
     const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
     State.money += sellVal;
@@ -1124,9 +1197,10 @@ function spawnDebris(x, y, color, count, speedMulti=1, lifeMulti=1) {
     }
 }
 
-function spawnProjectile(x, y, target, damage, speed, color) {
+function spawnProjectile(x, y, target, damage, speed, color, damageType) {
     State.projectiles.push({
         x, y, target, damage, speed, color,
+        damage_type: damageType || TOWER_DAMAGE_TYPES.EXPLOSIVE, // Default if missing
         active: true
     });
 }
@@ -1141,10 +1215,10 @@ function update(dt) {
         // Only update particles
         for (let i = State.particles.length - 1; i >= 0; i--) {
             const p = State.particles[i];
-            if(p.type === 'pulse') {
+            if(p.type === 'pulse' || p.type === 'beam') {
                 p.life += dt;
                 if(p.life >= p.duration) State.particles.splice(i, 1);
-                else p.r = (p.life / p.duration) * p.maxR;
+                else if(p.type === 'pulse') p.r = (p.life / p.duration) * p.maxR;
             } else if (p.type === 'debris') {
                 p.life += dt;
                 if (p.life >= p.maxLife) {
@@ -1340,7 +1414,7 @@ function update(dt) {
     // Towers
     State.towers.forEach(t => {
         // Ensure def exists (for legacy/live reload safety)
-        if (!t.def) t.def = TOWER_TYPES[t.type];
+        if (!t.def) t.def = TOWERS[t.type];
         const def = t.def;
 
         // Dynamic Stats (from UI or Default)
@@ -1351,9 +1425,10 @@ function update(dt) {
 
         // Target Selection
         let target = null;
-        if (def.type === 'pulse') {
-             // Pulse hits all in range, but we might still want 'a' target for consistency if needed,
-             // though pulse logic iterates all.
+        // Check for EMP (Pulse) logic or standard
+        if (def.type === TOWER_TYPES.EMP) {
+            // Pulse logic often triggers if ANY enemy is in range, but targeting logic might pick nearest
+            // If stickiness matters for pulse (e.g. tracking one to show range? It doesn't really target).
         } else {
 
              // Determine Targeting Mode
@@ -1416,7 +1491,7 @@ function update(dt) {
             while (diff < -Math.PI) diff += Math.PI * 2;
 
             // Apply Rotation
-            const maxRot = (CONSTS.TOWER_RETARGET_ROTATION_RATE || 5.0) * dtSec;
+            const maxRot = (def.retarget_rotation_rate !== undefined ? def.retarget_rotation_rate : (CONSTS.TOWER_RETARGET_ROTATION_RATE || 5.0)) * dtSec;
 
             if (Math.abs(diff) <= maxRot) {
                 t.angle = targetAngle; // Snap if close
@@ -1432,9 +1507,9 @@ function update(dt) {
         }
 
         // Firing Logic
-        if (def.type === 'laser') {
-            const shotDur = GameConfig['greenShotDuration'] || def.shot_duration_ms || 2000;
-            const pauseDur = GameConfig['greenFiringPause'] || def.firing_pause_ms || 1000;
+        if (def.type === TOWER_TYPES.LASER) {
+            const shotDur = GameConfig['laserShotDuration'] || def.shot_duration_ms || 2000;
+            const pauseDur = GameConfig['laserFiringPause'] || def.firing_pause_ms || 1000;
 
             // Pulse Cycle
             if (t.isFiring === undefined) { t.isFiring = true; t.fireTimer = 0; } // Safety init
@@ -1478,8 +1553,11 @@ function update(dt) {
 
             // Fire only if active cycle AND locked
             if (shouldEmit) {
-                const res = (target.resistance && target.resistance.laser) || 1.0;
-                target.hp -= (damage * res) * dtSec;
+                // Use defined damage type or default
+                const dtype = def.damage_type || TOWER_DAMAGE_TYPES.LASER;
+                const rVal = (target.resistance && target.resistance[dtype] !== undefined) ? target.resistance[dtype] : 1.0;
+
+                target.hp -= (damage * rVal) * dtSec;
 
                 // Visuals: Impact Particles
                 if (Math.random() < 0.3) {
@@ -1488,7 +1566,7 @@ function update(dt) {
                 }
             }
         }
-        else if (def.type === 'projectile' || def.type === 'artillary') {
+        else if (def.type === TOWER_TYPES.MISSILE || def.type === TOWER_TYPES.ARTILLERY) {
             if (target && t.locked && now - t.lastShot >= cooldown) {
                 t.lastShot = now;
                 playSound(def.fire_sound, def.fire_sound_volume);
@@ -1508,13 +1586,13 @@ function update(dt) {
 
                              const sx = t.x + outlet.x;
                              const sy = t.y + outlet.y;
-                             spawnProjectile(sx, sy, target, damage, def.projectile.speed, def.projectile.color);
+                             spawnProjectile(sx, sy, target, damage, def.projectile.speed, def.projectile.color, def.damage_type);
                          }
                     }, outlet.delay);
                 });
             }
         }
-        else if (def.type === 'pulse') {
+        else if (def.type === TOWER_TYPES.EMP) {
              if (now - t.lastShot >= cooldown && (!target || t.locked)) { // Allow pulse if no target req (but here logic implies targeting)? Pulse usually fires if *any* enemy in range.
                  // Actually, standard Pulse behavior in this codebase finds 'target' = nearest enemy.
                  // If we enforce locking, Pulse must face nearest enemy to fire.
@@ -1535,10 +1613,86 @@ function update(dt) {
                         if (pointDistance(t.x, t.y, e.x, e.y) <= range) {
                             e.frozen = def.effect.duration; // 'frozen' is actually slow duration
                             e.slowFactor = def.effect.factor;
-                            const res = (e.resistance && e.resistance.pulse) || 1.0;
-                            e.hp -= (damage * res);
+
+                            const dtype = def.damage_type || TOWER_DAMAGE_TYPES.ELECTROMAGNETIC; // Pulse default
+                            const rVal = (e.resistance && e.resistance[dtype] !== undefined) ? e.resistance[dtype] : 1.0;
+                            e.hp -= (damage * rVal);
                         }
                     });
+                }
+             }
+        }
+        else if (def.type === TOWER_TYPES.RAILGUN) {
+             if (now - t.lastShot >= cooldown) {
+                // Determine direction based on angle
+                const cos = Math.cos(t.angle);
+                const sin = Math.sin(t.angle);
+                let dirIdx = 0; // 0:E, 1:S, 2:W, 3:N
+                if (Math.abs(cos) > Math.abs(sin)) {
+                    dirIdx = cos > 0 ? 0 : 2;
+                } else {
+                    dirIdx = sin > 0 ? 1 : 3;
+                }
+
+                // Hit Scan Check
+                const beamWidth = 20;
+                let targets = [];
+                let triggerFound = false;
+
+                State.enemies.forEach(e => {
+                    let hit = false;
+                    const dx = e.x - t.x;
+                    const dy = e.y - t.y;
+                    let dist = Infinity;
+
+                    if (dirIdx === 0) { // East
+                         if (dx > 0 && Math.abs(dy) < beamWidth) { hit = true; dist = dx; }
+                    } else if (dirIdx === 2) { // West
+                         if (dx < 0 && Math.abs(dy) < beamWidth) { hit = true; dist = -dx; }
+                    } else if (dirIdx === 3) { // North
+                         if (dy < 0 && Math.abs(dx) < beamWidth) { hit = true; dist = -dy; }
+                    } else if (dirIdx === 1) { // South
+                         if (dy > 0 && Math.abs(dx) < beamWidth) { hit = true; dist = dy; }
+                    }
+
+                    if (hit) {
+                        targets.push(e);
+                        // Check trigger condition (Linear Distance)
+                        if (dist <= range) {
+                            triggerFound = true;
+                        }
+                    }
+                });
+
+                if (triggerFound && targets.length > 0) {
+                     // Fire
+                     t.lastShot = now;
+                     playSound(def.fire_sound, def.fire_sound_volume);
+
+                     // Beam End Point
+                     let endX = t.x, endY = t.y;
+                     if (dirIdx === 0) endX = COLS * TILE_SIZE;
+                     if (dirIdx === 2) endX = 0;
+                     if (dirIdx === 3) endY = 0;
+                     if (dirIdx === 1) endY = ROWS * TILE_SIZE;
+
+                     State.particles.push({
+                         type: 'beam',
+                         x: t.x, y: t.y,
+                         ex: endX, ey: endY,
+                         life: 0,
+                         duration: 1000,
+                         color: def.color
+                     });
+
+                     // Damage
+                     targets.forEach(e => {
+                         const dtype = def.damage_type || TOWER_DAMAGE_TYPES.HIGH_ENERGY;
+                         const rVal = (e.resistance && e.resistance[dtype] !== undefined) ? e.resistance[dtype] : 1.0;
+                         e.hp -= (damage * rVal);
+                         const debrisColor = blendColors(def.color, e.color || '#fff', 0.5);
+                         spawnDebris(e.x, e.y, debrisColor, 5);
+                     });
                 }
              }
         }
@@ -1576,8 +1730,28 @@ function update(dt) {
 
         if (dist <= move) {
             // Impact
-            const res = (p.target.resistance && p.target.resistance.projectile) || 1.0;
-            p.target.hp -= (p.damage * res);
+            // Projectile itself holds damage but not its type? We need to pass type or lookup tower def?
+            // Actually, we spawnProjectiles from a tower definition.
+            // But we don't store the damage type on the projectile object currently.
+            // CONSTS doesn't seem to define projectile 'types' separately.
+            // But in spawnProjectile (function we didn't view yet), we might need to pass it.
+            // Or here, we need to know the source tower type? The projectile has no ref to source.
+            // WAIT. We need to check if we can add damageType to projectile when spawned.
+
+            // Assuming we patch spawnProjectile or can check p.damage_type if we added it.
+            // existing spawnProjectile takes (x,y,target,damage,speed,color).
+            // We should add damageType to it.
+
+            // For now, let's look at where spawnProjectile is called (lines 1583) from tower.
+            // We can add it there or assume 'explosive' default for now if missing?
+            // Most projectiles are explosive. Artillary and Red are explosive.
+            // If we add damageType to projectile object, we can read it here.
+
+            // Let's assume we will add it to projectile object.
+             const dtype = p.damage_type || TOWER_DAMAGE_TYPES.EXPLOSIVE;
+             const rVal = (p.target.resistance && p.target.resistance[dtype] !== undefined) ? p.target.resistance[dtype] : 1.0;
+
+            p.target.hp -= (p.damage * rVal);
             // Mix Red (#ff3333) + Target Color
             const debrisColor = blendColors('#ff3333', p.target.color || '#fff', 0.5);
             spawnDebris(p.target.x, p.target.y, debrisColor, Math.max(1, 5 * CONSTS.IMPACT_PARTICLE_MULTIPLIER));
@@ -1598,10 +1772,10 @@ function update(dt) {
     // Particles
     for (let i = State.particles.length - 1; i >= 0; i--) {
         const p = State.particles[i];
-        if(p.type === 'pulse') {
+        if(p.type === 'pulse' || p.type === 'beam') {
             p.life += dt;
             if(p.life >= p.duration) State.particles.splice(i, 1);
-            else p.r = (p.life / p.duration) * p.maxR;
+            else if(p.type === 'pulse') p.r = (p.life / p.duration) * p.maxR;
         } else if (p.type === 'debris') {
             p.life += dt;
             if (p.life >= p.maxLife) {
@@ -1626,10 +1800,14 @@ function updateStats() {
 
     // Dynamic Tower Buttons
     if (typeof TOWER_TYPES !== 'undefined') {
-        Object.keys(TOWER_TYPES).forEach(type => {
+        Object.values(TOWER_TYPES).forEach(type => {
             const btn = document.querySelector(`.btn-${type}`);
             if (btn) {
-                const def = TOWER_TYPES[type];
+                const def = TOWERS[type];
+
+                // Inject Color for CSS
+                btn.style.setProperty('--selected-color', def.color);
+
                 if (State.money < def.price) {
                      btn.disabled = true;
                      btn.classList.add('disabled');
@@ -1672,7 +1850,7 @@ function triggerGameOver() {
         setTimeout(() => {
             let color = '#fff';
             if (t.def && t.def.color) color = t.def.color;
-            else if (TOWER_TYPES[t.type]) color = TOWER_TYPES[t.type].color;
+            else if (TOWERS[t.type]) color = TOWERS[t.type].color;
 
             if (t.def && t.def.explode_sound) {
                  playSound(t.def.explode_sound, t.def.explode_sound_volume || 1.0);
@@ -1753,7 +1931,7 @@ function render() {
     // Towers
     State.towers.forEach(t => {
         // Ensure def exists
-        if (!t.def) t.def = TOWER_TYPES[t.type];
+        if (!t.def) t.def = TOWERS[t.type];
         const def = t.def;
 
         // Selection Highlight
@@ -1769,6 +1947,28 @@ function render() {
              const tx = t.c * TILE_SIZE;
              const ty = t.r * TILE_SIZE;
              ctx.strokeRect(tx + 1, ty + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+             // Draw Range Circle
+             const range = GameConfig[t.type + 'Range'] || def.range;
+             if (range) {
+                 ctx.beginPath();
+                 ctx.globalAlpha = 0.3;
+                 ctx.lineWidth = 2;
+                 ctx.arc(0, 0, range, 0, Math.PI*2); // We are inside loop but NOT translated yet? NO.
+                 // Wait, we are NOT translated yet.
+                 // Lines 1895-1908 are BEFORE ctx.translate(t.x, t.y).
+                 // So we need to use t.x, t.y or translate.
+                 // Actually, ctx.strokeRect uses tx, ty (top-left).
+                 // t.x, t.y are centers.
+
+                 ctx.strokeRect(tx + 1, ty + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                 // Redoing range circle in correct coordinates
+                 ctx.beginPath();
+                 ctx.arc(t.x, t.y, range, 0, Math.PI*2);
+                 ctx.stroke();
+                 ctx.globalAlpha = 1.0;
+             }
+
              ctx.restore();
         }
 
@@ -1793,7 +1993,7 @@ function render() {
         ctx.stroke();
 
         // Overlay Effects
-        if (def.type === 'laser') {
+        if (def.type === TOWER_TYPES.LASER) {
             // Draw Laser
             if (t.hasTarget && t.targetPos && t.locked && t.isFiring) {
                 ctx.restore(); ctx.save(); // Global space
@@ -1870,6 +2070,28 @@ function render() {
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(0,0, p.r, 0, Math.PI*2); ctx.stroke();
             ctx.restore();
+        } else if (p.type === 'beam') {
+            ctx.save();
+            let alpha = 1.0;
+            if (p.life > 500) alpha = 1.0 - ((p.life - 500) / 500);
+            if (alpha < 0) alpha = 0;
+
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = p.color || '#4b0082';
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 15;
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.ex, p.ey);
+            ctx.stroke();
+
+            // Core
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            ctx.restore();
         } else if (p.type === 'debris') {
             ctx.save();
             ctx.translate(p.x, p.y);
@@ -1894,7 +2116,7 @@ function render() {
                 const c = State.mouse.tileX;
 
                 const type = State.selectedTower;
-                const def = TOWER_TYPES[type];
+                const def = TOWERS[type];
                 if (!def) return; // safety
 
                 // Calculate Validity
@@ -1932,7 +2154,7 @@ function render() {
                 ctx.beginPath();
                 ctx.strokeStyle = drawColor;
                 ctx.globalAlpha = 0.3;
-                ctx.lineWidth = 1;
+                ctx.lineWidth = 2;
                 ctx.arc(tx, ty, range, 0, Math.PI*2);
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
@@ -1947,9 +2169,13 @@ function render() {
                 ctx.strokeStyle = drawColor;
                 ctx.lineWidth = 2;
 
-                if (def.type === 'artillary') {
+                if (def.type === TOWER_TYPES.ARTILLERY) {
                      // For ghost, default rotation
                      // (Optional: could rotate to mouse or center, but keep simple)
+                }
+
+                if (def.type === TOWER_TYPES.RAILGUN && State.placementAngle !== undefined) {
+                     ctx.rotate(State.placementAngle);
                 }
 
                 drawShape(ctx, def.shape, 10);
@@ -1990,7 +2216,7 @@ function gameLoop(timestamp) {
 }
 
 function renderTowerButtons() {
-    const types = ['green', 'red', 'blue', 'purple'];
+    const types = typeof TOWER_TYPES !== 'undefined' ? Object.values(TOWER_TYPES) : [];
     types.forEach(type => {
         const btnCanvas = document.getElementById(`btn-canvas-${type}`);
         if (!btnCanvas) return;
@@ -2005,7 +2231,7 @@ function renderTowerButtons() {
         const centerY = rect.top + rect.height / 2;
 
         let angle = -Math.PI / 2; // Default Up for fixed
-        if (type !== 'blue') {
+        if (type !== TOWER_TYPES.EMP && type !== TOWER_TYPES.RAILGUN) {
             angle = Math.atan2(State.uiMouse.y - centerY, State.uiMouse.x - centerX);
         }
 
@@ -2015,7 +2241,7 @@ function renderTowerButtons() {
 
         // Color
         let color = '#fff';
-        if (TOWER_TYPES[type]) color = TOWER_TYPES[type].color;
+        if (TOWERS[type]) color = TOWERS[type].color;
 
         bCtx.strokeStyle = color;
         bCtx.lineWidth = 2;
@@ -2024,11 +2250,11 @@ function renderTowerButtons() {
         bCtx.shadowColor = color;
         bCtx.shadowBlur = 5;
 
-        drawShape(bCtx, TOWER_TYPES[type].shape, 12); // Scale 12 fits 40x40
+        drawShape(bCtx, TOWERS[type].shape, 12); // Scale 12 fits 40x40
         bCtx.stroke();
 
         // Add a center dot or detail?
-        if (type === 'laser') {
+        if (type === TOWER_TYPES.LASER) {
              // specific detail?
         }
 

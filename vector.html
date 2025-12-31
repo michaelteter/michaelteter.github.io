@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vector Tower Defense</title>
-    <link rel="stylesheet" href="vector_assets/css/styles.css?v=7">
+    <link rel="stylesheet" href="vector_assets/css/styles.css?v=26">
 </head>
 <body>
 
@@ -79,27 +79,54 @@
 
                     <div class="tower-select">
                         <!-- <h3>Towers</h3> Removed per request -->
-                        <button class="tower-btn btn-green" onclick="selectTower('green')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                            <canvas id="btn-canvas-green" width="40" height="40"></canvas>
+                        <button class="tower-btn btn-laser" onclick="selectTower('laser')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-laser" width="40" height="40"></canvas>
                             <div style="font-size:10px; margin-top:2px;">$10</div>
                         </button>
-                        <button class="tower-btn btn-red" onclick="selectTower('red')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                            <canvas id="btn-canvas-red" width="40" height="40"></canvas>
+                        <button class="tower-btn btn-missile" onclick="selectTower('missile')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-missile" width="40" height="40"></canvas>
                             <div style="font-size:10px; margin-top:2px;">$20</div>
                         </button>
-                        <button class="tower-btn btn-blue" onclick="selectTower('blue')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                            <canvas id="btn-canvas-blue" width="40" height="40"></canvas>
+                        <button class="tower-btn btn-emp" onclick="selectTower('emp')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-emp" width="40" height="40"></canvas>
                             <div style="font-size:10px; margin-top:2px;">$30</div>
                         </button>
-                        <button class="tower-btn btn-purple" onclick="selectTower('purple')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
-                            <canvas id="btn-canvas-purple" width="40" height="40"></canvas>
+                        <button class="tower-btn btn-artillery" onclick="selectTower('artillery')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-artillery" width="40" height="40"></canvas>
                             <div style="font-size:10px; margin-top:2px;">$40</div>
+                        </button>
+                        <button class="tower-btn btn-railgun" onclick="selectTower('railgun')" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:5px;">
+                            <canvas id="btn-canvas-railgun" width="40" height="40"></canvas>
+                            <div style="font-size:10px; margin-top:2px;">$100</div>
                         </button>
                     </div>
 
                     <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 4px; margin-top: 10px;">
                         <h3 id="ctx-tower-name" style="margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Tower</h3>
-                        <div id="ctx-tower-info" style="color: #ccc; font-size: 12px; line-height: 1.4;"></div>
+
+                        <div class="ctx-body" style="display: flex; flex-direction: row; gap: 10px; align-items: start;">
+                            <!-- Column 1: Stats -->
+                            <div id="ctx-tower-info" style="flex: 1; color: #ccc; font-size: 12px; line-height: 1.4;"></div>
+
+                            <!-- Column 2: Controls (D-Pad) -->
+                            <div id="ctx-tower-controls" style="display:none; justify-content: center; align-items: center;">
+                                <div class="dpad-grid" style="display: grid; grid-template-columns: repeat(3, 24px); grid-template-rows: repeat(3, 24px); gap: 2px;">
+                                    <!-- Row 1 -->
+                                    <div></div>
+                                    <button class="dir-btn" data-dir="3" title="North" style="width:100%; height:100%; padding:0;">&#9650;</button>
+                                    <div></div>
+                                    <!-- Row 2 -->
+                                    <button class="dir-btn" data-dir="6" title="West" style="width:100%; height:100%; padding:0;">&#9664;</button>
+                                    <div></div>
+                                    <button class="dir-btn" data-dir="4" title="East" style="width:100%; height:100%; padding:0;">&#9654;</button>
+                                    <!-- Row 3 -->
+                                    <div></div>
+                                    <button class="dir-btn" data-dir="5" title="South" style="width:100%; height:100%; padding:0;">&#9660;</button>
+                                    <div></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="ctx-tower-actions" style="display: flex; gap: 5px; margin-top: 5px;">
                             <button id="btn-sell" class="tower-btn" style="flex: 1; border-color: #555; background: #222; color: #aaa;">Sell</button>
                         </div>
@@ -111,8 +138,8 @@
 
     </div>
 
-<script src="vector_assets/js/consts.js?v=7"></script>
-<script src="vector_assets/js/maps.js?v=7"></script>
-<script src="vector_assets/js/game.js?v=7"></script>
+<script src="vector_assets/js/consts.js?v=26"></script>
+<script src="vector_assets/js/maps.js?v=26"></script>
+<script src="vector_assets/js/game.js?v=26"></script>
 </body>
 </html>

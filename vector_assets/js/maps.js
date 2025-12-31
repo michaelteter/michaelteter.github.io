@@ -11,6 +11,7 @@ e = ship will turn east
 
 const Maps = [
   // map for testing basic stuff
+  /*
     `
 OOOOOOOOOOOO
 OOOOOOOOOOOO
@@ -20,6 +21,7 @@ OOOOOOOOOOOO
 S          E
 OOOOOOOOOOOO
 OOOOOOOOOOOO`,
+*/
 /*
          1         2
 12345678901234567890
