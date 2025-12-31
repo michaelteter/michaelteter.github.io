@@ -1,3 +1,3 @@
-# michaelteter.com website/blog
+*[MichaelTeter.com](https://michaelteter.com)*
 
 
