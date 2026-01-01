@@ -243,7 +243,8 @@ function loadMap(index) {
 
 // --- Sound Helper ---
 const SoundBank = {}; // Map<filename, Array<Audio>>
-const POOL_SIZE = 8;
+const SoundLimits = {}; // Map<filename, limit_int>
+
 // No global ActiveSFX array needed, we iterate pools
 
 
@@ -251,27 +252,46 @@ const POOL_SIZE = 8;
 
 function preloadSounds() {
     const soundUrls = new Set();
+    // Default Pool Config
+    const poolSize = (typeof CONSTS !== 'undefined' && CONSTS.AUDIO_POOL_SIZE) ? CONSTS.AUDIO_POOL_SIZE : 32;
+
+    const limitFire = (typeof CONSTS !== 'undefined' && CONSTS.MAX_SIMULTANEOUS_FIRE_SOUNDS) ? CONSTS.MAX_SIMULTANEOUS_FIRE_SOUNDS : 3;
+    const limitExplode = (typeof CONSTS !== 'undefined' && CONSTS.MAX_SIMULTANEOUS_EXPLOSION_SOUNDS) ? CONSTS.MAX_SIMULTANEOUS_EXPLOSION_SOUNDS : 8;
+    const limitHit = (typeof CONSTS !== 'undefined' && CONSTS.MAX_SIMULTANEOUS_HIT_SOUNDS) ? CONSTS.MAX_SIMULTANEOUS_HIT_SOUNDS : 8;
+
 
     if (typeof TOWERS !== 'undefined') {
         Object.values(TOWERS).forEach(def => {
-            if (def.fire_sound) soundUrls.add(def.fire_sound);
-            if (def.explode_sound) soundUrls.add(def.explode_sound);
+            if (def.fire_sound) {
+                soundUrls.add(def.fire_sound);
+                SoundLimits[def.fire_sound] = limitFire;
+            }
+            if (def.explode_sound) {
+                soundUrls.add(def.explode_sound);
+                SoundLimits[def.explode_sound] = limitExplode;
+            }
         });
     }
     if (typeof ENEMIES !== 'undefined') {
         ENEMIES.forEach(def => {
-            if (def.explode_sound) soundUrls.add(def.explode_sound);
+            if (def.explode_sound) {
+                soundUrls.add(def.explode_sound);
+                 // Enemy explosions likely share same sound as tower explosions, or use Hit limit
+                 // If specific explosion sound, default to explode limit
+                 if (!SoundLimits[def.explode_sound]) SoundLimits[def.explode_sound] = limitExplode;
+            }
         });
     }
     // Consts alarm sound
     if (typeof CONSTS !== 'undefined' && CONSTS.EXIT_ALARM_SOUND) {
         soundUrls.add(CONSTS.EXIT_ALARM_SOUND);
+        SoundLimits[CONSTS.EXIT_ALARM_SOUND] = 1; // Alarm only once
     }
 
     soundUrls.forEach(url => {
         if (!SoundBank[url]) {
             SoundBank[url] = [];
-            for (let i = 0; i < POOL_SIZE; i++) {
+            for (let i = 0; i < poolSize; i++) {
                 const a = new Audio(url);
                 a.preload = 'auto';
                 SoundBank[url].push(a);
@@ -284,11 +304,28 @@ function playSound(filename, volumeScale = 1.0) {
     if (!filename || !SoundBank[filename]) return null;
 
     const pool = SoundBank[filename];
+
+    // Check Logic Limit
+    const limit = SoundLimits[filename] || 5; // Default fallback if unknown
+
+    // Count active
+    let activeCount = 0;
+    for (let i = 0; i < pool.length; i++) {
+        if (!pool[i].paused && !pool[i].ended) {
+            activeCount++;
+            if (activeCount >= limit) {
+                // Limit reached, do not play
+                return null;
+            }
+        }
+    }
+
     // Find free existing one
     const audio = pool.find(a => a.paused || a.ended);
 
     if (!audio) {
-        // All sounds in pool are busy. Skip sound.
+        // All sounds in pool are busy (physical limit). Skip sound.
+        // This should be rare with pool size 32 and limits ~8
         return null;
     }
 
@@ -833,7 +870,12 @@ function setupEvents() {
             const index = key - 1;
             const types = typeof TOWER_TYPES !== 'undefined' ? Object.values(TOWER_TYPES) : [];
             if (index < types.length) {
-                selectTower(types[index]);
+                const type = types[index];
+                const def = TOWERS[type];
+                // Only allow selection if affordable
+                if (def && State.money >= def.price) {
+                     selectTower(type);
+                }
             }
         }
 

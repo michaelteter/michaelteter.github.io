@@ -38,7 +38,11 @@ const CONSTS = {
   SFX_VOL_DOWN_AMOUNT: 0.1,
   SFX_VOL_UP_AMOUNT: 0.1,
   MUSIC_VOL_DOWN_AMOUNT: 0.1,
-  MUSIC_VOL_UP_AMOUNT: 0.1
+  MUSIC_VOL_UP_AMOUNT: 0.1,
+  AUDIO_POOL_SIZE: 32,
+  MAX_SIMULTANEOUS_FIRE_SOUNDS: 3,
+  MAX_SIMULTANEOUS_EXPLOSION_SOUNDS: 8,
+  MAX_SIMULTANEOUS_HIT_SOUNDS: 8
 };
 
 const SHAPES = {
@@ -248,7 +252,7 @@ const TOWERS = {
         shape: "laser_tower",
         targeting_mode: TARGETING_MODES.fixed,
         fire_sound: "vector_assets/audio/steam-hissing-2-386162.wav",
-        fire_sound_volume: 1.0,
+        fire_sound_volume: 0.7,
         explode_sound: "vector_assets/audio/cinematic-boom-171285.wav",
         explode_sound_volume: 1.0,
         price: 10,
@@ -319,7 +323,7 @@ const TOWERS = {
           quick-bursts-of-air-429815.wav
           the-aerosol-spray-117048.wav
         */
-        fire_sound_volume: 0.8,
+        fire_sound_volume: 0.7,
         explode_sound: "vector_assets/audio/cinematic-boom-171285.wav",
         explode_sound_volume: 1.0,
         price: 60,
