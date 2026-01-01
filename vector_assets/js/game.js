@@ -32,6 +32,16 @@ const GameConfig = {
     railgunDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.RAILGUN].damage : 150),
     railgunDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.RAILGUN].cooldown : 2000),
 
+    railgunDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.RAILGUN].cooldown : 2000),
+
+
+    // Nanite Sprayer
+    naniteDamage: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.NANITE].damage : 2),
+    naniteRange: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.NANITE].range : 120),
+    naniteDelay: (typeof TOWERS !== 'undefined' ? TOWERS[TOWER_TYPES.NANITE].cooldown : 50),
+    naniteDotDamage: (typeof TOWERS !== 'undefined' && TOWERS[TOWER_TYPES.NANITE].nanite_settings ? TOWERS[TOWER_TYPES.NANITE].nanite_settings.dot_damage : 5),
+    naniteEffectDuration: (typeof TOWERS !== 'undefined' && TOWERS[TOWER_TYPES.NANITE].nanite_settings ? TOWERS[TOWER_TYPES.NANITE].nanite_settings.effect_duration_ms : 3000),
+
     // Misc
     particleLife: 500
 };
@@ -83,7 +93,8 @@ const State = {
     paused: true,
     gameOver: false,
     musicPlaying: false,
-    uiMouse: { x: 0, y: 0 }
+    uiMouse: { x: 0, y: 0 },
+    lastPlacementAngles: {} // Persist angles per type
 };
 
 const bgMusic = new Audio(); // Start empty
@@ -317,6 +328,25 @@ function stopAllSFX() {
     });
 }
 
+function isAdjacentToLoader(towerTower) {
+    if (!towerTower) return false;
+    const c = towerTower.c;
+    const r = towerTower.r;
+
+    // Check surrounding 8 cells
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+
+            const neighbor = State.towers.find(t => t.c === c + dx && t.r === r + dy);
+            if (neighbor && neighbor.type === TOWER_TYPES.LOADER) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // --- Helpers ---
 function pointDistance(x1, y1, x2, y2) {
     return Math.hypot(x2 - x1, y2 - y1);
@@ -383,9 +413,9 @@ function drawShape(ctx, shapeName, scale) {
     const shapeData = SHAPES[shapeName] || SHAPES.triangle;
     if (shapeData && shapeData.length > 0) {
         ctx.beginPath();
-        ctx.moveTo(shapeData[0].x * scale, shapeData[0].y * scale);
+        ctx.moveTo((shapeData[0].x / 10) * scale, (shapeData[0].y / 10) * scale);
         for (let i = 1; i < shapeData.length; i++) {
-            ctx.lineTo(shapeData[i].x * scale, shapeData[i].y * scale);
+            ctx.lineTo((shapeData[i].x / 10) * scale, (shapeData[i].y / 10) * scale);
         }
         ctx.closePath();
     } else {
@@ -472,12 +502,31 @@ function blendColors(c1, c2, ratio) {
 
 let enemyIdCounter = 0;
 
+function setupTowerHotkeys() {
+    const types = typeof TOWER_TYPES !== 'undefined' ? Object.values(TOWER_TYPES) : [];
+    types.forEach((type, index) => {
+        const btn = document.querySelector(`.btn-${type}`);
+        if (btn) {
+            // Check if already exists (hot reload safety)
+            let indicator = btn.querySelector('.hotkey-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'hotkey-indicator';
+                btn.appendChild(indicator);
+            }
+            indicator.textContent = index + 1;
+        }
+    });
+}
+
+
 // --- Initialization ---
 function init() {
 
     preloadSounds();
     loadMap(0); // Load default map BEFORE events (resize)
     setupEvents();
+    setupTowerHotkeys();
 
     const splash = document.getElementById('splash-screen');
     const startBtn = document.getElementById('btn-start-game');
@@ -713,10 +762,16 @@ function setupEvents() {
         // Standard Selection
         State.selectedTowerInstance = null; // Clear instance selection
         State.selectedTower = type;
-        if (type === 'railgun') {
-            State.placementAngle = Math.PI; // Default West
+
+        // Check persistence
+        if (State.lastPlacementAngles[type] !== undefined) {
+             State.placementAngle = State.lastPlacementAngles[type];
         } else {
-            State.placementAngle = 0;
+             if (type === 'railgun' || type === 'nanite') {
+                 State.placementAngle = Math.PI; // Default West
+             } else {
+                 State.placementAngle = 0;
+             }
         }
 
         // Visual Selection
@@ -770,13 +825,52 @@ function setupEvents() {
     const btnNewGame = document.getElementById('btn-new-game');
     if (btnNewGame) btnNewGame.addEventListener('click', resetGame);
 
+    // Tower Selection & WASD Hotkeys
+    window.addEventListener('keydown', e => {
+        // Check for keys 1-9
+        const key = parseInt(e.key);
+        if (!isNaN(key) && key >= 1 && key <= 9) {
+            const index = key - 1;
+            const types = typeof TOWER_TYPES !== 'undefined' ? Object.values(TOWER_TYPES) : [];
+            if (index < types.length) {
+                selectTower(types[index]);
+            }
+        }
+
+        // WASD Direction Control
+        const lowerKey = e.key.toLowerCase();
+        if (['w', 'a', 's', 'd'].includes(lowerKey)) {
+             let angle = null;
+             // Directions: W=North (-90/270), A=West (180), S=South (90), D=East (0)
+             if (lowerKey === 'w') angle = -Math.PI / 2; // North
+             else if (lowerKey === 'a') angle = Math.PI; // West
+             else if (lowerKey === 's') angle = Math.PI / 2; // South
+             else if (lowerKey === 'd') angle = 0; // East
+
+             if (angle !== null) {
+                 // CASE 1: Placement Mode (Ghost)
+                 if (State.selectedTower && (State.selectedTower === 'railgun' || State.selectedTower === 'nanite')) {
+                     State.placementAngle = angle;
+                     State.lastPlacementAngles[State.selectedTower] = angle;
+                     updatePanelVisibility(); // Refresh UI
+                 }
+                 // CASE 2: Context Mode (Existing Tower)
+                 else if (State.selectedTowerInstance && (State.selectedTowerInstance.type === 'railgun' || State.selectedTowerInstance.type === 'nanite')) {
+                     State.selectedTowerInstance.angle = angle;
+                     // Update UI to highlight the correct D-pad button
+                     updatePanelVisibility();
+                 }
+             }
+        }
+    });
+
     const btnRestart = document.getElementById('btn-restart');
     if (btnRestart) btnRestart.addEventListener('click', resetGame);
 
     // Context Controls (Railgun Direction)
     document.querySelectorAll('.dir-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const dir = parseInt(e.target.dataset.dir);
+            const dir = parseInt(e.currentTarget.dataset.dir);
             // 3:N (-PI/2), 4:E (0), 5:S (PI/2), 6:W (PI)
             let angle = 0;
             if (dir === 3) angle = -Math.PI/2;
@@ -784,13 +878,16 @@ function setupEvents() {
             if (dir === 5) angle = Math.PI/2;
             if (dir === 6) angle = Math.PI;
 
-            if (State.selectedTowerInstance && State.selectedTowerInstance.type === 'railgun') {
+            if (State.selectedTowerInstance && (State.selectedTowerInstance.type === 'railgun' || State.selectedTowerInstance.type === 'nanite')) {
                 State.selectedTowerInstance.angle = angle;
                 State.selectedTowerInstance.lastShot = Date.now(); // Reset Cooldown
                 populateTowerInfo(State.selectedTowerInstance); // Update visuals
-            } else if (State.selectedTower === 'railgun') {
+            } else if (State.selectedTower === 'railgun' || State.selectedTower === 'nanite') {
                 State.placementAngle = angle;
-                populateTowerInfo('railgun'); // Update visuals
+                // If nanite, also need to update button canvas probably?
+                // Currently renderTowerButtons uses State.mouse, but for placement preview we use State.placementAngle.
+                // Actually populateTowerInfo updates the active button state.
+                populateTowerInfo(State.selectedTower || State.selectedTowerInstance);
             }
         });
     });
@@ -889,12 +986,13 @@ function tryPlaceTower() {
         c, r, x, y,
         type: State.selectedTower,
         c, r, x, y,
-        angle: (State.selectedTower === 'railgun' ? (State.placementAngle !== undefined ? State.placementAngle : Math.PI) : 0),
+        angle: ((State.selectedTower === 'railgun' || State.selectedTower === 'nanite') ? (State.placementAngle !== undefined ? State.placementAngle : Math.PI) : 0),
         lastShot: 0
     });
 
     State.money -= cost;
     updateStats();
+    deselectTowerInstance();
 }
 
 // --- Context UI ---
@@ -949,7 +1047,13 @@ function populateTowerInfo(target) {
     if(nameLbl) nameLbl.textContent = def.name;
 
     // Info String
+    // Info String
     let info = [];
+
+    if (def.effect_description) {
+        info.push(`<div style="margin-bottom: 6px; font-style: italic; color: #ccc;">${def.effect_description}</div>`);
+    }
+
     const damage = GameConfig[type + 'Damage'] || def.damage;
     const range = GameConfig[type + 'Range'] || def.range;
     const cooldown = GameConfig[type + 'Delay'] || def.cooldown;
@@ -988,7 +1092,8 @@ function populateTowerInfo(target) {
     // Controls (Railgun)
     const ctrlDiv = document.getElementById('ctx-tower-controls');
     if (ctrlDiv) {
-        if (type === 'railgun') { // Show for both instance and placement
+
+        if (type === 'railgun' || type === 'nanite') { // Show for both instance and placement
             ctrlDiv.style.display = 'flex';
             // Update active state
             const angle = isInstance ? target.angle : (State.placementAngle !== undefined ? State.placementAngle : Math.PI);
@@ -1175,7 +1280,10 @@ function spawnEnemy(startPos) {
         color: color,
         shape: def ? def.shape : 'triangle',
         draw_scale: def ? (def.draw_scale || 1.0) : 1.0,
-        resistance: def ? (def.resistance || {laser:1, projectile:1, pulse:1}) : {laser:1, projectile:1, pulse:1}
+        shape: def ? def.shape : 'triangle',
+        draw_scale: def ? (def.draw_scale || 1.0) : 1.0,
+        resistance: def ? (def.resistance || {laser:1, projectile:1, pulse:1}) : {laser:1, projectile:1, pulse:1},
+        activeEffects: {} // For Nanite or other lingering effects
     };
     State.enemies.push(e);
     return e;
@@ -1197,10 +1305,11 @@ function spawnDebris(x, y, color, count, speedMulti=1, lifeMulti=1) {
     }
 }
 
-function spawnProjectile(x, y, target, damage, speed, color, damageType) {
+function spawnProjectile(x, y, target, damage, speed, color, damageType, effect) {
     State.projectiles.push({
         x, y, target, damage, speed, color,
         damage_type: damageType || TOWER_DAMAGE_TYPES.EXPLOSIVE, // Default if missing
+        effect: effect || null,
         active: true
     });
 }
@@ -1286,9 +1395,25 @@ function update(dt) {
     for (let i = State.enemies.length - 1; i >= 0; i--) {
         const e = State.enemies[i];
 
+        // Handle Active Effects (Nanite Dot)
+        if (e.activeEffects && e.activeEffects.nanite) {
+            const eff = e.activeEffects.nanite;
+            eff.duration -= dt;
+            eff.tickTimer += dt;
+            if (eff.tickTimer >= eff.tickRate) {
+                eff.tickTimer = 0;
+                e.hp -= eff.damage;
+                // Visual tick?
+                spawnDebris(e.x, e.y, '#00ffcc', 2, 0.5, 0.5);
+            }
+            if (eff.duration <= 0) {
+                delete e.activeEffects.nanite;
+            }
+        }
+
         let currentSpeed = e.speed;
         if (e.frozen > 0) {
-            currentSpeed *= e.slowFactor;
+            currentSpeed *= (1.0 - e.slowFactor);
             e.frozen -= dt;
         }
 
@@ -1420,7 +1545,16 @@ function update(dt) {
         // Dynamic Stats (from UI or Default)
         // Access keys dynamically: 'greenRange', 'redDelay', etc.
         const range = GameConfig[t.type + 'Range'] !== undefined ? GameConfig[t.type + 'Range'] : def.range;
-        const cooldown = GameConfig[t.type + 'Delay'] !== undefined ? GameConfig[t.type + 'Delay'] : def.cooldown;
+        // Apply Loader Cooldown Reduction if applicable
+        let baseCooldown = GameConfig[t.type + 'Delay'] !== undefined ? GameConfig[t.type + 'Delay'] : def.cooldown;
+        if ((t.type === TOWER_TYPES.RAILGUN || t.type === TOWER_TYPES.ARTILLERY || t.type === TOWER_TYPES.MISSILE) && isAdjacentToLoader(t)) {
+             // Get factor
+             const loaderDef = TOWERS[TOWER_TYPES.LOADER];
+             const factor = (loaderDef && loaderDef.cooldown_reduction_factor) ? loaderDef.cooldown_reduction_factor : 0.2;
+             baseCooldown *= (1.0 - factor);
+        }
+        const cooldown = baseCooldown;
+
         const damage = GameConfig[t.type + 'Damage'] !== undefined ? GameConfig[t.type + 'Damage'] : def.damage;
 
         // Target Selection
@@ -1586,7 +1720,7 @@ function update(dt) {
 
                              const sx = t.x + outlet.x;
                              const sy = t.y + outlet.y;
-                             spawnProjectile(sx, sy, target, damage, def.projectile.speed, def.projectile.color, def.damage_type);
+                             spawnProjectile(sx, sy, target, damage, def.projectile.speed, def.projectile.color, def.damage_type, def.effect);
                          }
                     }, outlet.delay);
                 });
@@ -1696,6 +1830,72 @@ function update(dt) {
                 }
              }
         }
+        else if (def.type === TOWER_TYPES.NANITE) {
+             // 1. Trigger Spray
+             if (target && !t.isSpraying && now - t.lastShot >= cooldown) {
+                t.lastShot = now;
+                playSound(def.fire_sound, def.fire_sound_volume);
+
+                t.isSpraying = true;
+                t.sprayTimer = 0;
+                t.sprayAccumulator = 0;
+             }
+
+             // 2. Process Spray
+             if (t.isSpraying) {
+                const sprayDuration = def.spray_duration || 500;
+
+                t.sprayTimer += dt;
+
+                // Handle Emission
+                const sprayCount = (def.nanite_settings && def.nanite_settings.spray_count) ? def.nanite_settings.spray_count : 15;
+                const particlesPerMs = sprayCount / sprayDuration;
+
+                t.sprayAccumulator += (particlesPerMs * dt);
+
+                let particlesToSpawn = Math.floor(t.sprayAccumulator);
+                if (particlesToSpawn > 0) {
+                    t.sprayAccumulator -= particlesToSpawn;
+
+                    if (particlesToSpawn > 5) particlesToSpawn = 5; // Safety Cap
+
+                    const arcDeg = (def.nanite_settings && def.nanite_settings.arc_width_deg) ? def.nanite_settings.arc_width_deg : 60;
+                    const arcRad = arcDeg * (Math.PI / 180);
+
+                    for (let i = 0; i < particlesToSpawn; i++) {
+                         const randomOffset = (Math.random() - 0.5) * arcRad;
+                         const fireAngle = t.angle + randomOffset;
+                         const speedVar = 0.8 + Math.random() * 0.4;
+
+                         spawnProjectile(
+                             t.x + Math.cos(t.angle)*15,
+                             t.y + Math.sin(t.angle)*15,
+                             null,
+                             damage,
+                             5,
+                             def.color,
+                             def.damage_type
+                         );
+
+                         const p = State.projectiles[State.projectiles.length - 1];
+                         if (p) {
+                             const baseSpeed = 1.5 * speedVar;
+                             p.vx = Math.cos(fireAngle) * baseSpeed;
+                             p.vy = Math.sin(fireAngle) * baseSpeed;
+
+                             // Varied distance for mist effect
+                             const baseDist = (def.nanite_settings ? def.nanite_settings.particle_travel_distance : 150);
+                             p.maxDist = baseDist * (0.9 + Math.random() * 0.2);
+                             p.traveled = 0;
+                         }
+                    }
+                }
+
+                if (t.sprayTimer >= sprayDuration) {
+                    t.isSpraying = false;
+                }
+             }
+        }
     });
 
     // Projectiles
@@ -1704,11 +1904,56 @@ function update(dt) {
         // Check target validity
         const targetValid = p.target && p.target.hp > 0 && State.enemies.includes(p.target);
 
+
+
         if (!targetValid) {
-            // Target lost: Continue in last known direction (dumb fire)
-            if (p.vx && p.vy) {
+            // Target lost or Untargeted (Nanite): Continue in direction
+            if (p.vx !== undefined && p.vy !== undefined) {
+                // Time correction if possible, but let's stick to simple
                 p.x += p.vx;
                 p.y += p.vy;
+
+                if (p.traveled !== undefined) {
+                    p.traveled += Math.hypot(p.vx, p.vy);
+                    if (p.traveled >= p.maxDist) {
+                        State.projectiles.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // NANITE COLLISION
+                if (p.damage_type === TOWER_DAMAGE_TYPES.NANITE) {
+                     for (const e of State.enemies) {
+                         if (pointDistance(p.x, p.y, e.x, e.y) < (20)) { // Hit radius
+                             // Apply Hit
+                             // Resistance Mod
+                             const rVal = (e.resistance && e.resistance.nanite !== undefined) ? e.resistance.nanite : 1.0;
+                             // Vulnerability Check (if already debuffed)
+                             let damageMod = 1.0;
+                             if (e.activeEffects && e.activeEffects.nanite) {
+                                 damageMod += e.activeEffects.nanite.resistancePenalty;
+                             }
+
+                             e.hp -= (p.damage * rVal * damageMod);
+
+                             // Apply/Refresh Effect
+                             if (!e.activeEffects) e.activeEffects = {};
+
+                             const settings = (TOWERS[TOWER_TYPES.NANITE].nanite_settings || {});
+                             e.activeEffects.nanite = {
+                                 duration: settings.effect_duration_ms || 3000,
+                                 tickRate: settings.effect_tick_rate_ms || 500,
+                                 tickTimer: 0,
+                                 damage: settings.dot_damage || 5,
+                                 resistancePenalty: settings.resistance_penalty || 0.3
+                             };
+
+                             spawnDebris(e.x, e.y, p.color, 3);
+                             State.projectiles.splice(i, 1);
+                             break; // One hit per particle
+                         }
+                     }
+                }
 
                 // Remove if off screen
                 if (p.x < 0 || p.x > (COLS * TILE_SIZE) || p.y < 0 || p.y > (ROWS * TILE_SIZE)) {
@@ -1752,6 +1997,13 @@ function update(dt) {
              const rVal = (p.target.resistance && p.target.resistance[dtype] !== undefined) ? p.target.resistance[dtype] : 1.0;
 
             p.target.hp -= (p.damage * rVal);
+
+            // Apply Effect (if present)
+            if (p.effect && p.effect.type === 'slow') {
+                 p.target.frozen = p.effect.duration;
+                 p.target.slowFactor = p.effect.factor;
+            }
+
             // Mix Red (#ff3333) + Target Color
             const debrisColor = blendColors('#ff3333', p.target.color || '#fff', 0.5);
             spawnDebris(p.target.x, p.target.y, debrisColor, Math.max(1, 5 * CONSTS.IMPACT_PARTICLE_MULTIPLIER));
@@ -1965,6 +2217,14 @@ function render() {
                  // Redoing range circle in correct coordinates
                  ctx.beginPath();
                  ctx.arc(t.x, t.y, range, 0, Math.PI*2);
+
+                 // Fill Disc
+                 ctx.fillStyle = color;
+                 ctx.globalAlpha = (typeof CONSTS !== 'undefined' ? CONSTS.TOWER_PLACEMENT_RANGE_DISC_TRANSPARENCY : 0.2);
+                 ctx.fill();
+
+                 // Stroke Ring
+                 ctx.globalAlpha = 0.5;
                  ctx.stroke();
                  ctx.globalAlpha = 1.0;
              }
@@ -2008,6 +2268,33 @@ function render() {
             }
         }
 
+        // Loader Connections
+        if (def.type === TOWER_TYPES.LOADER) {
+             const beneficiaries = [TOWER_TYPES.RAILGUN, TOWER_TYPES.ARTILLERY, TOWER_TYPES.MISSILE];
+             for (let dy = -1; dy <= 1; dy++) {
+                 for (let dx = -1; dx <= 1; dx++) {
+                     if (dx === 0 && dy === 0) continue;
+
+                     const neighbor = State.towers.find(n => n.c === t.c + dx && n.r === t.r + dy);
+                     if (neighbor && beneficiaries.includes(neighbor.type)) {
+                          ctx.save();
+                          // Position at the edge/corner shared with the neighbor
+                          const px = dx * (TILE_SIZE / 2);
+                          const py = dy * (TILE_SIZE / 2);
+
+                          ctx.fillStyle = def.color || '#b0c4de';
+                          ctx.shadowBlur = 5;
+                          ctx.shadowColor = def.color || '#b0c4de';
+
+                          ctx.beginPath();
+                          ctx.arc(px, py, 2, 0, Math.PI*2); // Dot size
+                          ctx.fill();
+                          ctx.restore();
+                     }
+                 }
+             }
+        }
+
         ctx.restore();
     });
 
@@ -2049,10 +2336,18 @@ function render() {
             ctx.lineWidth = 2;
             ctx.shadowColor = pColor;
             ctx.shadowBlur = 5;
-            ctx.beginPath();
-            ctx.moveTo(-6, 0);
-            ctx.lineTo(6, 0);
-            ctx.stroke();
+
+            if (p.damage_type === TOWER_DAMAGE_TYPES.NANITE) {
+                ctx.fillStyle = pColor;
+                ctx.beginPath();
+                ctx.arc(0, 0, 1, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(-6, 0);
+                ctx.lineTo(6, 0);
+                ctx.stroke();
+            }
             ctx.restore();
     });
 
@@ -2152,10 +2447,17 @@ function render() {
 
                 // Draw Radius (Always, using drawColor)
                 ctx.beginPath();
-                ctx.strokeStyle = drawColor;
-                ctx.globalAlpha = 0.3;
-                ctx.lineWidth = 2;
                 ctx.arc(tx, ty, range, 0, Math.PI*2);
+
+                // Fill Disc
+                ctx.fillStyle = drawColor;
+                ctx.globalAlpha = (typeof CONSTS !== 'undefined' ? CONSTS.TOWER_PLACEMENT_RANGE_DISC_TRANSPARENCY : 0.2);
+                ctx.fill();
+
+                // Stroke Ring
+                ctx.strokeStyle = drawColor;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.5;
                 ctx.stroke();
                 ctx.globalAlpha = 1.0;
 
@@ -2174,7 +2476,7 @@ function render() {
                      // (Optional: could rotate to mouse or center, but keep simple)
                 }
 
-                if (def.type === TOWER_TYPES.RAILGUN && State.placementAngle !== undefined) {
+                if ((def.type === TOWER_TYPES.RAILGUN || def.type === TOWER_TYPES.NANITE) && State.placementAngle !== undefined) {
                      ctx.rotate(State.placementAngle);
                 }
 
@@ -2217,7 +2519,7 @@ function gameLoop(timestamp) {
 
 function renderTowerButtons() {
     const types = typeof TOWER_TYPES !== 'undefined' ? Object.values(TOWER_TYPES) : [];
-    types.forEach(type => {
+    types.forEach((type, index) => {
         const btnCanvas = document.getElementById(`btn-canvas-${type}`);
         if (!btnCanvas) return;
 
@@ -2231,7 +2533,7 @@ function renderTowerButtons() {
         const centerY = rect.top + rect.height / 2;
 
         let angle = -Math.PI / 2; // Default Up for fixed
-        if (type !== TOWER_TYPES.EMP && type !== TOWER_TYPES.RAILGUN) {
+        if (type !== TOWER_TYPES.EMP && type !== TOWER_TYPES.RAILGUN && type !== TOWER_TYPES.NANITE && type !== TOWER_TYPES.LOADER) {
             angle = Math.atan2(State.uiMouse.y - centerY, State.uiMouse.x - centerX);
         }
 
