@@ -94,7 +94,8 @@ const State = {
     gameOver: false,
     musicPlaying: false,
     uiMouse: { x: 0, y: 0 },
-    lastPlacementAngles: {} // Persist angles per type
+    lastPlacementAngles: {}, // Persist angles per type
+    gameTime: 0 // Track active game time (not wall clock)
 };
 
 const bgMusic = new Audio(); // Start empty
@@ -192,6 +193,7 @@ function loadMap(index) {
     State.totalEnemiesToSpawn = 0;
     State.spawnTimer = 0;
     State.nextSpawnDelay = 0;
+    State.gameTime = 0;
     State.groupCooldownTimer = 0;
     State.paused = true; // Pause on map load
     State.gameOver = false;
@@ -922,7 +924,7 @@ function setupEvents() {
 
             if (State.selectedTowerInstance && (State.selectedTowerInstance.type === 'railgun' || State.selectedTowerInstance.type === 'nanite')) {
                 State.selectedTowerInstance.angle = angle;
-                State.selectedTowerInstance.lastShot = Date.now(); // Reset Cooldown
+                State.selectedTowerInstance.lastShot = State.gameTime; // Reset Cooldown
                 populateTowerInfo(State.selectedTowerInstance); // Update visuals
             } else if (State.selectedTower === 'railgun' || State.selectedTower === 'nanite') {
                 State.placementAngle = angle;
@@ -1029,7 +1031,7 @@ function tryPlaceTower() {
         type: State.selectedTower,
         c, r, x, y,
         angle: ((State.selectedTower === 'railgun' || State.selectedTower === 'nanite') ? (State.placementAngle !== undefined ? State.placementAngle : Math.PI) : 0),
-        lastShot: 0
+        lastShot: State.gameTime - (TOWERS[State.selectedTower].cooldown || 1000)
     });
 
     State.money -= cost;
@@ -1359,7 +1361,7 @@ function spawnProjectile(x, y, target, damage, speed, color, damageType, effect)
 // --- Game Logic Loop ---
 function update(dt) {
     const dtSec = dt / 1000;
-    const now = Date.now();
+    const now = State.gameTime;
 
     // Reset loop (e.g. particles) if Game Over
     if (State.gameOver) {
@@ -2551,6 +2553,7 @@ function gameLoop(timestamp) {
     if (!State.paused || State.gameOver) {
         // Cap dt to prevent massive jumps
         const safeDt = Math.min(dt, 100);
+        State.gameTime += safeDt;
         update(safeDt);
     }
 
