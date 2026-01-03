@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vector Tower Defense</title>
-    <link rel="stylesheet" href="vector_assets/css/styles.css?v=32">
+    <link rel="stylesheet" href="vector_assets/css/styles.css?v=33">
 </head>
 <body>
 
@@ -32,7 +32,7 @@
                     <button id="btn-next-song" class="music-btn" onclick="playNextSong()" title="Next Track">&#10095;&#10095;</button>
 
                     <div class="vol-group">
-                        <div class="vol-label">Music</div>
+                        <div class="vol-label">Music - <span id="vol-music-display">5</span></div>
                         <div class="vol-btns">
                             <button id="btn-music-vol-down" class="vol-btn" onclick="adjustMusic(-1)">&#9660;</button>
                             <button id="btn-music-vol-up" class="vol-btn" onclick="adjustMusic(1)">&#9650;</button>
@@ -40,7 +40,7 @@
                     </div>
 
                     <div class="vol-group">
-                        <div class="vol-label">SFX</div>
+                        <div class="vol-label">SFX - <span id="vol-sfx-display">5</span></div>
                         <div class="vol-btns">
                             <button id="btn-sfx-down" class="vol-btn" onclick="adjustSFX(-1)">&#9660;</button>
                             <button id="btn-sfx-up" class="vol-btn" onclick="adjustSFX(1)">&#9650;</button>
@@ -111,6 +111,7 @@
                     </div>
 
                     <div class="tower-context-panel" style="display: none; flex-direction: column; gap: 10px; background: #1a1a1a; padding: 10px; border: 1px solid #333; border-radius: 4px; margin-top: 10px;">
+                        <canvas id="ctx-bg-canvas" width="300" height="150" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity: 0.15;"></canvas>
                         <h3 id="ctx-tower-name" style="margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px;">Tower</h3>
 
                         <div class="ctx-body" style="display: flex; flex-direction: row; gap: 10px; align-items: start;">
@@ -155,8 +156,8 @@
 
     </div>
 
-<script src="vector_assets/js/consts.js?v=32"></script>
-<script src="vector_assets/js/maps.js?v=32"></script>
-<script src="vector_assets/js/game.js?v=32"></script>
+<script src="vector_assets/js/consts.js?v=33"></script>
+<script src="vector_assets/js/maps.js?v=33"></script>
+<script src="vector_assets/js/game.js?v=33"></script>
 </body>
 </html>

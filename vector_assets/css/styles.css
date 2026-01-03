@@ -66,7 +66,7 @@ body {
     gap: 20px;
     box-shadow: -4px 0 6px rgba(0,0,0,0.3);
     height: 100%;
-    overflow-y: auto;
+    overflow: hidden; /* Prevent scrollbar on main container */
     z-index: 10;
 }
 
@@ -522,12 +522,13 @@ body {
 #ui-content-wrapper {
     position: relative; /* For Game Over Overlay */
     flex: 1; /* Take remaining height */
-    overflow-y: auto; /* Scroll internally */
+    overflow: hidden; /* Use hidden here, let children manage scroll */
     display: flex;
     flex-direction: column;
     gap: 20px;
     min-height: 0; /* Firefox/Flex fix */
     padding-right: 2px; /* Scrollbar space */
+    padding-bottom: 20px; /* Ensure gap at bottom */
 }
 
 #game-over-panel {
@@ -687,3 +688,23 @@ a {
 }
 
 
+
+/* Context Panel Background */
+.tower-context-panel {
+    position: relative; /* Context for absolute canvas */
+    overflow: hidden; /* contain the canvas */
+    z-index: 1;
+    flex: 1; /* Fill remaining height */
+    overflow-y: auto; /* Scroll internally if needed */
+    margin-bottom: 20px; /* Padding from bottom */
+    min-height: 0; /* Allow shrinking */
+}
+
+#ctx-bg-canvas {
+    z-index: 0;
+}
+
+.tower-context-panel > * {
+    position: relative; /* Sit above canvas */
+    z-index: 1; /* Above canvas */
+}

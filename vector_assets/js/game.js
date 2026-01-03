@@ -76,6 +76,7 @@ const State = {
     groupCooldownTimer: 0,
     selectedTower: null, // "placement mode" type (string)
     selectedTowerInstance: null, // "context mode" instance (object)
+    selectedEnemy: null, // "context mode" enemy (object)
     towers: [],
     enemies: [],
     projectiles: [],
@@ -566,6 +567,7 @@ function init() {
     loadMap(0); // Load default map BEFORE events (resize)
     setupEvents();
     setupTowerHotkeys();
+    updateAudioUI();
 
     const splash = document.getElementById('splash-screen');
     const startBtn = document.getElementById('btn-start-game');
@@ -654,20 +656,37 @@ function handleResize() {
     renderStaticBackground();
 }
 
+function updateAudioUI() {
+    if (typeof CONSTS === 'undefined') return;
+
+    // Map 0-1 to 0-9 for display
+    // Using Math.round to ensure clean integers
+    const musicVol = Math.round(bgMusic.volume * 9);
+    const sfxVol = Math.round((CONSTS.SFX_VOLUME !== undefined ? CONSTS.SFX_VOLUME : 0.6) * 9);
+
+    const musicSpan = document.getElementById('vol-music-display');
+    if (musicSpan) musicSpan.textContent = musicVol;
+
+    const sfxSpan = document.getElementById('vol-sfx-display');
+    if (sfxSpan) sfxSpan.textContent = sfxVol;
+}
+
 function adjustSFX(dir) {
     if (typeof CONSTS === 'undefined') return;
 
     // Default step if not defined (fallback)
     const step = CONSTS.SFX_VOL_DOWN_AMOUNT || 0.1;
 
-    let newVol = (CONSTS.SFX_VOLUME || 0.6) + (dir * step);
+    // Fix: Explicit undefined check so 0 is not overridden
+    let currentVol = (CONSTS.SFX_VOLUME !== undefined) ? CONSTS.SFX_VOLUME : 0.6;
+
+    let newVol = currentVol + (dir * step);
     newVol = Math.max(0, Math.min(1, newVol));
 
     // Update Constant (Runtime)
     CONSTS.SFX_VOLUME = newVol;
 
-    // No visual feedback requested, but maybe console log?
-    console.log("SFX Volume:", CONSTS.SFX_VOLUME.toFixed(1));
+    updateAudioUI();
 }
 window.adjustSFX = adjustSFX;
 
@@ -682,7 +701,7 @@ function adjustMusic(dir) {
     // Update constant for persistence if we were saving it (we aren't, but good practice)
     CONSTS.MUSIC_VOLUME = newVol;
 
-    console.log("Music Volume:", bgMusic.volume.toFixed(1));
+    updateAudioUI();
 }
 window.adjustMusic = adjustMusic;
 
@@ -742,6 +761,18 @@ function toggleMusic() {
 }
 
 function setupEvents() {
+    window.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            if (State.selectedTower || State.selectedTowerInstance || State.selectedEnemy) {
+                 e.preventDefault();
+                 e.stopPropagation();
+
+                 if (State.selectedTower || State.selectedTowerInstance) deselectTowerInstance();
+                 if (State.selectedEnemy) deselectEnemy();
+            }
+        }
+    });
+
     window.addEventListener('resize', handleResize);
     window.addEventListener('mousemove', e => {
         State.uiMouse.x = e.clientX;
@@ -776,12 +807,38 @@ function setupEvents() {
             if (State.selectedTowerInstance === existing) {
                 deselectTowerInstance();
             } else {
+                deselectEnemy(); // Deselect enemy if selecting tower
                 selectTowerInstance(existing);
             }
         } else if (State.selectedTower) {
             tryPlaceTower();
         } else {
-            deselectTowerInstance();
+            // Check for Enemy Click
+            const mx = State.mouse.x;
+            const my = State.mouse.y;
+            let clickedEnemy = null;
+
+            // Simple Circle Check (Radius ~20)
+            // Iterate backwards to select 'top' enemy if overlapping
+            for (let i = State.enemies.length - 1; i >= 0; i--) {
+                const en = State.enemies[i];
+                if (pointDistance(mx, my, en.x, en.y) < 25) { // 25px tolerance
+                    clickedEnemy = en;
+                    break;
+                }
+            }
+
+            if (clickedEnemy) {
+                if (State.selectedEnemy === clickedEnemy) {
+                    deselectEnemy();
+                } else {
+                    deselectTowerInstance(); // Deselect tower if selecting enemy
+                    selectEnemy(clickedEnemy);
+                }
+            } else {
+                deselectTowerInstance();
+                deselectEnemy();
+            }
         }
     });
 
@@ -799,6 +856,7 @@ function setupEvents() {
         }
 
         // Standard Selection
+        deselectEnemy(); // Ensure enemy is deselected
         State.selectedTowerInstance = null; // Clear instance selection
         State.selectedTower = type;
 
@@ -883,6 +941,12 @@ function setupEvents() {
 
         // WASD Direction Control
         const lowerKey = e.key.toLowerCase();
+
+        if (lowerKey === 'x') {
+            sellSelectedTower();
+            return;
+        }
+
         if (['w', 'a', 's', 'd'].includes(lowerKey)) {
              let angle = null;
              // Directions: W=North (-90/270), A=West (180), S=South (90), D=East (0)
@@ -1056,19 +1120,111 @@ function updatePanelVisibility() {
     // panelSelect (Top buttons) - logic implies they stay, but maybe we just ensure config is swapped.
     if(panelSelect) panelSelect.style.display = 'grid'; // Ensure visible (was hidden by old logic)
 
-    const active = State.selectedTower || State.selectedTowerInstance;
+    const activeTower = State.selectedTower || State.selectedTowerInstance;
+    const activeEnemy = State.selectedEnemy;
 
-    if (active) {
+    if (activeTower || activeEnemy) {
         if(panelConfig) panelConfig.style.display = 'none';
         if(panelContext) panelContext.style.display = 'flex';
-        populateTowerInfo(active);
+
+        if (activeEnemy) {
+            updateEnemyInfo(activeEnemy);
+        } else {
+            populateTowerInfo(activeTower);
+        }
     } else {
         if(panelConfig) panelConfig.style.display = 'flex';
         if(panelContext) panelContext.style.display = 'none';
     }
 }
 
+function selectEnemy(enemy) {
+    State.selectedEnemy = enemy;
+    updatePanelVisibility();
+}
+
+function deselectEnemy() {
+    State.selectedEnemy = null;
+    updatePanelVisibility();
+}
+
+function updateEnemyInfo(enemy) {
+    const nameLbl = document.getElementById('ctx-tower-name');
+    const infoLbl = document.getElementById('ctx-tower-info');
+    const actionsDiv = document.getElementById('ctx-tower-actions');
+    const ctrlDiv = document.getElementById('ctx-tower-controls');
+
+    if (nameLbl) nameLbl.textContent = enemy.type.toUpperCase() + " SHIP";
+
+    let info = [];
+    info.push(`HP: ${Math.ceil(enemy.hp)}/${Math.ceil(enemy.maxHp)}`);
+    info.push(`Speed: ${Math.ceil(enemy.speed)} (Now: ${(enemy.frozen > 0 ? (enemy.speed * (1-enemy.slowFactor)) : enemy.speed).toFixed(0)})`);
+
+    // Resistances
+    let res = [];
+    if(enemy.resistance) {
+         if(enemy.resistance.laser !== 1) res.push(`Laser: ${(enemy.resistance.laser*100).toFixed(0)}%`);
+         if(enemy.resistance.explosive !== 1) res.push(`Projectile: ${(enemy.resistance.explosive*100).toFixed(0)}%`);
+         if(enemy.resistance.nanite !== undefined && enemy.resistance.nanite !== 1) res.push(`Nanite: ${(enemy.resistance.nanite*100).toFixed(0)}%`);
+    }
+    if(res.length > 0) info.push(`Resistances (${res.join(', ')})`);
+
+    // Effects
+    let effects = [];
+    if (enemy.frozen > 0) {
+        effects.push(`SLOW ${(enemy.slowFactor*100).toFixed(0)}% (${(enemy.frozen/1000).toFixed(1)}s)`);
+    }
+    if (enemy.activeEffects && enemy.activeEffects.nanite) {
+        const nan = enemy.activeEffects.nanite;
+        effects.push(`NANITE DoT (${(nan.duration/1000).toFixed(1)}s)`);
+    }
+    if (effects.length > 0) {
+        info.push(`<span style="color: #ffcc00;">${effects.join('<br>')}</span>`);
+    }
+
+    if (infoLbl) infoLbl.innerHTML = info.join('<br>');
+
+    // Hide Irrelevant Controls
+    if (actionsDiv) actionsDiv.style.display = 'none';
+    if (ctrlDiv) ctrlDiv.style.display = 'none';
+
+    // Draw Background Shape
+    // Draw Background Shape
+    const bgCanvas = document.getElementById('ctx-bg-canvas');
+    if (bgCanvas) {
+        // Resize canvas to match panel size for sharp rendering
+        const rect = bgCanvas.parentElement.getBoundingClientRect();
+        bgCanvas.width = rect.width;
+        bgCanvas.height = rect.height;
+
+        const ctx = bgCanvas.getContext('2d');
+        ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+        ctx.save();
+        ctx.translate(bgCanvas.width/2, bgCanvas.height/2); // Center
+        ctx.rotate(-Math.PI/2); // Point Up
+
+        ctx.strokeStyle = enemy.color;
+        ctx.lineWidth = 8; // Thicker stroke
+        ctx.globalAlpha = 0.5; // More visible
+
+        // Custom Scale based on shape - make it large but with more margin
+        let s = Math.min(bgCanvas.width, bgCanvas.height) * 0.5;
+
+        drawShape(ctx, enemy.shape || 'triangle', s);
+        ctx.stroke(); // Hollow
+        ctx.restore();
+    }
+}
+
 function populateTowerInfo(target) {
+    // Clear Enemy BG
+    const bgCanvas = document.getElementById('ctx-bg-canvas');
+    if (bgCanvas) {
+        const ctx = bgCanvas.getContext('2d');
+        ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    }
+
     const nameLbl = document.getElementById('ctx-tower-name');
     const infoLbl = document.getElementById('ctx-tower-info');
     const sellBtn = document.getElementById('btn-sell');
@@ -1101,12 +1257,24 @@ function populateTowerInfo(target) {
     const damage = GameConfig[type + 'Damage'] || def.damage;
     const range = GameConfig[type + 'Range'] || def.range;
     const cooldown = GameConfig[type + 'Delay'] || def.cooldown;
+    let finalCooldown = cooldown;
+    let boostText = "";
 
-    let dps = (cooldown > 0) ? (damage * (1000/cooldown)) : (damage * (1000/60)); // rough est
+    // Check for specific boosts (Loader)
+    if (isInstance) {
+         if ((type === TOWER_TYPES.RAILGUN || type === TOWER_TYPES.ARTILLERY || type === TOWER_TYPES.MISSILE) && isAdjacentToLoader(target)) {
+             const loaderDef = TOWERS[TOWER_TYPES.LOADER];
+             const factor = (loaderDef && loaderDef.cooldown_reduction_factor) ? loaderDef.cooldown_reduction_factor : 0.2;
+             finalCooldown *= (1.0 - factor);
+             boostText = ` -> <span style="color: #00ff66">${(finalCooldown/1000).toFixed(1)}s</span>`;
+         }
+    }
+
+    let dps = (finalCooldown > 0) ? (damage * (1000/finalCooldown)) : (damage * (1000/60)); // rough est
 
     info.push(`Damage: ${damage}`);
     info.push(`Range: ${range}`);
-    info.push(`Cooldown: ${(cooldown/1000).toFixed(1)}s`);
+    info.push(`Cooldown: ${(cooldown/1000).toFixed(1)}s${boostText}`);
 
     if (def.type === TOWER_TYPES.EMP) {
         // Special Pulse Info
@@ -1127,10 +1295,14 @@ function populateTowerInfo(target) {
         if(actionsDiv) actionsDiv.style.display = 'flex';
         const basePrice = def.price;
         const sellVal = Math.floor(basePrice * CONSTS.TOWER_SALE_PCT);
-        if(sellBtn) sellBtn.textContent = `Sell ($${sellVal})`;
+        if(sellBtn) {
+            sellBtn.innerHTML = `<span class="hotkey-indicator" style="position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-size: 1.2em; font-weight: bold; opacity: 0.8;">X</span>Sell ($${sellVal})`;
+            sellBtn.style.position = 'relative'; // Ensure button handles absolute child
+        }
     } else {
         // Placement mode - No actions (Sell)
         if(actionsDiv) actionsDiv.style.display = 'none';
+        if(sellBtn) sellBtn.innerHTML = '';
     }
 
     // Controls (Railgun)
@@ -2086,6 +2258,16 @@ function update(dt) {
         }
     }
 
+
+    // Live UI Update for Enemy Stats
+    if (State.selectedEnemy) {
+        if (State.selectedEnemy.hp > 0 && State.enemies.includes(State.selectedEnemy)) {
+            updateEnemyInfo(State.selectedEnemy);
+        } else {
+             // Enemy died or despawned
+             deselectEnemy();
+        }
+    }
 
 }
 
