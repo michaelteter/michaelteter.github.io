@@ -111,5 +111,3 @@ With a background spanning software engineering, architecture, integration, syst
 
 **Principia College** — B.S., Computer Science
 Illinois, USA | 1989–1993
-
-<!-- ATS Keywords: Forward Deployed Engineer, Implementation Engineer, Solutions Engineering, Pre-Sales Consulting, Systems Architecture, API Integration, Technical Discovery, Business Analysis, Data Workflows, Stakeholder Communication, Solution Design, Cross-Functional Leadership, Technical Consulting, Requirements Gathering, Technical Demos, Process Optimization, Presales -->
