@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q1 Sum</title>
+    <link rel="stylesheet" href="q1sum_assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Fireworks Overlay -->
+        <canvas id="fireworks"></canvas>
+
+        <!-- Sidebar / Info Panel -->
+        <aside class="sidebar">
+            <h1 class="game-title">Q1 Sum</h1>
+
+            <div id="winner-banner" class="hidden">WINNER!</div>
+
+            <div class="stats-container">
+                <div class="stat-box">
+                    <span class="stat-label">Current Score</span>
+                    <span id="current-score" class="stat-value">0</span>
+                </div>
+                <!-- Max Score Removed -->
+                <div class="stat-box">
+                    <span class="stat-label">Goal</span>
+                    <span id="target-score" class="stat-value">0</span>
+                </div>
+            </div>
+
+            <div class="controls-container">
+                <div class="control-group">
+                    <label for="grid-size">Grid Size</label>
+                    <div class="size-selector">
+                        <button class="size-btn active" data-size="4">4x4</button>
+                        <button class="size-btn" data-size="6">6x6</button>
+                        <button class="size-btn" data-size="8">8x8</button>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="btn-undo" class="btn-secondary" disabled>
+                        <span class="icon">⟲</span> Undo
+                    </button>
+                    <button id="btn-new-game" class="btn-primary">New Game</button>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <p>Maximize the sum of the top-left quadrant.</p>
+            </div>
+        </aside>
+
+        <!-- Main Game Area -->
+        <main class="game-area">
+            <div class="game-board-container">
+                <!-- The grid will be injected here by JS -->
+                <div id="game-grid" class="game-grid"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="q1sum_assets/js/script.js"></script>
+</body>
+</html>
