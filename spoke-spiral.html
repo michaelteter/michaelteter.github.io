@@ -35,6 +35,9 @@
     }
 
     canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
       display: block;
       width: 100vw;
       height: 100vh;
@@ -42,6 +45,7 @@
 
     .hud {
       position: fixed;
+      z-index: 1;
       inset: 18px 18px auto 18px;
       display: flex;
       justify-content: space-between;
@@ -97,6 +101,7 @@
 
     .overlay {
       position: fixed;
+      z-index: 2;
       inset: 0;
       display: flex;
       align-items: center;
@@ -104,6 +109,7 @@
       padding: 24px;
       background: rgba(1, 3, 8, 0.54);
       backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       transition: opacity 220ms ease;
     }
 
@@ -115,18 +121,39 @@
     .start-overlay {
       justify-content: center;
       align-items: center;
+      background: rgba(1, 3, 8, 0.78);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      pointer-events: none;
     }
 
     .result-overlay {
+      transition: opacity 2000ms ease;
       justify-content: flex-start;
       align-items: flex-start;
-      padding: 96px 16px 16px;
+      padding: 0;
       background: transparent;
       backdrop-filter: none;
       pointer-events: none;
     }
 
+    .result-overlay .card {
+      width: 100%;
+      border-radius: 0 0 24px 24px;
+      background:
+        linear-gradient(180deg, rgba(18, 26, 46, 0.56), rgba(8, 11, 20, 0.62));
+      border: 1px solid rgba(162, 222, 255, 0.14);
+      box-shadow:
+        0 24px 72px rgba(0, 0, 0, 0.28),
+        0 0 0 1px rgba(255, 255, 255, 0.025) inset;
+    }
+
+    .result-overlay.instant-hide {
+      transition: none;
+    }
+
     .card {
+      position: relative;
       width: min(560px, 100%);
       padding: 28px 28px 24px;
       border-radius: 24px;
@@ -140,8 +167,8 @@
     }
 
     .result-card {
-      width: min(320px, calc(100vw - 24px));
-      padding: 18px 18px 16px;
+      width: 100%;
+      padding: 18px 20px 16px;
     }
 
     .card h1 {
@@ -162,12 +189,14 @@
       margin-bottom: 6px;
       font-size: clamp(22px, 3vw, 34px);
       line-height: 0.98;
+      text-align: center;
     }
 
     .result-card p {
       margin-bottom: 12px;
       font-size: 13px;
       line-height: 1.36;
+      text-align: center;
     }
 
     .pill-row {
@@ -189,9 +218,11 @@
     }
 
     button {
+      position: relative;
       appearance: none;
       border: 0;
       cursor: pointer;
+      touch-action: manipulation;
       border-radius: 14px;
       padding: 14px 20px;
       font: inherit;
@@ -199,6 +230,26 @@
       font-weight: 700;
       background: linear-gradient(135deg, #8ef4ff, #77baff);
       box-shadow: 0 12px 34px rgba(89, 173, 255, 0.34);
+      transform: translateZ(0);
+    }
+
+    .start-prompt {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: min(280px, 100%);
+      margin-top: 4px;
+      padding: 14px 20px;
+      border-radius: 14px;
+      border: 1px solid rgba(142, 244, 255, 0.28);
+      background: linear-gradient(135deg, rgba(142, 244, 255, 0.18), rgba(119, 186, 255, 0.14));
+      color: #eaf8ff;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: center;
+      box-shadow: 0 12px 34px rgba(89, 173, 255, 0.16);
     }
 
     button:hover {
@@ -207,17 +258,14 @@
 
     .result-grid {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
       margin: 12px 0 14px;
     }
 
     .result {
-      max-width: 220px;
-      padding: 10px 11px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(162, 222, 255, 0.12);
+      padding: 0;
+      text-align: center;
     }
 
     .result-label {
@@ -233,6 +281,13 @@
       font-weight: 700;
     }
 
+    .result-restart {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      text-align: center;
+    }
+
     .footer-note {
       margin-top: 10px;
       color: var(--muted);
@@ -244,9 +299,15 @@
       .hud {
         inset: 12px 12px auto 12px;
         flex-direction: column;
+        gap: 12px;
       }
 
       .instructions {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        max-width: none;
         text-align: left;
       }
 
@@ -255,18 +316,41 @@
         width: 100%;
       }
 
+      .hud > .panel:first-child {
+        width: calc(100vw - 24px);
+      }
+
       .result-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
       }
 
       .result-overlay {
         justify-content: center;
-        align-items: flex-end;
-        padding: 24px 12px 12px;
+        align-items: flex-start;
       }
 
       .result-overlay .card {
-        width: min(560px, 100%);
+        width: 100%;
+        border-radius: 0 0 18px 18px;
+        background:
+          linear-gradient(180deg, rgba(18, 26, 46, 0.42), rgba(8, 11, 20, 0.48));
+      }
+
+      .result-card {
+        padding: 16px 12px 14px;
+      }
+
+      .result-grid {
+        gap: 10px;
+      }
+
+      .result-label {
+        font-size: 10px;
+        margin-bottom: 6px;
+      }
+
+      .result-value {
+        font-size: 17px;
       }
     }
   </style>
@@ -289,10 +373,10 @@
     <div class="card">
       <h1>Spoke Spiral</h1>
       <p>
-        Hit the target on each ring to complete the spokes.
+        Hit target on each ring to complete spokes.
       </p>
-      <button id="startButton">Play!</button>
-      <div class="footer-note">Press <strong>Space</strong> to Play.</div>
+      <div class="start-prompt">Tap or Click Anywhere</div>
+      <div class="footer-note">Tap or click anywhere to start, or press <strong>Space</strong>.</div>
     </div>
   </div>
 
@@ -318,20 +402,27 @@
           <div class="result-value" id="idealHit">0.0</div>
         </div>
       </div>
-      <button id="restartButton">Play Again</button>
-      <div class="footer-note">Press <strong>N</strong> for a new run. Difficulty multipliers and advanced variants are intentionally deferred in this prototype.</div>
+      <div class="result-restart">Click or tap anywhere for new game.</div>
     </div>
   </div>
 
   <script>
     (() => {
-      const MIN_RINGS = 3;
-      const MAX_RINGS = 5;
+      const MIN_RINGS = 2;
+      const MAX_RINGS = 4;
       const MIN_SPOKES = 1;
-      const MAX_SPOKES = 4;
+      const MAX_SPOKES = 3;
       const OUTER_SIZE_RATIO = 0.72;
+      const MOBILE_MAX_DIMENSION = 800;
+      const COMPACT_OUTER_SIZE_RATIO = 0.62;
+      const COMPACT_VERTICAL_RESERVE = 220;
       const GAP_TO_STROKE_RATIO = 0.8;
       const CENTER_GAP_TO_GAP_RATIO = 3;
+      const DESKTOP_MIN_RING_STROKE = 12;
+      const COMPACT_MIN_RING_STROKE = 3;
+      const DESKTOP_MIN_RING_GAP = 8;
+      const COMPACT_MIN_RING_GAP = 4;
+      const MIN_CENTER_CLEARANCE = 18;
       const SHAPE_OPTIONS = [
         { name: "circle", sides: 72, kind: "circle" },
         { name: "triangle", sides: 3, kind: "polygon" },
@@ -352,15 +443,16 @@
         ["#9de86f", "#5fd4ff"],
       ];
       const SCORE_CAP = 100;
-      const HIT_LOCKOUT_MS = 320;
-      const RING_TRANSITION_MS = 180;
+      const HIT_LOCKOUT_MS = 90;
+      const RING_TRANSITION_MS = 70;
       const RING_TRANSITION_TRAVEL_FACTOR = 0.0375;
       const FLASH_MS = 260;
       const BASE_SPEED = 190;
       const SPEED_STEP = 34;
       const MAX_TOLERANCE_FACTOR = 0.18;
       const HEAD_TRAIL_LENGTH = 0.19;
-      const MIN_OUTER_SWEEP_FRACTION = 1 / 8;
+      const MIN_SPOKE_ANGLE = (22.5 * Math.PI) / 180;
+      const RESULT_RESTART_DELAY_MS = 2000;
 
       const canvas = document.getElementById("game");
       const ctx = canvas.getContext("2d");
@@ -370,8 +462,6 @@
       const statusText = document.getElementById("statusText");
       const startOverlay = document.getElementById("startOverlay");
       const resultOverlay = document.getElementById("resultOverlay");
-      const startButton = document.getElementById("startButton");
-      const restartButton = document.getElementById("restartButton");
       const resultHeadline = document.getElementById("resultHeadline");
       const resultSummary = document.getElementById("resultSummary");
       const finalScore = document.getElementById("finalScore");
@@ -385,6 +475,10 @@
       let lastTime = performance.now();
       let audioContext = null;
       let audioUnlocked = false;
+      let backgroundGradient = null;
+      let lastScoreText = "";
+      let lastMetaText = "";
+      let lastStatusValue = "";
 
       const state = {
         phase: "start",
@@ -404,6 +498,7 @@
         currentTargetIndex: 0,
         spokeDirections: [],
         inputLockUntil: 0,
+        resultReadyAt: 0,
         flashUntil: 0,
         flashColor: "rgba(255,255,255,0.2)",
         popLabel: null,
@@ -417,32 +512,121 @@
         canvas.style.height = `${window.innerHeight}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        backgroundGradient = ctx.createRadialGradient(
+          center.x,
+          center.y,
+          0,
+          center.x,
+          center.y,
+          Math.max(window.innerWidth, window.innerHeight) * 0.7
+        );
+        backgroundGradient.addColorStop(0, "rgba(16, 26, 44, 0.38)");
+        backgroundGradient.addColorStop(1, "rgba(4, 7, 13, 0)");
         buildRings();
       }
 
-      function buildRings() {
-        const previousRings = rings;
-        const previousProgress = state.progress;
-        const previousPerimeter = previousRings[state.activeRingIndex]?.perimeter || 0;
-        const size = Math.min(window.innerWidth, window.innerHeight) * OUTER_SIZE_RATIO;
-        const ringCount = state.selectedRingCount;
-        rings = [];
-        const shape = state.selectedShape || SHAPE_OPTIONS[2];
-        const palette = state.ringPalette.length ? state.ringPalette : buildGradientPalette(ringCount);
+      function getPlayfieldMetrics() {
+        const minDimension = Math.min(window.innerWidth, window.innerHeight);
+        const isCompact = minDimension <= MOBILE_MAX_DIMENSION;
+        const outerSizeRatio = isCompact ? COMPACT_OUTER_SIZE_RATIO : OUTER_SIZE_RATIO;
+        const availableHeight = isCompact
+          ? Math.max(220, window.innerHeight - COMPACT_VERTICAL_RESERVE)
+          : window.innerHeight;
+        const baseDimension = Math.min(window.innerWidth, availableHeight);
+        return {
+          minDimension,
+          isCompact,
+          size: baseDimension * outerSizeRatio,
+        };
+      }
+
+      function getMinimumRingCount() {
+        return getPlayfieldMetrics().isCompact ? 2 : MIN_RINGS;
+      }
+
+      function computeRingLayoutForCount(shape, ringCount) {
+        const { size, isCompact } = getPlayfieldMetrics();
         const unitVertices = createUnitVertices(shape);
         const span = getVertexSpan(unitVertices);
         const outerScale = size / Math.max(span.width, span.height);
         const outerApothem = getApothemFactor(shape) * outerScale;
         const gapFactor = GAP_TO_STROKE_RATIO;
         const centerGapFactor = GAP_TO_STROKE_RATIO * CENTER_GAP_TO_GAP_RATIO;
-        const stroke = Math.max(
-          18,
-          Math.round(outerApothem / (0.5 + centerGapFactor + Math.max(0, ringCount - 1) * (1 + gapFactor)))
+        const minStroke = isCompact ? COMPACT_MIN_RING_STROKE : DESKTOP_MIN_RING_STROKE;
+        const minGap = isCompact ? COMPACT_MIN_RING_GAP : DESKTOP_MIN_RING_GAP;
+        const preferredStroke = Math.round(
+          outerApothem / (0.5 + centerGapFactor + Math.max(0, ringCount - 1) * (1 + gapFactor))
         );
-        const gap = Math.max(12, Math.round(stroke * GAP_TO_STROKE_RATIO));
+        let stroke = Math.max(minStroke, preferredStroke);
+        let gap = Math.max(minGap, Math.round(stroke * GAP_TO_STROKE_RATIO));
         const totalInsetStep = stroke + gap;
+        let innerApothem = outerApothem - Math.max(0, ringCount - 1) * totalInsetStep;
+        let innerClearance = innerApothem - stroke / 2;
 
-        for (let i = 0; i < state.selectedRingCount; i += 1) {
+        while (stroke > minStroke && innerClearance < MIN_CENTER_CLEARANCE) {
+          stroke -= 1;
+          gap = Math.max(minGap, Math.round(stroke * GAP_TO_STROKE_RATIO));
+          innerApothem = outerApothem - Math.max(0, ringCount - 1) * (stroke + gap);
+          innerClearance = innerApothem - stroke / 2;
+        }
+
+        return {
+          outerApothem,
+          stroke,
+          gap,
+          totalInsetStep: stroke + gap,
+          innerApothem,
+          innerClearance,
+        };
+      }
+
+      function getSafeRingCount(requestedRingCount, shape) {
+        const minimumRingCount = getMinimumRingCount();
+        for (let ringCount = requestedRingCount; ringCount >= minimumRingCount; ringCount -= 1) {
+          const layout = computeRingLayoutForCount(shape, ringCount);
+          if (layout.innerClearance >= MIN_CENTER_CLEARANCE) {
+            return ringCount;
+          }
+        }
+        return minimumRingCount;
+      }
+
+      function trimRunStateForRingCount(ringCount) {
+        state.selectedRingCount = ringCount;
+        state.activeRingIndex = Math.min(state.activeRingIndex, ringCount - 1);
+        state.ringLoopCounts = state.ringLoopCounts.slice(0, ringCount);
+        while (state.ringLoopCounts.length < ringCount) {
+          state.ringLoopCounts.push(0);
+        }
+        state.placedNodes = state.placedNodes.slice(0, ringCount);
+        while (state.placedNodes.length < ringCount) {
+          state.placedNodes.push([]);
+        }
+        state.placedNodeFractions = state.placedNodeFractions.slice(0, ringCount);
+        while (state.placedNodeFractions.length < ringCount) {
+          state.placedNodeFractions.push([]);
+        }
+        state.idealNodes = state.idealNodes.slice(0, ringCount);
+        state.ringPalette = state.ringPalette.length >= ringCount
+          ? state.ringPalette.slice(0, ringCount)
+          : buildGradientPalette(ringCount);
+      }
+
+      function buildRings() {
+        const previousRings = rings;
+        const previousProgress = state.progress;
+        const previousPerimeter = previousRings[state.activeRingIndex]?.perimeter || 0;
+        const shape = state.selectedShape || SHAPE_OPTIONS[2];
+        const safeRingCount = getSafeRingCount(state.selectedRingCount, shape);
+        if (safeRingCount !== state.selectedRingCount) {
+          trimRunStateForRingCount(safeRingCount);
+        }
+        const ringCount = state.selectedRingCount;
+        rings = [];
+        const palette = state.ringPalette.length ? state.ringPalette : buildGradientPalette(ringCount);
+        const { outerApothem, stroke, totalInsetStep } = computeRingLayoutForCount(shape, ringCount);
+
+        for (let i = 0; i < ringCount; i += 1) {
           const apothem = outerApothem - i * totalInsetStep;
           rings.push(createRing(apothem, stroke, palette[i], i, shape));
         }
@@ -695,25 +879,34 @@
 
       function seedSpokePath() {
         const outerRing = rings[0];
-        const minSweepDistance = outerRing.perimeter * MIN_OUTER_SWEEP_FRACTION;
-        const availableDistance = outerRing.perimeter - minSweepDistance;
-        const sliceSize = availableDistance / state.selectedSpokeCount;
         state.spokeDirections = [];
+        const sectorSize = (Math.PI * 2) / state.selectedSpokeCount;
+        const angleMargin = Math.min(MIN_SPOKE_ANGLE / 2, sectorSize * 0.3);
+        const rotation = Math.random() * Math.PI * 2;
 
         for (let i = 0; i < state.selectedSpokeCount; i += 1) {
-          const sliceStart = minSweepDistance + i * sliceSize;
-          const distance = sliceStart + Math.random() * sliceSize;
-          const outerPoint = getPointOnRing(outerRing, distance);
+          const sectorStart = rotation + i * sectorSize;
+          const localRange = Math.max(0, sectorSize - angleMargin * 2);
+          const angle = sectorStart + angleMargin + Math.random() * localRange;
           const direction = {
-            x: outerPoint.x - center.x,
-            y: outerPoint.y - center.y,
+            x: Math.cos(angle),
+            y: Math.sin(angle),
           };
-          const length = Math.hypot(direction.x, direction.y) || 1;
+          const outerPoint = findIntersectionOnRing(outerRing, direction);
+          const length = outerPoint ? Math.hypot(outerPoint.x - center.x, outerPoint.y - center.y) : 1;
           state.spokeDirections.push({
-            x: direction.x / length,
-            y: direction.y / length,
+            x: direction.x / length * length,
+            y: direction.y / length * length,
           });
         }
+
+        state.spokeDirections = state.spokeDirections.map((direction) => {
+          const length = Math.hypot(direction.x, direction.y) || 1;
+          return {
+            x: direction.x / length,
+            y: direction.y / length,
+          };
+        });
 
         recomputeIdealNodes();
       }
@@ -732,6 +925,26 @@
         return state.ringLoopCounts[state.activeRingIndex] || 0;
       }
 
+      function setTextIfChanged(element, nextValue, cacheKey) {
+        if (cacheKey === "score") {
+          if (lastScoreText === nextValue) {
+            return;
+          }
+          lastScoreText = nextValue;
+        } else if (cacheKey === "meta") {
+          if (lastMetaText === nextValue) {
+            return;
+          }
+          lastMetaText = nextValue;
+        } else if (cacheKey === "status") {
+          if (lastStatusValue === nextValue) {
+            return;
+          }
+          lastStatusValue = nextValue;
+        }
+        element.textContent = nextValue;
+      }
+
       function setStatusText() {
         if (state.phase !== "playing") {
           return;
@@ -739,7 +952,11 @@
         const ringNumber = state.activeRingIndex + 1;
         const targetNumber = state.currentTargetIndex + 1;
         const loops = currentLoopCount();
-        statusText.textContent = `Ring ${ringNumber}: hit target ${targetNumber} of ${state.selectedSpokeCount}. Loops used: ${loops}. Later tuning can reduce score for extra full passes.`;
+        setTextIfChanged(
+          statusText,
+          `Ring ${ringNumber}: hit target ${targetNumber} of ${state.selectedSpokeCount}. Loops used: ${loops}. Later tuning can reduce score for extra full passes.`,
+          "status"
+        );
       }
 
       function startRun() {
@@ -752,31 +969,37 @@
         state.score = 0;
         state.displayedScore = 0;
         state.ringScores = [];
-        state.selectedRingCount = randomIntInclusive(MIN_RINGS, MAX_RINGS);
+        state.selectedSpokeCount = randomIntInclusive(MIN_SPOKES, MAX_SPOKES);
+        state.selectedShape = randomShape();
+        state.selectedRingCount = getSafeRingCount(randomIntInclusive(MIN_RINGS, MAX_RINGS), state.selectedShape);
         state.ringLoopCounts = new Array(state.selectedRingCount).fill(0);
         state.placedNodes = Array.from({ length: state.selectedRingCount }, () => []);
         state.placedNodeFractions = Array.from({ length: state.selectedRingCount }, () => []);
         state.idealNodes = [];
-        state.selectedSpokeCount = randomIntInclusive(MIN_SPOKES, MAX_SPOKES);
-        state.selectedShape = randomShape();
         state.ringPalette = buildGradientPalette(state.selectedRingCount);
         state.currentTargetIndex = 0;
         state.spokeDirections = [];
         state.inputLockUntil = 0;
+        state.resultReadyAt = 0;
         state.flashUntil = 0;
         state.popLabel = null;
+        lastScoreText = "";
+        lastMetaText = "";
+        lastStatusValue = "";
         lastTime = performance.now();
         buildRings();
         seedSpokePath();
         updateHud();
         hud.classList.remove("hidden");
         startOverlay.classList.add("hidden");
+        resultOverlay.classList.add("instant-hide");
         resultOverlay.classList.add("hidden");
         setStatusText();
       }
 
       function completeRun() {
         state.phase = "results";
+        state.resultReadyAt = performance.now() + RESULT_RESTART_DELAY_MS;
         const baseScore = state.score;
         const best = state.ringScores.length ? Math.max(...state.ringScores) : 0;
         const average = state.ringScores.length ? baseScore / state.ringScores.length : 0;
@@ -787,6 +1010,7 @@
         averageRing.textContent = average.toFixed(1);
         bestRing.textContent = best.toFixed(1);
         idealHit.textContent = (SCORE_CAP / (state.selectedRingCount * state.selectedSpokeCount)).toFixed(1);
+        resultOverlay.classList.remove("instant-hide");
         resultOverlay.classList.remove("hidden");
         hud.classList.add("hidden");
       }
@@ -849,7 +1073,6 @@
             state.progress = 0;
           }
           state.inputLockUntil = Math.max(state.inputLockUntil, now + RING_TRANSITION_MS);
-          scoreMeta.textContent = `Ring ${state.activeRingIndex + 1} / ${state.selectedRingCount} • ${state.selectedShape.name} • Spokes ${state.selectedSpokeCount}`;
           setStatusText();
         } else {
           completeRun();
@@ -892,11 +1115,19 @@
       }
 
       function updateHud() {
-        scoreValue.textContent = state.displayedScore.toFixed(1);
+        setTextIfChanged(scoreValue, state.displayedScore.toFixed(1), "score");
         if (state.phase === "playing") {
-          scoreMeta.textContent = `Ring ${state.activeRingIndex + 1} / ${state.selectedRingCount} • ${state.selectedShape.name} • Spokes ${state.selectedSpokeCount}`;
+          setTextIfChanged(
+            scoreMeta,
+            `Ring ${state.activeRingIndex + 1} / ${state.selectedRingCount} • ${state.selectedShape.name} • Spokes ${state.selectedSpokeCount}`,
+            "meta"
+          );
         } else if (state.phase === "start") {
-          scoreMeta.textContent = `Ring 1 / ${MIN_RINGS}-${MAX_RINGS} • random shape • Spokes ${MIN_SPOKES}-${MAX_SPOKES}`;
+          setTextIfChanged(
+            scoreMeta,
+            `Ring 1 / ${getMinimumRingCount()}-${MAX_RINGS} • random shape • Spokes ${MIN_SPOKES}-${MAX_SPOKES}`,
+            "meta"
+          );
         }
       }
 
@@ -932,10 +1163,7 @@
       }
 
       function drawBackground(now) {
-        const gradient = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, Math.max(window.innerWidth, window.innerHeight) * 0.7);
-        gradient.addColorStop(0, "rgba(16, 26, 44, 0.38)");
-        gradient.addColorStop(1, "rgba(4, 7, 13, 0)");
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = backgroundGradient;
         ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
         if (now < state.flashUntil) {
@@ -1193,12 +1421,41 @@
       }
 
 
-      startButton.addEventListener("click", startRun);
-      restartButton.addEventListener("click", startRun);
+      function handleRestartPress(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (state.phase !== "results") {
+          return;
+        }
+        if (performance.now() < state.resultReadyAt) {
+          return;
+        }
+        startRun();
+      }
+
       window.addEventListener("pointerdown", (event) => {
+        if (state.phase === "start") {
+          event.preventDefault();
+          startRun();
+          return;
+        }
+        if (state.phase === "results") {
+          handleRestartPress(event);
+          return;
+        }
         if (state.phase === "playing") {
           event.preventDefault();
           handleTap();
+        }
+      }, { passive: false });
+      window.addEventListener("touchend", (event) => {
+        if (state.phase === "start") {
+          event.preventDefault();
+          startRun();
+          return;
+        }
+        if (state.phase === "results") {
+          handleRestartPress(event);
         }
       }, { passive: false });
       window.addEventListener("keydown", (event) => {
