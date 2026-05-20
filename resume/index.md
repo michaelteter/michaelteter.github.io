@@ -2,6 +2,7 @@
 layout: page
 title: Resume
 permalink: /resume/
+nav_exclude: true
 ---
 
 [Download PDF version](/michaelteter_resume.pdf)
