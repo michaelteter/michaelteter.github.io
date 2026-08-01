@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>m6 student haikus</title>
+  <style>
+    /* ==========================================================================
+       Delicate Minimalist M6 Haiku Showcase - Scrubbed Single View
+       ========================================================================== */
+
+    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-gradient: radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0f172a 60%, #0b0f19 100%);
+      --text-main: #f1f5f9;
+      --text-subtle: #475569;
+      --accent-soft: #a78bfa;
+      
+      --font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      text-transform: lowercase; /* Force everything lowercase */
+    }
+
+    body {
+      font-family: var(--font-family);
+      font-weight: 300;
+      background-color: var(--bg-dark);
+      background-image: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 32px 24px;
+    }
+
+    /* Minimal Container */
+    .haiku-container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 52px;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .haiku-container.fade-out {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .haiku-container.fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 1. Center Title: [title] */
+    .haiku-title {
+      font-size: 2.2rem;
+      font-weight: 400;
+      color: var(--accent-soft);
+      letter-spacing: 1px;
+    }
+
+    /* 2. Single Plain Haiku Text (3 Lines) */
+    .haiku-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .poem-line {
+      font-size: 2.2rem;
+      font-weight: 300;
+      line-height: 1.5;
+      color: var(--text-main);
+      letter-spacing: 0.5px;
+    }
+
+    /* Subtle Bottom Progress Line */
+    .bottom-progress {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #a78bfa, #f472b6, #38bdf8);
+      transition: width 0.1s linear;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .haiku-container {
+        gap: 36px;
+      }
+      
+      .haiku-title {
+        font-size: 1.7rem;
+      }
+      
+      .poem-line {
+        font-size: 1.65rem;
+        line-height: 1.4;
+      }
+    }
+
+    /* Top Unobtrusive Attribution Line */
+    .top-attribution {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.85rem;
+      font-weight: 400;
+      letter-spacing: 2px;
+      color: #94a3b8;
+      opacity: 0.85;
+      text-transform: lowercase;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* Bottom Unobtrusive Copyright Line */
+    .bottom-copyright {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.78rem;
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+      opacity: 0.85;
+      text-transform: lowercase;
+      text-align: center;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .bottom-copyright a {
+      color: #cbd5e1;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Unobtrusive Attribution -->
+  <div class="top-attribution">haikus from rooms 71 and 72</div>
+
+  <!-- Minimal Single Haiku Display Container -->
+  <main id="haikuContainer" class="haiku-container">
+    <!-- [title] -->
+    <h1 id="haikuTitle" class="haiku-title">--</h1>
+
+    <!-- [normal haiku text on three lines] -->
+    <div class="haiku-lines">
+      <p id="line1" class="poem-line">--</p>
+      <p id="line2" class="poem-line">--</p>
+      <p id="line3" class="poem-line">--</p>
+    </div>
+  </main>
+
+  <!-- Bottom edge timer progress indicator -->
+  <div class="bottom-progress">
+    <div id="progressFill" class="progress-fill"></div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       CONFIGURABLE SLIDE DURATION CONSTANT (60000 = 60 SECONDS PER HAIKU)
+       ========================================================================== */
+    const DISPLAY_DURATION_MS = 60000;
+
+    /* ==========================================================================
+       HAIKU SLIDESHOW LOGIC
+       ========================================================================== */
+    const EMBEDDED_HAIKUS = [
+  {
+    "topic": "matcha 🍵🗯️😋💞",
+    "standard": {
+      "line1": "bright green powder whisked",
+      "line2": "earthy taste in a warm milk",
+      "line3": "calm morning delight"
+    }
+  },
+  {
+    "topic": "morning coffee",
+    "standard": {
+      "line1": "hot morning coffee",
+      "line2": "spilled on my chinese homework",
+      "line3": "all papers turned brown"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "soft drops touch the grass",
+      "line2": "cool gray mist falls from the sky",
+      "line3": "earth drinks up the rain"
+    }
+  },
+  {
+    "topic": "cats",
+    "standard": {
+      "line1": "soft paws walk so light",
+      "line2": "sleeping in the warm sunlight",
+      "line3": "purring all day long"
+    }
+  },
+  {
+    "topic": "morning coffee",
+    "standard": {
+      "line1": "warm steam from my cup",
+      "line2": "sipping sun shine in the morn",
+      "line3": "oops! i forgot sugar!"
+    }
+  },
+  {
+    "topic": "bangkok rain",
+    "standard": {
+      "line1": "bangkok rain arrives",
+      "line2": "cars move slowly through the streets",
+      "line3": "grey skies hide the sun"
+    }
+  },
+  {
+    "topic": "this morning",
+    "standard": {
+      "line1": "laying on the bed",
+      "line2": "a blissful friday morning",
+      "line3": "“ring, ring” i woke up"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "rain falls from the sky",
+      "line2": "cool drops dancing on the leaves",
+      "line3": "nature comes alive"
+    }
+  },
+  {
+    "topic": "winter",
+    "standard": {
+      "line1": "silent snowflakes fall",
+      "line2": "frosty breath in the cool air",
+      "line3": "calm cold winter night"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "soft rain taps the glass",
+      "line2": "clouds drift slowly through the sky",
+      "line3": "cool drops wash the earth"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "rain falls from the sky",
+      "line2": "birds hide under green tree leaves",
+      "line3": "flowers drink the rain"
+    }
+  },
+  {
+    "topic": "winter snow",
+    "standard": {
+      "line1": "the freeze water fall",
+      "line2": "through the leafless tree forest",
+      "line3": "such my loneliness"
+    }
+  },
+  {
+    "topic": "morning sunrise",
+    "standard": {
+      "line1": "golden sun appears",
+      "line2": "birds sing through the quiet trees",
+      "line3": "a peaceful new day"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "morning rain falls",
+      "line2": "tiny drops dance on leaves",
+      "line3": "clouds drift away"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "soft rain falls softly",
+      "line2": "green leaves dance in cool wet wind",
+      "line3": "puddles shine like glass"
+    }
+  },
+  {
+    "topic": "student life",
+    "standard": {
+      "line1": "i just a cool kids",
+      "line2": "shirts must be  inside the shorts",
+      "line3": "take a nap all days"
+    }
+  },
+  {
+    "topic": "best mandu",
+    "standard": {
+      "line1": "want to eat mandu",
+      "line2": "where to find the best mandu",
+      "line3": "7-eleven"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "lying on the bed",
+      "line2": "familiar sound comes around",
+      "line3": "then a rainy day"
+    }
+  },
+  {
+    "topic": "morning coffee",
+    "standard": {
+      "line1": "my morning coffee,",
+      "line2": "today i had iced latte;",
+      "line3": "now i feel awake."
+    }
+  },
+  {
+    "topic": "fireflies at night",
+    "standard": {
+      "line1": "fireflies wake now",
+      "line2": "tiny lanterns softly glow",
+      "line3": "night whispers with light"
+    }
+  },
+  {
+    "topic": "cozy winter breeze",
+    "standard": {
+      "line1": "gentle winter breeze",
+      "line2": "drifting through the quiet trees",
+      "line3": "warm thoughts fill my mind"
+    }
+  },
+  {
+    "topic": "sunny day",
+    "standard": {
+      "line1": "the sun is warm",
+      "line2": "birds are singing in the trees",
+      "line3": "i feel so happy"
+    }
+  },
+  {
+    "topic": "spring frost",
+    "standard": {
+      "line1": "cherry blossoms falls",
+      "line2": "sudden frost bites the new buds",
+      "line3": "spring waits in the cold"
+    }
+  },
+  {
+    "topic": "cozy library",
+    "standard": {
+      "line1": "sunlight warms the shelves",
+      "line2": "old books breathe in gentle air",
+      "line3": "silence blooms inside"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "soft rain falls outside",
+      "line2": "cozy blanket wrapped up tight",
+      "line3": "time to close my eyes"
+    }
+  },
+  {
+    "topic": "rainy day",
+    "standard": {
+      "line1": "rain falls on the glass",
+      "line2": "soft drops trickling down the pane",
+      "line3": "cool air fills the room"
+    }
+  },
+  {
+    "topic": "warm cup in my hands",
+    "standard": {
+      "line1": "warm cup in my hands.",
+      "line2": "soft light wakes the quiet room.",
+      "line3": "a fresh day begins."
+    }
+  },
+  {
+    "topic": "gripping weekend",
+    "standard": {
+      "line1": "people gather here,",
+      "line2": "smiles bloom in the warm weekend",
+      "line3": "joy fills every heart."
+    }
+  },
+  {
+    "topic": "cats",
+    "standard": {
+      "line1": "orange whiskers gleam",
+      "line2": "long tail flicks through tall green grass",
+      "line3": "daytime hums with purrs"
+    }
+  },
+  {
+    "topic": "a break",
+    "standard": {
+      "line1": "as the sunlight shines",
+      "line2": "all is calm no thoughts arrive",
+      "line3": "wonderful break time"
+    }
+  },
+  {
+    "topic": "examination day",
+    "standard": {
+      "line1": "exam in minutes",
+      "line2": "dark classroom, no one’s inside",
+      "line3": "wrong building again"
+    }
+  },
+  {
+    "topic": "sunny day",
+    "standard": {
+      "line1": "hot sun in the sky",
+      "line2": "the air feels warm on my face",
+      "line3": "i drink cold water"
+    }
+  },
+  {
+    "topic": "cats",
+    "standard": {
+      "line1": "soft fur, sleepy eyes",
+      "line2": "purring softly on my lap",
+      "line3": "gentle paws stretch out"
+    }
+  },
+  {
+    "topic": "simile karma to nature",
+    "standard": {
+      "line1": "karma is a breeze",
+      "line2": "in my hair in the weekend",
+      "line3": "karma vibe like that"
+    }
+  },
+  {
+    "topic": "cats",
+    "standard": {
+      "line1": "i love cats so much",
+      "line2": "cats are so beautiful.",
+      "line3": "and they are so cute."
+    }
+  },
+  {
+    "topic": "a rain",
+    "standard": {
+      "line1": "the drop falls to ground",
+      "line2": "then it pours like a large wave",
+      "line3": "i want to be sinked"
+    }
+  },
+  {
+    "topic": "chocolate dog",
+    "standard": {
+      "line1": "a dog name's choco",
+      "line2": "she bows for my chocolate",
+      "line3": "i tell her sorry"
+    }
+  },
+  {
+    "topic": "summative",
+    "standard": {
+      "line1": "summative has come.",
+      "line2": "tears are streaming down my face.",
+      "line3": "i won't pass the tests"
+    }
+  }
+];
+
+    let currentIndex = 0;
+    let isPlaying = true;
+    let startTime = 0;
+    let elapsedTime = 0;
+    let timerInterval = null;
+
+    function renderHaiku(index) {
+      if (!EMBEDDED_HAIKUS || !EMBEDDED_HAIKUS.length) return;
+      
+      const container = document.getElementById('haikuContainer');
+      container.classList.add('fade-out');
+      
+      setTimeout(() => {
+        const item = EMBEDDED_HAIKUS[index];
+        
+        document.getElementById('haikuTitle').textContent = (item.topic || 'untitled').toLowerCase();
+        document.getElementById('line1').textContent = item.standard.line1.toLowerCase();
+        document.getElementById('line2').textContent = item.standard.line2.toLowerCase();
+        document.getElementById('line3').textContent = item.standard.line3.toLowerCase();
+
+        container.classList.remove('fade-out');
+        container.classList.add('fade-in');
+        setTimeout(() => container.classList.remove('fade-in'), 500);
+      }, 250);
+    }
+
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      startTime = Date.now() - elapsedTime;
+      
+      timerInterval = setInterval(() => {
+        if (!isPlaying) return;
+        elapsedTime = Date.now() - startTime;
+        let progress = (elapsedTime / DISPLAY_DURATION_MS) * 100;
+        
+        if (progress >= 100) {
+          progress = 100;
+          nextHaiku();
+        }
+        document.getElementById('progressFill').style.width = `${progress}%`;
+      }, 100);
+    }
+
+    function resetTimer() {
+      elapsedTime = 0;
+      startTime = Date.now();
+      document.getElementById('progressFill').style.width = '0%';
+      if (isPlaying) startTimer();
+    }
+
+    function nextHaiku() {
+      if (!EMBEDDED_HAIKUS.length) return;
+      currentIndex = (currentIndex + 1) % EMBEDDED_HAIKUS.length;
+      renderHaiku(currentIndex);
+      resetTimer();
+    }
+
+    function prevHaiku() {
+      if (!EMBEDDED_HAIKUS.length) return;
+      currentIndex = (currentIndex - 1 + EMBEDDED_HAIKUS.length) % EMBEDDED_HAIKUS.length;
+      renderHaiku(currentIndex);
+      resetTimer();
+    }
+
+    /* Keyboard navigation shortcuts (Arrow keys & Spacebar skip) */
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        nextHaiku();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevHaiku();
+      }
+    });
+
+    /* Randomize order across whole set */
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      shuffleArray(EMBEDDED_HAIKUS);
+      renderHaiku(0);
+      startTimer();
+    });
+  </script>
+
+  <!-- Bottom Unobtrusive Copyright Footer -->
+  <div class="bottom-copyright">
+    haikus are copyrighted by their respective student authors and cannot be used without permission • contact <a href="mailto:legal@michaelteter.com">legal@michaelteter.com</a> to inquire
+  </div>
+</body>
+</html>
