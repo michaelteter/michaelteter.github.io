@@ -503,6 +503,36 @@
   }
 ];
 
+    /* ==========================================================================
+       TEMPORARY AI EXCLUSION LIST (Prefiltering suspected AI haikus)
+       Update this list after verifying with students.
+       ========================================================================== */
+    const SUSPECTED_AI_EXCLUSIONS = [
+      "soft drops touch the grass",
+      "soft paws walk so light",
+      "rain falls from the sky",
+      "silent snowflakes fall",
+      "soft rain taps the glass",
+      "golden sun appears",
+      "morning rain falls",
+      "soft rain falls softly",
+      "fireflies wake now",
+      "gentle winter breeze",
+      "cherry blossoms falls",
+      "sunlight warms the shelves",
+      "soft rain falls outside",
+      "rain falls on the glass",
+      "warm cup in my hands.",
+      "people gather here,",
+      "orange whiskers gleam",
+      "soft fur, sleepy eyes"
+    ];
+
+    const DISPLAY_HAIKUS = EMBEDDED_HAIKUS.filter(item => {
+      const line1 = item.standard && item.standard.line1 ? item.standard.line1.toLowerCase().trim() : "";
+      return !SUSPECTED_AI_EXCLUSIONS.includes(line1);
+    });
+
     let currentIndex = 0;
     let isPlaying = true;
     let startTime = 0;
@@ -510,13 +540,13 @@
     let timerInterval = null;
 
     function renderHaiku(index) {
-      if (!EMBEDDED_HAIKUS || !EMBEDDED_HAIKUS.length) return;
+      if (!DISPLAY_HAIKUS || !DISPLAY_HAIKUS.length) return;
       
       const container = document.getElementById('haikuContainer');
       container.classList.add('fade-out');
       
       setTimeout(() => {
-        const item = EMBEDDED_HAIKUS[index];
+        const item = DISPLAY_HAIKUS[index];
         
         document.getElementById('haikuTitle').textContent = (item.topic || 'untitled').toLowerCase();
         document.getElementById('line1').textContent = item.standard.line1.toLowerCase();
@@ -554,15 +584,15 @@
     }
 
     function nextHaiku() {
-      if (!EMBEDDED_HAIKUS.length) return;
-      currentIndex = (currentIndex + 1) % EMBEDDED_HAIKUS.length;
+      if (!DISPLAY_HAIKUS.length) return;
+      currentIndex = (currentIndex + 1) % DISPLAY_HAIKUS.length;
       renderHaiku(currentIndex);
       resetTimer();
     }
 
     function prevHaiku() {
-      if (!EMBEDDED_HAIKUS.length) return;
-      currentIndex = (currentIndex - 1 + EMBEDDED_HAIKUS.length) % EMBEDDED_HAIKUS.length;
+      if (!DISPLAY_HAIKUS.length) return;
+      currentIndex = (currentIndex - 1 + DISPLAY_HAIKUS.length) % DISPLAY_HAIKUS.length;
       renderHaiku(currentIndex);
       resetTimer();
     }
@@ -587,7 +617,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      shuffleArray(EMBEDDED_HAIKUS);
+      shuffleArray(DISPLAY_HAIKUS);
       renderHaiku(0);
       startTimer();
     });
