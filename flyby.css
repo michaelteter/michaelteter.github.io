@@ -1,0 +1,607 @@
+/* flyby.css - 8-Bit Retro Biplane Fly By Styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: #0f1118;
+  color: #f4eedb;
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#game-wrapper {
+  position: relative;
+  width: 960px;
+  height: 540px;
+  max-width: 100vw;
+  max-height: 100vh;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  box-shadow: 0 0 35px rgba(0, 0, 0, 0.9), 0 0 10px rgba(78, 148, 255, 0.2);
+  border: 4px solid #3a4454;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background-color: #6bb0ff;
+}
+
+/* Arcade Top HUD */
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(180deg, rgba(16, 20, 28, 0.92) 0%, rgba(16, 20, 28, 0.6) 80%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  z-index: 10;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.hud-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hud-label {
+  color: #8c9bb0;
+  font-size: 8px;
+}
+
+.hud-value {
+  color: #ffdf40;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.combo-box {
+  background: rgba(255, 170, 0, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 170, 0, 0.4);
+}
+
+.combo-val {
+  color: #ff9900;
+  font-weight: bold;
+  transition: transform 0.1s ease;
+}
+
+.combo-val.active {
+  color: #ff3366;
+  text-shadow: 0 0 8px #ff3366, 1px 1px 0 #000;
+  animation: pulse-combo 0.4s infinite alternate;
+}
+
+@keyframes pulse-combo {
+  from { transform: scale(1); }
+  to { transform: scale(1.2); }
+}
+
+.lives-container {
+  display: flex;
+  gap: 6px;
+}
+
+.plane-icon {
+  color: #55ff77;
+  font-size: 12px;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+
+.fuel-bar-wrapper {
+  width: 90px;
+  height: 10px;
+  background: #252b36;
+  border: 1px solid #6b7a94;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fuel-bar-fill {
+  width: 100%;
+  height: 100%;
+  background: #38ef7d;
+  transition: width 0.15s ease;
+}
+
+.fuel-bar-fill.low {
+  background: #ff4757;
+  animation: pulse-fuel 0.5s infinite alternate;
+}
+
+@keyframes pulse-fuel {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}
+
+/* Alert Notification Center (Top/Center Overlay) */
+#alert-container {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 18;
+  pointer-events: none;
+  max-width: 90%;
+}
+
+/* Stall Warning Banner */
+#stall-warning {
+  color: #ff2222;
+  font-size: 11px;
+  font-weight: bold;
+  background: rgba(26, 4, 4, 0.94);
+  padding: 4px 14px;
+  border: 2px solid #ff2222;
+  border-radius: 4px;
+  text-shadow: 0 0 8px rgba(255, 34, 34, 0.9);
+  box-shadow: 0 0 12px rgba(255, 34, 34, 0.5), 0 4px 12px rgba(0, 0, 0, 0.8);
+  animation: blink-stall 0.25s infinite alternate;
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+@keyframes blink-stall {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0.2; transform: scale(0.97); }
+}
+
+/* Status / Message Banner */
+#status-banner {
+  color: #40e0d0;
+  font-size: 9px;
+  background: rgba(10, 18, 28, 0.92);
+  padding: 5px 14px;
+  border: 1px solid #40e0d0;
+  border-radius: 4px;
+  text-shadow: 0 0 5px #40e0d0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  animation: banner-pop 0.15s ease-out;
+}
+
+@keyframes banner-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#status-banner.status-banner-info {
+  color: #40e0d0;
+  border-color: #40e0d0;
+  background: rgba(10, 18, 28, 0.92);
+  text-shadow: 0 0 6px #40e0d0;
+  box-shadow: 0 0 10px rgba(64, 224, 208, 0.3), 0 4px 14px rgba(0, 0, 0, 0.8);
+}
+
+#status-banner.status-banner-bonus {
+  color: #ffdf40;
+  border-color: #ffd700;
+  background: rgba(30, 22, 6, 0.95);
+  text-shadow: 0 0 8px #ffcc00, 1px 1px 0 #000;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.8);
+  animation: pulse-bonus-banner 0.4s infinite alternate;
+}
+
+@keyframes pulse-bonus-banner {
+  from { border-color: #ffd700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
+  to { border-color: #ffffff; box-shadow: 0 0 18px rgba(255, 215, 0, 0.8); }
+}
+
+#status-banner.status-banner-combo {
+  color: #ff5588;
+  border-color: #ff3366;
+  background: rgba(30, 10, 20, 0.95);
+  text-shadow: 0 0 8px #ff3366;
+  box-shadow: 0 0 12px rgba(255, 51, 102, 0.4), 0 4px 14px rgba(0, 0, 0, 0.8);
+}
+
+#status-banner.status-banner-warning {
+  color: #ffaa00;
+  border-color: #ff9900;
+  background: rgba(30, 18, 6, 0.95);
+  text-shadow: 0 0 8px #ff9900;
+  box-shadow: 0 0 10px rgba(255, 153, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.8);
+}
+
+#status-banner.status-banner-danger {
+  color: #ff4757;
+  border-color: #ff2222;
+  background: rgba(30, 6, 6, 0.95);
+  text-shadow: 0 0 8px #ff2222;
+  box-shadow: 0 0 12px rgba(255, 34, 34, 0.4), 0 4px 14px rgba(0, 0, 0, 0.8);
+}
+
+#status-banner.status-banner-success {
+  color: #55ff77;
+  border-color: #38ef7d;
+  background: rgba(6, 28, 14, 0.95);
+  text-shadow: 0 0 8px #38ef7d;
+  box-shadow: 0 0 10px rgba(56, 239, 125, 0.3), 0 4px 14px rgba(0, 0, 0, 0.8);
+}
+
+/* Cockpit Instrument Dashboard Overlay (Left Side Bar) */
+#instrument-panel {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(10, 15, 24, 0.92);
+  padding: 8px 5px;
+  border-radius: 0 8px 8px 0;
+  border: 1.5px solid #2f3f56;
+  border-left: none;
+  box-shadow: 3px 0 14px rgba(0, 0, 0, 0.8), inset -1px 0 3px rgba(255, 255, 255, 0.06);
+  z-index: 10;
+  pointer-events: none;
+  width: 44px;
+  box-sizing: border-box;
+}
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.gauge-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6.5px;
+  color: #3aafa9;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 4px rgba(58, 175, 169, 0.6);
+  text-align: center;
+}
+
+.gauge-bar-track {
+  position: relative;
+  width: 20px;
+  height: 52px;
+  background: #080d14;
+  border: 1.5px solid #2d3b4e;
+  border-radius: 2px;
+  box-shadow: inset 0 0 6px #000;
+  overflow: hidden;
+}
+
+.gauge-bar-ticks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.12) 0,
+    rgba(255, 255, 255, 0.12) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+  pointer-events: none;
+  z-index: 4;
+}
+
+.gauge-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  border-radius: 1px;
+  transition: height 0.06s ease-out;
+  z-index: 2;
+}
+
+/* Speed Bar Styling */
+#bar-spd {
+  background: linear-gradient(to top, #0288d1, #26c6da);
+  box-shadow: 0 0 6px rgba(38, 198, 218, 0.6);
+}
+
+/* Altitude Bar Styling */
+#bar-alt {
+  background: linear-gradient(to top, #2e7d32, #55ff77);
+  box-shadow: 0 0 6px rgba(85, 255, 119, 0.6);
+}
+
+/* Throttle Bar Styling */
+#bar-thr {
+  background: linear-gradient(to top, #d84315, #ffb300);
+  box-shadow: 0 0 6px rgba(255, 179, 0, 0.6);
+}
+
+/* AOA Specific Track & Center-Origin Fill */
+.gauge-aoa-track {
+  background: #080d14;
+}
+
+.gauge-aoa-center-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.75);
+  transform: translateY(-50%);
+  z-index: 5;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+.gauge-aoa-fill {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  border-radius: 1px;
+  transition: height 0.05s ease-out, top 0.05s ease-out, bottom 0.05s ease-out, background-color 0.1s ease;
+  z-index: 2;
+}
+
+.gauge-aoa-fill.stalled {
+  animation: stall-aoa-pulse 0.2s infinite alternate;
+}
+
+@keyframes stall-aoa-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.35; }
+}
+
+.gauge-val {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5.5px;
+  color: #ffdf40;
+  text-shadow: 0 0 3px rgba(255, 223, 64, 0.4);
+  text-align: center;
+  letter-spacing: -0.5px;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+/* Retro Buttons */
+.retro-btn {
+  background: #293447;
+  color: #f1f4f9;
+  border: 2px solid #5d7499;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 3px;
+  box-shadow: 0 3px 0 #131924;
+  transition: all 0.1s ease;
+}
+
+.retro-btn:hover {
+  background: #394a66;
+  border-color: #8fa7cf;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #131924;
+}
+
+.retro-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #131924;
+}
+
+.primary-btn {
+  background: #237844;
+  border-color: #49aa67;
+  color: #ffffff;
+  box-shadow: 0 3px 0 #0f3d20;
+}
+
+.primary-btn:hover {
+  background: #2c9655;
+  border-color: #6ee693;
+}
+
+.icon-btn {
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Fullscreen Overlay Modals (Title, GameOver, Settings) */
+.overlay-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.85);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 30;
+  transition: opacity 0.25s ease;
+}
+
+.screen-card {
+  background: #141c28;
+  border: 3px solid #4a5c78;
+  border-radius: 8px;
+  padding: 24px 32px;
+  max-width: 580px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.pixel-title {
+  font-size: 26px;
+  color: #ffdf40;
+  text-shadow: 2px 2px 0 #b37400, 4px 4px 0 #000000;
+  margin-bottom: 20px;
+  letter-spacing: 2px;
+}
+
+.pixel-subtitle {
+  font-size: 11px;
+  color: #79a6d2;
+  margin-bottom: 18px;
+  letter-spacing: 1px;
+}
+
+.red-glow {
+  color: #ff4757;
+  text-shadow: 2px 2px 0 #8b0000, 0 0 15px rgba(255, 71, 87, 0.6);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mission-text {
+  font-size: 9px;
+  color: #55ff77;
+  letter-spacing: 1px;
+}
+
+.briefing-list {
+  text-align: left;
+  list-style: none;
+  font-size: 8.5px;
+  line-height: 2;
+  background: #0d141e;
+  padding: 16px 20px;
+  border: 1px solid #2b394f;
+  border-radius: 4px;
+}
+
+.briefing-list li {
+  margin-bottom: 14px;
+}
+
+.briefing-list li:last-child {
+  margin-bottom: 0;
+}
+
+.key-badge {
+  display: inline-block;
+  background: #2c3a50;
+  border: 1px solid #708cb5;
+  color: #ffeb3b;
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-size: 8px;
+}
+
+.btn-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.credits-text {
+  font-size: 7.5px;
+  color: #8c9bb0;
+  margin-top: 16px;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+}
+
+.credits-text a {
+  color: #55ff77;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.credits-text a:hover {
+  color: #ffdf40;
+  text-decoration: underline;
+}
+
+.highlight-val {
+  color: #ffdf40;
+}
+
+/* Settings Modal Specific */
+.settings-card {
+  max-width: 520px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  background: #0d141e;
+  padding: 14px 18px;
+  border: 1px solid #2b394f;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 8px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.setting-item input[type="checkbox"] {
+  accent-color: #38ef7d;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* CRT Scanline Filter */
+.crt-filter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.25) 50%
+  ),
+  linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 3px, 6px 100%;
+  z-index: 25;
+}
+
+.hidden {
+  display: none !important;
+}

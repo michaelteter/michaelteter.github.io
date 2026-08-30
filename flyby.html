@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Fly By: Retro 8-bit biplane flight game. Pop balloons, dive barns, dodge airliners, and perform aerobatic stunt maneuvers!">
+  <title>Fly By: Balloon Pop & Stunt Flight</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310141c'/%3E%3Crect x='6' y='14' width='20' height='4' fill='%232b7a78'/%3E%3Crect x='12' y='8' width='8' height='3' fill='%233aafa9'/%3E%3Crect x='14' y='11' width='4' height='3' fill='%23def2f1'/%3E%3Ccircle cx='24' cy='10' r='4' fill='%23ff3366'/%3E%3Cpath d='M24 14 L23 18' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E" type="image/svg+xml">
+  <link rel="stylesheet" href="flyby.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+    <!-- Top Arcade HUD -->
+    <div id="hud">
+      <div class="hud-box">
+        <span class="hud-label">SCORE</span>
+        <span id="score-display" class="hud-value">00000</span>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">HIGH</span>
+        <span id="high-score-display" class="hud-value">00000</span>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">POPPED</span>
+        <span id="balloons-display" class="hud-value">0</span>
+      </div>
+      <div class="hud-box combo-box">
+        <span class="hud-label">COMBO</span>
+        <span id="combo-display" class="hud-value combo-val">x1</span>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">COURSE</span>
+        <span id="wave-display" class="hud-value">1</span>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">PLANES</span>
+        <div id="lives-display" class="lives-container">
+          <span class="plane-icon">✈</span>
+          <span class="plane-icon">✈</span>
+          <span class="plane-icon">✈</span>
+        </div>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">FUEL</span>
+        <div class="fuel-bar-wrapper">
+          <div id="fuel-bar" class="fuel-bar-fill"></div>
+        </div>
+      </div>
+      <button id="settings-btn" class="retro-btn icon-btn" title="Settings (ESC)">⚙</button>
+    </div>
+
+    <!-- Alert Notification Center (Top/Center Overlay) -->
+    <div id="alert-container">
+      <div id="stall-warning" class="hidden">STALL !</div>
+      <div id="status-banner" class="hidden"></div>
+    </div>
+
+    <!-- Cockpit Instrument Panel (Left Side Bar) -->
+    <div id="instrument-panel">
+      <!-- SPD Gauge -->
+      <div class="gauge" id="gauge-spd-container">
+        <span class="gauge-label">SPD</span>
+        <div class="gauge-bar-track">
+          <div class="gauge-bar-ticks"></div>
+          <div class="gauge-bar-fill" id="bar-spd"></div>
+        </div>
+        <span class="gauge-val" id="val-spd">0</span>
+      </div>
+
+      <!-- ALT Gauge -->
+      <div class="gauge" id="gauge-alt-container">
+        <span class="gauge-label">ALT</span>
+        <div class="gauge-bar-track">
+          <div class="gauge-bar-ticks"></div>
+          <div class="gauge-bar-fill" id="bar-alt"></div>
+        </div>
+        <span class="gauge-val" id="val-alt">0</span>
+      </div>
+
+      <!-- AOA Gauge -->
+      <div class="gauge" id="gauge-aoa-container">
+        <span class="gauge-label">AOA</span>
+        <div class="gauge-bar-track gauge-aoa-track">
+          <div class="gauge-bar-ticks"></div>
+          <div class="gauge-aoa-center-line"></div>
+          <div class="gauge-aoa-fill" id="bar-aoa"></div>
+        </div>
+        <span class="gauge-val" id="val-aoa">0°</span>
+      </div>
+
+      <!-- THR Gauge -->
+      <div class="gauge" id="gauge-thr-container">
+        <span class="gauge-label">THR</span>
+        <div class="gauge-bar-track">
+          <div class="gauge-bar-ticks"></div>
+          <div class="gauge-bar-fill" id="bar-thr"></div>
+        </div>
+        <span class="gauge-val" id="val-thr">IDLE</span>
+      </div>
+    </div>
+
+    <!-- Title / Start Screen Overlay -->
+    <div id="title-screen" class="overlay-screen">
+      <div class="screen-card">
+        <h1 class="pixel-title">FLY BY</h1>
+        <div class="card-body">
+          <ul class="briefing-list">
+            <li><span class="key-badge">▲</span> / <span class="key-badge">▼</span> or <span class="key-badge">W</span> / <span class="key-badge">S</span> : Pitch (Nose Up / Down)</li>
+            <li><span class="key-badge">SPACE</span> : Throttle / Brakes</li>
+            <li><span class="key-badge">P</span> : Pause &nbsp;|&nbsp; <span class="key-badge">M</span> : Mute &nbsp;|&nbsp; <span class="key-badge">ESC</span> : Settings</li>
+          </ul>
+          <div class="btn-row">
+            <button id="start-btn" class="retro-btn primary-btn">START FLIGHT</button>
+            <button id="title-settings-btn" class="retro-btn">SETTINGS</button>
+          </div>
+          <div class="credits-text">A game by Michael Teter (<a href="mailto:flyby@michaelteter.com">flyby@michaelteter.com</a>)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen Overlay -->
+    <div id="gameover-screen" class="overlay-screen hidden">
+      <div class="screen-card">
+        <h1 id="gameover-title" class="pixel-title red-glow">FLIGHT OVER</h1>
+        <div class="card-body">
+          <p>FINAL SCORE: <span id="final-score" class="highlight-val">0</span></p>
+          <p>COURSES COMPLETED: <span id="final-wave" class="highlight-val">1</span></p>
+          <p>BALLOONS POPPED: <span id="final-popped" class="highlight-val">0</span></p>
+          <p>NEAR MISSES: <span id="final-nearmisses" class="highlight-val">0</span></p>
+          <p>MAX COMBO: <span id="final-combo" class="highlight-val">x1</span></p>
+          <button id="restart-btn" class="retro-btn primary-btn">FLY AGAIN (F)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="overlay-screen hidden">
+      <div class="screen-card settings-card">
+        <h2 class="pixel-subtitle">PILOT SETTINGS</h2>
+        <div class="settings-list">
+          <label class="setting-item">
+            <span>Invert Y (Aviation Standard: Pull Back = Climb)</span>
+            <input type="checkbox" id="setting-invert-y" checked>
+          </label>
+          <label class="setting-item">
+            <span>Show Instrument Dashboard</span>
+            <input type="checkbox" id="setting-instruments" checked>
+          </label>
+          <label class="setting-item">
+            <span>Retro CRT Scanline Filter</span>
+            <input type="checkbox" id="setting-scanlines" checked>
+          </label>
+          <label class="setting-item">
+            <span>Airplane Engine Sound FX</span>
+            <input type="checkbox" id="setting-engine-sound" checked>
+          </label>
+        </div>
+        <button id="close-settings-btn" class="retro-btn primary-btn">SAVE & RESUME</button>
+      </div>
+    </div>
+
+    <!-- CRT Scanline effect layer -->
+    <div id="crt-overlay" class="crt-filter"></div>
+  </div>
+
+  <script src="flyby.js"></script>
+</body>
+</html>

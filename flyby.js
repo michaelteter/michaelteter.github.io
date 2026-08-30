@@ -1,0 +1,3884 @@
+/**
+ * flyby.js - Fly By: Balloon Pop & Stunt Flight
+ * Complete Game Engine: Flight Aerodynamics, Balloon Collection Courses,
+ * Barn Diving Mechanics, Airliners, Stunt Biplanes, Bird Flocks, Web Audio SFX & Settings.
+ */
+
+(function() {
+  'use strict';
+
+  // --- CANVAS & CONTEXT SETUP ---
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const GAME_WIDTH = 960;
+  const GAME_HEIGHT = 540;
+  const GROUND_Y = 480;
+  const RUNWAY_START = 120;
+  const RUNWAY_END = 480;
+
+  // --- SAFE STORAGE WRAPPER ---
+  const Storage = {
+    get(key, fallback = null) {
+      try { return localStorage.getItem(key) ?? fallback; }
+      catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(key, value); }
+      catch {}
+    }
+  };
+
+  // --- SETTINGS & CONFIG ---
+  const settings = {
+    invertY: true,         // Aviation default: Down Arrow / S = Pull Back (Climb)
+    showInstruments: true, // Cockpit side bar gauges
+    scanlines: true,       // CRT filter
+    engineSound: true      // Dynamic engine pitch & volume audio
+  };
+
+  // --- GAME STATE ---
+  const state = {
+    running: false,
+    paused: false,
+    gameOver: false,
+    score: 0,
+    highScore: parseInt(Storage.get('flyby_highscore') || Storage.get('barnstormer_highscore') || '0', 10),
+    wave: 1,
+    lives: 3,
+    balloonsPopped: 0,
+    totalBalloonsInWave: 0,
+    nearMisses: 0,
+    combo: 1,
+    maxCombo: 1,
+    lastPoppedX: null,
+    lastPoppedId: null,
+    cameraX: 0,
+    shake: 0,
+    bannerText: '',
+    bannerTimer: 0
+  };
+
+  // --- RETRO SOUND SYNTHESIZER (Web Audio API) ---
+  let audioCtx = null;
+  let masterAudioGain = null;
+  let engineAudio = null;
+  let airlinerAudioVoices = [];
+  let sharedPinkNoiseBuffer = null;
+  let sharedWhiteNoiseBuffer = null;
+
+  // Shared noise buffer generators for wind, jet exhaust roar, crashes and whooshes
+  function createPinkNoiseBuffer(ctx, duration = 2) {
+    const bufferSize = ctx.sampleRate * duration;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+      b6 = white * 0.115926;
+    }
+    return noiseBuffer;
+  }
+
+  function createWhiteNoiseBuffer(ctx, duration = 1.5) {
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        audioCtx = new AudioContext();
+      }
+    }
+    if (audioCtx && !masterAudioGain) {
+      masterAudioGain = audioCtx.createGain();
+      masterAudioGain.gain.setValueAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime);
+      masterAudioGain.connect(audioCtx.destination);
+    }
+    if (audioCtx && !sharedPinkNoiseBuffer) {
+      sharedPinkNoiseBuffer = createPinkNoiseBuffer(audioCtx, 2.0);
+    }
+    if (audioCtx && !sharedWhiteNoiseBuffer) {
+      sharedWhiteNoiseBuffer = createWhiteNoiseBuffer(audioCtx, 1.5);
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    if (audioCtx && !engineAudio) {
+      setupEngineAudio();
+    }
+    if (audioCtx && (!airlinerAudioVoices || airlinerAudioVoices.length === 0)) {
+      setupAirlinerAudio();
+    }
+  }
+
+  function setupEngineAudio() {
+    if (!audioCtx || engineAudio || !masterAudioGain) return;
+    try {
+      // 1. Master Engine Gain Node connected to masterAudioGain
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+      masterGain.connect(masterAudioGain);
+
+      // 2. Primary Cylinder / Propeller Oscillator (Sawtooth)
+      const osc1 = audioCtx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(38, audioCtx.currentTime);
+
+      const osc1Gain = audioCtx.createGain();
+      osc1Gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      osc1.connect(osc1Gain);
+
+      // 3. Sub-harmonic / Piston Rumble Oscillator (Triangle with slight detune)
+      const osc2 = audioCtx.createOscillator();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(19, audioCtx.currentTime);
+      osc2.detune.setValueAtTime(4, audioCtx.currentTime);
+
+      const osc2Gain = audioCtx.createGain();
+      osc2Gain.gain.setValueAtTime(0.24, audioCtx.currentTime);
+      osc2.connect(osc2Gain);
+
+      // 4. Low-pass filter for throaty vintage engine timbre
+      const engineFilter = audioCtx.createBiquadFilter();
+      engineFilter.type = 'lowpass';
+      engineFilter.frequency.setValueAtTime(260, audioCtx.currentTime);
+      engineFilter.Q.setValueAtTime(2.2, audioCtx.currentTime);
+
+      osc1Gain.connect(engineFilter);
+      osc2Gain.connect(engineFilter);
+      engineFilter.connect(masterGain);
+
+      // 5. Propeller & Airspeed Wind Hiss (Pink/White noise loop)
+      const noiseSource = audioCtx.createBufferSource();
+      noiseSource.buffer = sharedPinkNoiseBuffer || createPinkNoiseBuffer(audioCtx, 2);
+      noiseSource.loop = true;
+
+      const windFilter = audioCtx.createBiquadFilter();
+      windFilter.type = 'bandpass';
+      windFilter.frequency.setValueAtTime(320, audioCtx.currentTime);
+      windFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+
+      const windGain = audioCtx.createGain();
+      windGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+      noiseSource.connect(windFilter);
+      windFilter.connect(windGain);
+      windGain.connect(masterGain);
+
+      // Start looping sound generators
+      const now = audioCtx.currentTime;
+      osc1.start(now);
+      osc2.start(now);
+      noiseSource.start(now);
+
+      engineAudio = {
+        masterGain,
+        osc1,
+        osc2,
+        engineFilter,
+        windFilter,
+        windGain
+      };
+    } catch (err) {
+      console.warn('Could not initialize engine audio:', err);
+    }
+  }
+
+  function setupAirlinerAudio() {
+    if (!audioCtx || (airlinerAudioVoices && airlinerAudioVoices.length > 0) || !masterAudioGain) return;
+    try {
+      airlinerAudioVoices = [];
+      const sharedNoise = sharedPinkNoiseBuffer || createPinkNoiseBuffer(audioCtx, 2);
+      const MAX_VOICES = 3;
+
+      for (let v = 0; v < MAX_VOICES; v++) {
+        // Master Gain Node for this airliner voice
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+        let panner = null;
+        if (audioCtx.createStereoPanner) {
+          panner = audioCtx.createStereoPanner();
+          panner.pan.setValueAtTime(0, audioCtx.currentTime);
+          panner.connect(masterGain);
+        }
+
+        const voiceDest = panner || masterGain;
+        masterGain.connect(masterAudioGain);
+
+        // Distance Atmospheric Damping Filter (Lowpass)
+        const distanceFilter = audioCtx.createBiquadFilter();
+        distanceFilter.type = 'lowpass';
+        distanceFilter.frequency.setValueAtTime(2400, audioCtx.currentTime);
+        distanceFilter.Q.setValueAtTime(0.8, audioCtx.currentTime);
+        distanceFilter.connect(voiceDest);
+
+        // 1. Primary Square Wave Jet Turbine (Retro buzz, constant base pitch: 175 Hz)
+        const oscSquare1 = audioCtx.createOscillator();
+        oscSquare1.type = 'square';
+        oscSquare1.frequency.setValueAtTime(175, audioCtx.currentTime);
+
+        const square1Filter = audioCtx.createBiquadFilter();
+        square1Filter.type = 'bandpass';
+        square1Filter.frequency.setValueAtTime(550, audioCtx.currentTime);
+        square1Filter.Q.setValueAtTime(1.8, audioCtx.currentTime);
+
+        const square1Gain = audioCtx.createGain();
+        square1Gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+
+        oscSquare1.connect(square1Filter);
+        square1Filter.connect(square1Gain);
+        square1Gain.connect(distanceFilter);
+
+        // 2. Secondary Detuned Square Wave (Upper turbine harmonic buzz: 350 Hz)
+        const oscSquare2 = audioCtx.createOscillator();
+        oscSquare2.type = 'square';
+        oscSquare2.frequency.setValueAtTime(350, audioCtx.currentTime);
+        oscSquare2.detune.setValueAtTime(9, audioCtx.currentTime);
+
+        const square2Filter = audioCtx.createBiquadFilter();
+        square2Filter.type = 'bandpass';
+        square2Filter.frequency.setValueAtTime(1100, audioCtx.currentTime);
+        square2Filter.Q.setValueAtTime(2.0, audioCtx.currentTime);
+
+        const square2Gain = audioCtx.createGain();
+        square2Gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+
+        oscSquare2.connect(square2Filter);
+        square2Filter.connect(square2Gain);
+        square2Gain.connect(distanceFilter);
+
+        // 3. High-Frequency Airflow Hiss (Crisp rushing jet noise)
+        const hissSource = audioCtx.createBufferSource();
+        hissSource.buffer = sharedNoise;
+        hissSource.loop = true;
+
+        const hissFilter = audioCtx.createBiquadFilter();
+        hissFilter.type = 'bandpass';
+        hissFilter.frequency.setValueAtTime(1600, audioCtx.currentTime);
+        hissFilter.Q.setValueAtTime(1.1, audioCtx.currentTime);
+
+        const hissGain = audioCtx.createGain();
+        hissGain.gain.setValueAtTime(0.38, audioCtx.currentTime);
+
+        hissSource.connect(hissFilter);
+        hissFilter.connect(hissGain);
+        hissGain.connect(distanceFilter);
+
+        // 4. Broad Jet Exhaust Roar / Rush (Lower noise body)
+        const roarSource = audioCtx.createBufferSource();
+        roarSource.buffer = sharedNoise;
+        roarSource.loop = true;
+
+        const roarFilter = audioCtx.createBiquadFilter();
+        roarFilter.type = 'bandpass';
+        roarFilter.frequency.setValueAtTime(520, audioCtx.currentTime);
+        roarFilter.Q.setValueAtTime(1.3, audioCtx.currentTime);
+
+        const roarGain = audioCtx.createGain();
+        roarGain.gain.setValueAtTime(0.24, audioCtx.currentTime);
+
+        roarSource.connect(roarFilter);
+        roarFilter.connect(roarGain);
+        roarGain.connect(distanceFilter);
+
+        // Start continuous generators
+        const now = audioCtx.currentTime;
+        oscSquare1.start(now);
+        oscSquare2.start(now);
+        hissSource.start(now);
+        roarSource.start(now);
+
+        airlinerAudioVoices.push({
+          masterGain,
+          panner,
+          distanceFilter,
+          oscSquare1,
+          square1Filter,
+          oscSquare2,
+          square2Filter,
+          hissFilter,
+          roarFilter
+        });
+      }
+    } catch (err) {
+      console.warn('Could not initialize airliner audio:', err);
+    }
+  }
+
+  function updateEngineSound(plane, dt) {
+    if (!audioCtx || !engineAudio) return;
+
+    const now = audioCtx.currentTime;
+
+    // Determine if engine sound should be silenced
+    const shouldMute = !state.running || state.paused || state.gameOver || !plane || plane.isDead || !settings.engineSound;
+
+    if (shouldMute) {
+      engineAudio.masterGain.gain.setTargetAtTime(0, now, 0.05);
+      return;
+    }
+
+    const cruiseSpeed = plane.cruiseSpeed || 140;
+    const maxDive = plane.maxDiveSpeed || 330;
+    const cruiseRatio = cruiseSpeed / maxDive; // ~0.424
+    const maxLevelPitch = 34 + cruiseRatio * 180; // ~110.4 Hz (max level flight pitch)
+    const maxLevelFilter = 200 + cruiseRatio * 1250; // ~730 Hz
+    const maxLevelVol = 0.08 + cruiseRatio * 0.24; // ~0.182
+
+    // 1. Ground Idle / Parked State (Low steady rumble at rest)
+    if (plane.onGround && (plane.isStopped || plane.isParkedForService) && !plane.throttleUp) {
+      const targetPitch = 34; // Idle rumble (34 Hz)
+      const targetFilterFreq = 200;
+      const targetVolume = 0.06;
+
+      engineAudio.osc1.frequency.setTargetAtTime(targetPitch, now, 0.08);
+      engineAudio.osc2.frequency.setTargetAtTime(targetPitch * 0.5, now, 0.08);
+      engineAudio.engineFilter.frequency.setTargetAtTime(targetFilterFreq, now, 0.08);
+      engineAudio.masterGain.gain.setTargetAtTime(targetVolume, now, 0.08);
+      engineAudio.windGain.gain.setTargetAtTime(0, now, 0.08);
+      return;
+    }
+
+    // 2. Ground Takeoff Spool State (Spool up rapidly to max level flight sound/RPM)
+    if (plane.onGround && plane.throttleUp) {
+      const rpm = plane.rpm || 0.2;
+      const targetPitch = 34 + rpm * (maxLevelPitch - 34);
+      const targetFilterFreq = 200 + rpm * (maxLevelFilter - 200);
+      const targetVolume = 0.06 + rpm * (maxLevelVol - 0.06);
+      const targetWindVol = rpm * 0.04;
+      const targetWindFreq = 250 + rpm * 500;
+
+      engineAudio.osc1.frequency.setTargetAtTime(targetPitch, now, 0.06);
+      engineAudio.osc2.frequency.setTargetAtTime(targetPitch * 0.5, now, 0.06);
+      engineAudio.engineFilter.frequency.setTargetAtTime(targetFilterFreq, now, 0.06);
+      engineAudio.masterGain.gain.setTargetAtTime(targetVolume, now, 0.06);
+      engineAudio.windGain.gain.setTargetAtTime(targetWindVol, now, 0.06);
+      engineAudio.windFilter.frequency.setTargetAtTime(targetWindFreq, now, 0.06);
+      return;
+    }
+
+    // 3. Airborne Throttle: Idle State Audio (Gliding)
+    if (!plane.onGround && plane.isIdle) {
+      const speed = Math.max(0, plane.airspeed);
+      const speedRatio = Math.min(1.0, speed / 330);
+      let targetPitch = Math.max(22, 34 + speedRatio * 35);
+      if (plane.stalled) targetPitch = Math.max(20, targetPitch * 0.7);
+
+      engineAudio.osc1.frequency.setTargetAtTime(targetPitch, now, 0.08);
+      engineAudio.osc2.frequency.setTargetAtTime(targetPitch * 0.5, now, 0.08);
+      engineAudio.engineFilter.frequency.setTargetAtTime(200 + speedRatio * 250, now, 0.08);
+      engineAudio.masterGain.gain.setTargetAtTime(0.06 + speedRatio * 0.06, now, 0.08);
+
+      const targetWindVol = Math.pow(speedRatio, 2.0) * 0.20;
+      const targetWindFreq = 250 + speedRatio * 1400;
+      engineAudio.windGain.gain.setTargetAtTime(targetWindVol, now, 0.08);
+      engineAudio.windFilter.frequency.setTargetAtTime(targetWindFreq, now, 0.08);
+      return;
+    }
+
+    // 4. Airborne Max Throttle Flight
+    // Dynamic pitch and volume calculations based on airspeed, with gradual settle from takeoff
+    const speed = Math.max(0, plane.airspeed);
+    const speedRatio = Math.min(1.0, speed / maxDive);
+
+    const flightPitch = 34 + speedRatio * 180;
+    const flightFilterFreq = 200 + speedRatio * 1250;
+    const flightVolume = 0.08 + speedRatio * 0.24;
+
+    // Smooth blend settling back from takeoff spool to standard flight acoustics
+    const takeoffBlend = plane.takeoffTimer ? Math.min(1.0, Math.max(0, plane.takeoffTimer)) : 0;
+    let targetPitch = flightPitch + takeoffBlend * (maxLevelPitch - flightPitch);
+    let targetFilterFreq = flightFilterFreq + takeoffBlend * (maxLevelFilter - flightFilterFreq);
+    let targetVolume = flightVolume + takeoffBlend * (maxLevelVol - flightVolume);
+
+    if (plane.stalled) {
+      targetPitch = Math.max(26, targetPitch * 0.70); // Engine sputters down during stall
+      targetFilterFreq = Math.max(160, targetFilterFreq * 0.65);
+      targetVolume *= 0.65;
+    }
+    if (plane.fuel <= 0 || plane.engineFailed || plane.isWobblingCrash) {
+      targetPitch = Math.max(16, targetPitch * 0.35); // Unpowered windmilling prop / dead engine
+      targetFilterFreq = 160;
+      targetVolume = 0.03;
+    }
+
+    // Wind / Prop Wash Hiss: Rises dynamically during flight & dives
+    let targetWindVol = Math.pow(speedRatio, 2.0) * 0.24;
+    if (plane.stalled) targetWindVol += 0.08;
+    const targetWindFreq = 250 + speedRatio * 1500;
+
+    engineAudio.osc1.frequency.setTargetAtTime(targetPitch, now, 0.07);
+    engineAudio.osc2.frequency.setTargetAtTime(targetPitch * 0.5, now, 0.07);
+    engineAudio.engineFilter.frequency.setTargetAtTime(targetFilterFreq, now, 0.07);
+    engineAudio.masterGain.gain.setTargetAtTime(Math.min(0.38, targetVolume), now, 0.07);
+    engineAudio.windGain.gain.setTargetAtTime(targetWindVol, now, 0.07);
+    engineAudio.windFilter.frequency.setTargetAtTime(targetWindFreq, now, 0.07);
+  }
+
+  function updateAirlinersSound(plane, dt) {
+    if (!audioCtx || !airlinerAudioVoices || airlinerAudioVoices.length === 0) return;
+
+    const now = audioCtx.currentTime;
+    const shouldMute = !state.running || state.paused || state.gameOver || !plane || !settings.engineSound;
+
+    if (shouldMute || !airliners || airliners.length === 0) {
+      for (let i = 0; i < airlinerAudioVoices.length; i++) {
+        airlinerAudioVoices[i].masterGain.gain.setTargetAtTime(0, now, 0.05);
+      }
+      return;
+    }
+
+    const MAX_AUDIBLE_DIST = 1200;
+    const activeList = airliners
+      .filter(al => !al.isDead)
+      .map(al => {
+        const dx = al.x - plane.x;
+        const dy = al.y - plane.y;
+        const dist = Math.hypot(dx, dy);
+        return { al, dx, dy, dist };
+      })
+      .sort((a, b) => a.dist - b.dist);
+
+    for (let i = 0; i < airlinerAudioVoices.length; i++) {
+      const voice = airlinerAudioVoices[i];
+      if (i >= activeList.length) {
+        voice.masterGain.gain.setTargetAtTime(0, now, 0.06);
+        continue;
+      }
+
+      const { al, dx, dy, dist } = activeList[i];
+
+      // Far away jets are silent
+      if (dist >= MAX_AUDIBLE_DIST) {
+        voice.masterGain.gain.setTargetAtTime(0, now, 0.06);
+        continue;
+      }
+
+      // Distance attenuation: smooth quadratic falloff
+      const distRatio = Math.max(0, 1 - dist / MAX_AUDIBLE_DIST);
+      let targetVolume = 0.28 * distRatio * distRatio;
+      if (al.isCrashing) {
+        targetVolume *= 0.5;
+      }
+
+      // Doppler effect relative to our plane:
+      // Delta of horizontal velocities projected along line between planes
+      const nx = dist > 0 ? (dx / dist) : 0;
+      const deltaVx = plane.vx - al.vx;
+      const vRel = nx * deltaVx;
+
+      // Speed of sound in pixel/sec coordinate space
+      const cSound = 750;
+      // Doppler frequency shift factor: c / (c - vRel)
+      let dopplerFactor = cSound / Math.max(120, cSound - vRel);
+      dopplerFactor = Math.max(0.5, Math.min(2.0, dopplerFactor));
+
+      // Constant intrinsic jet frequencies shifted by Doppler effect
+      const baseSquare1 = 175;
+      const baseSquare1Filter = 550;
+      const baseSquare2 = 350;
+      const baseSquare2Filter = 1100;
+      const baseHissFilter = 1600;
+      const baseRoarFilter = 520;
+
+      const targetPitch1 = baseSquare1 * dopplerFactor;
+      const targetFilter1 = Math.max(150, Math.min(3500, baseSquare1Filter * dopplerFactor));
+      const targetPitch2 = baseSquare2 * dopplerFactor;
+      const targetFilter2 = Math.max(250, Math.min(5000, baseSquare2Filter * dopplerFactor));
+      const targetHissFilter = Math.max(400, Math.min(6000, baseHissFilter * dopplerFactor));
+      const targetRoarFilter = Math.max(150, Math.min(3000, baseRoarFilter * dopplerFactor));
+
+      // Atmospheric high-frequency absorption over distance modulated by Doppler shift
+      const targetAtmosphereCutoff = Math.max(250, (450 + distRatio * 2600) * dopplerFactor);
+
+      voice.oscSquare1.frequency.setTargetAtTime(targetPitch1, now, 0.05);
+      voice.square1Filter.frequency.setTargetAtTime(targetFilter1, now, 0.05);
+      voice.oscSquare2.frequency.setTargetAtTime(targetPitch2, now, 0.05);
+      voice.square2Filter.frequency.setTargetAtTime(targetFilter2, now, 0.05);
+      voice.hissFilter.frequency.setTargetAtTime(targetHissFilter, now, 0.05);
+      voice.roarFilter.frequency.setTargetAtTime(targetRoarFilter, now, 0.05);
+      voice.distanceFilter.frequency.setTargetAtTime(targetAtmosphereCutoff, now, 0.05);
+      voice.masterGain.gain.setTargetAtTime(targetVolume, now, 0.05);
+
+      if (voice.panner) {
+        const pan = Math.max(-1, Math.min(1, dx / 480));
+        voice.panner.pan.setTargetAtTime(pan, now, 0.05);
+      }
+    }
+  }
+
+  function playSound(type, param = 1) {
+    if (!audioCtx || !settings.engineSound || !masterAudioGain) return;
+    try {
+      const now = audioCtx.currentTime;
+      const destination = masterAudioGain;
+
+      if (type === 'pop') {
+        // High-pitched bright rubber pop
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const pitch = 450 + Math.min(param * 70, 700); // Higher pitch on combo
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(pitch * 2.2, now + 0.05);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.13);
+      } else if (type === 'gold_pop') {
+        // Chime for gold balloon
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1320, now + 0.08);
+        osc.frequency.setValueAtTime(1760, now + 0.16);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.36);
+      } else if (type === 'crash') {
+        // Low rumble crash using preallocated noise buffer
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 0.4);
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, now);
+        filter.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        noise.start(now);
+        noise.stop(now + 0.42);
+      } else if (type === 'boost') {
+        // Whoosh boost sound
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.linearRampToValueAtTime(280, now + 0.2);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.26);
+      } else if (type === 'stage_clear') {
+        // Fanfare
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+          gain.gain.setValueAtTime(0.25, now + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.3);
+          osc.connect(gain);
+          gain.connect(destination);
+          osc.start(now + idx * 0.1);
+          osc.stop(now + idx * 0.1 + 0.32);
+        });
+      } else if (type === 'bird_strike') {
+        // Feather flutter + thud
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(75, now + 0.18);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      } else if (type === 'engine_sputter') {
+        // Coughing misfire pulses
+        for (let i = 0; i < 3; i++) {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(85 - i * 15, now + i * 0.07);
+          gain.gain.setValueAtTime(0.25, now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.07 + 0.06);
+          osc.connect(gain);
+          gain.connect(destination);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.07);
+        }
+      } else if (type === 'wing_tear') {
+        // Harsh metal/wooden stress snap using preallocated noise buffer
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 0.3);
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.frequency.exponentialRampToValueAtTime(260, now + 0.25);
+        filter.Q.setValueAtTime(3.2, now);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        noise.start(now);
+        noise.stop(now + 0.27);
+      } else if (type === 'big_crash') {
+        // Heavy catastrophic explosion rumble using preallocated noise buffer
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 1.0);
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(750, now);
+        filter.frequency.exponentialRampToValueAtTime(25, now + 0.8);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.85, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        noise.start(now);
+        noise.stop(now + 0.85);
+      } else if (type === 'near_miss') {
+        // High-speed Doppler whoosh + chime
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        // Doppler pitch slide down from 980 Hz to 420 Hz
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(980, now);
+        osc1.frequency.exponentialRampToValueAtTime(360, now + 0.28);
+
+        // High harmony chime
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1480, now);
+        osc2.frequency.exponentialRampToValueAtTime(880, now + 0.22);
+
+        // Whoosh noise sweep using preallocated noise buffer
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 0.3);
+
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(1800, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(400, now + 0.25);
+        noiseFilter.Q.setValueAtTime(2.5, now);
+
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.3, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(destination);
+
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        noise.start(now);
+        osc1.stop(now + 0.29);
+        osc2.stop(now + 0.29);
+        noise.stop(now + 0.30);
+      }
+    } catch (e) {
+      // Audio not permitted yet or failed
+    }
+  }
+
+  // --- INPUT CONTROLLER ---
+  const keys = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    space: false,
+    boost: false
+  };
+
+  window.addEventListener('keydown', (e) => {
+    initAudio();
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = true;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = true;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if (e.code === 'Space') { keys.space = true; keys.boost = true; e.preventDefault(); }
+    if (e.code === 'KeyP') {
+      if (state.running && !state.gameOver) {
+        state.paused = !state.paused;
+      }
+    }
+    if (e.code === 'Escape') {
+      toggleSettings();
+    }
+    if (e.code === 'KeyM') {
+      toggleMute();
+    }
+    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && settingsModal.classList.contains('hidden'))) {
+      if (state.gameOver || !state.running) {
+        restartGame();
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = false;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    if (e.code === 'Space') { keys.space = false; keys.boost = false; }
+  });
+
+  window.addEventListener('pointerdown', () => {
+    initAudio();
+  });
+
+  // --- FLOATING TEXT & POPUPS ---
+  const floatingTexts = [];
+
+  function addFloatingText(x, y, text, color = '#ffdf40', size = 10) {
+    floatingTexts.push({
+      x,
+      y,
+      text,
+      color,
+      size,
+      life: 1.0,
+      vy: -45
+    });
+  }
+
+  // --- PARTICLE SYSTEM ---
+  const particles = [];
+
+  function createConfettiBurst(x, y, count = 20, special = false) {
+    const colors = special 
+      ? ['#ffd700', '#fff380', '#ffffff', '#ff9900', '#ff4500']
+      : ['#ff3366', '#33ccff', '#ffcc00', '#33ff77', '#ff66cc', '#ffffff'];
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 160 + 40;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: Math.random() * 4 + 2,
+        life: 1.0,
+        decay: Math.random() * 1.2 + 0.8,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        gravity: 90,
+        isConfetti: true,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 12
+      });
+    }
+  }
+
+  function createExplosion(x, y, count = 30) {
+    state.shake = Math.min(state.shake + count * 0.3, 14);
+    playSound('crash');
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 150 + 30;
+      const r = Math.random();
+      const color = r < 0.35 ? '#ff3311' : r < 0.7 ? '#ff9900' : '#ffe14c';
+
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: Math.random() * 4 + 2,
+        life: 1.0,
+        decay: Math.random() * 1.2 + 0.8,
+        color,
+        gravity: 60
+      });
+    }
+  }
+
+  function createSmokePuff(x, y, vx = 0, vy = 0, size = 3, color = 'rgba(230,230,230,') {
+    particles.push({
+      x,
+      y,
+      vx: vx * 0.2 + (Math.random() - 0.5) * 10,
+      vy: vy * 0.2 - Math.random() * 15 - 5,
+      size,
+      life: 1.0,
+      decay: Math.random() * 1.4 + 0.9,
+      color,
+      isSmoke: true,
+      gravity: -8
+    });
+  }
+
+  function createFirePuff(x, y, vx = 0, vy = 0, size = 4) {
+    particles.push({
+      x,
+      y,
+      vx: vx * 0.2 + (Math.random() - 0.5) * 20,
+      vy: vy * 0.2 - Math.random() * 25 - 5,
+      size,
+      life: 1.0,
+      decay: Math.random() * 1.8 + 1.2,
+      color: Math.random() < 0.5 ? '#ff4500' : '#ffaa00',
+      isFire: true,
+      gravity: -10
+    });
+  }
+
+  function createDebrisPiece(options) {
+    particles.push({
+      x: options.x,
+      y: options.y,
+      vx: options.vx,
+      vy: options.vy,
+      gravity: options.gravity !== undefined ? options.gravity : 150,
+      rotation: options.rotation || (Math.random() * Math.PI * 2),
+      rotSpeed: options.rotSpeed !== undefined ? options.rotSpeed : (Math.random() - 0.5) * 12,
+      width: options.width || 8,
+      height: options.height || 4,
+      color: options.color || '#ffcc00',
+      accentColor: options.accentColor || null,
+      type: options.type || 'generic',
+      isDebris: true,
+      smoking: options.smoking || false,
+      smokeTimer: 0,
+      life: options.life || 3.5,
+      decay: options.decay || 0.8,
+      bounce: options.bounce !== undefined ? options.bounce : 0.45
+    });
+  }
+
+  function createFeatherBurst(x, y, count = 20) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 70 + 15;
+      particles.push({
+        x: x + (Math.random() - 0.5) * 12,
+        y: y + (Math.random() - 0.5) * 12,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 15,
+        flutter: Math.random() * Math.PI * 2,
+        flutterSpeed: Math.random() * 5 + 4,
+        size: Math.random() * 3 + 2,
+        life: 1.0,
+        decay: Math.random() * 0.4 + 0.3,
+        color: Math.random() < 0.6 ? '#e2e8f0' : '#475569',
+        isFeather: true,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 6
+      });
+    }
+  }
+
+  function createBiplaneDebris(x, y, vx, vy, scheme = 'player', speedMult = 1.0) {
+    const isPlayer = scheme === 'player';
+    const primaryColor = isPlayer ? '#2b7a78' : '#ffcc00';
+    const wingColor = isPlayer ? '#3aafa9' : '#9b5de5';
+    const accentColor = isPlayer ? '#def2f1' : '#111111';
+
+    const baseVx = (vx || 0) * 0.4;
+    const baseVy = (vy || 0) * 0.4;
+
+    // Top Wing
+    createDebrisPiece({
+      x, y: y - 8,
+      vx: baseVx + (Math.random() * 60 - 30) * speedMult,
+      vy: baseVy - (Math.random() * 90 + 70) * speedMult,
+      width: 22, height: 4,
+      color: wingColor,
+      accentColor: accentColor,
+      type: 'wing',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 14
+    });
+
+    // Bottom Wing
+    createDebrisPiece({
+      x, y: y + 5,
+      vx: baseVx + (Math.random() * 80 - 40) * speedMult,
+      vy: baseVy - (Math.random() * 60 + 30) * speedMult,
+      width: 20, height: 3.5,
+      color: wingColor,
+      type: 'wing',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 14
+    });
+
+    // Fuselage Front
+    createDebrisPiece({
+      x: x + 8, y,
+      vx: baseVx + (Math.random() * 90 + 40) * speedMult,
+      vy: baseVy - (Math.random() * 70 + 40) * speedMult,
+      width: 14, height: 7,
+      color: primaryColor,
+      accentColor: '#17252a',
+      type: 'fuselage',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 10
+    });
+
+    // Fuselage Rear
+    createDebrisPiece({
+      x: x - 8, y,
+      vx: baseVx - (Math.random() * 90 + 40) * speedMult,
+      vy: baseVy - (Math.random() * 60 + 30) * speedMult,
+      width: 12, height: 6,
+      color: primaryColor,
+      type: 'fuselage',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 12
+    });
+
+    // Propeller
+    createDebrisPiece({
+      x: x + 14, y,
+      vx: baseVx + (Math.random() * 110 + 60) * speedMult,
+      vy: baseVy - (Math.random() * 100 + 40) * speedMult,
+      width: 12, height: 2.5,
+      color: '#e2e8f0',
+      type: 'prop',
+      rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (20 + Math.random() * 15)
+    });
+
+    // Tail Fin / Rudder
+    createDebrisPiece({
+      x: x - 16, y: y - 4,
+      vx: baseVx - (Math.random() * 80 + 30) * speedMult,
+      vy: baseVy - (Math.random() * 80 + 40) * speedMult,
+      width: 6, height: 8,
+      color: primaryColor,
+      accentColor: accentColor,
+      type: 'tail',
+      smoking: false,
+      rotSpeed: (Math.random() - 0.5) * 10
+    });
+
+    // Landing gear / wheel
+    createDebrisPiece({
+      x, y: y + 8,
+      vx: baseVx + (Math.random() * 50 - 25) * speedMult,
+      vy: baseVy + (Math.random() * 40 + 10) * speedMult,
+      width: 4, height: 4,
+      color: '#333333',
+      type: 'wheel',
+      bounce: 0.6
+    });
+
+    // Silk scarf for player
+    if (isPlayer) {
+      createDebrisPiece({
+        x: x - 4, y: y - 5,
+        vx: baseVx - Math.random() * 40 - 20,
+        vy: baseVy - Math.random() * 40 - 10,
+        width: 7, height: 3,
+        color: '#ffffff',
+        type: 'scarf',
+        gravity: 40,
+        decay: 0.5
+      });
+    }
+
+    // 8 small splinters / embers
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = (Math.random() * 120 + 30) * speedMult;
+      createDebrisPiece({
+        x, y,
+        vx: baseVx + Math.cos(angle) * spd,
+        vy: baseVy + Math.sin(angle) * spd,
+        width: Math.random() * 3 + 2,
+        height: Math.random() * 3 + 2,
+        color: Math.random() < 0.5 ? primaryColor : '#ff9900',
+        smoking: Math.random() < 0.5,
+        gravity: 120
+      });
+    }
+  }
+
+  function createAirlinerWingDebris(x, y, direction = -1) {
+    const dirMult = direction === 1 ? 1 : -1;
+    // Wing with engine pod falling off
+    createDebrisPiece({
+      x: x + dirMult * 4,
+      y: y + 4,
+      vx: dirMult * (Math.random() * 60 + 30),
+      vy: -Math.random() * 40 - 20,
+      width: 26,
+      height: 12,
+      color: '#ced4da',
+      accentColor: '#495057',
+      type: 'airliner_wing',
+      smoking: true,
+      rotSpeed: dirMult * (Math.random() * 3 + 2),
+      gravity: 130,
+      life: 4.0
+    });
+
+    // Extra sheared metal sparks and fire puffs
+    for (let i = 0; i < 12; i++) {
+      createFirePuff(x + dirMult * 4, y + 4, dirMult * 40, -20, 5);
+    }
+  }
+
+  function createAirlinerDebris(x, y, vx, vy, count = 16) {
+    // Airliner Hull Section (White/Blue)
+    createDebrisPiece({
+      x: x - 12, y: y - 4,
+      vx: (vx || 0) * 0.4 + (Math.random() * 70 - 35),
+      vy: -Math.random() * 80 - 40,
+      width: 26, height: 12,
+      color: '#f8f9fa',
+      accentColor: '#003566',
+      type: 'airliner_hull',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 8
+    });
+
+    // Airliner Nose Section
+    createDebrisPiece({
+      x: x + 16, y: y - 2,
+      vx: (vx || 0) * 0.4 + (Math.random() * 80 + 20),
+      vy: -Math.random() * 90 - 30,
+      width: 16, height: 10,
+      color: '#f8f9fa',
+      accentColor: '#212529',
+      type: 'airliner_nose',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 9
+    });
+
+    // Airliner Tail Fin
+    createDebrisPiece({
+      x: x - 20, y: y - 10,
+      vx: (vx || 0) * 0.4 - (Math.random() * 80 + 20),
+      vy: -Math.random() * 100 - 50,
+      width: 14, height: 16,
+      color: '#003566',
+      accentColor: '#00b4d8',
+      type: 'airliner_tail',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 7
+    });
+
+    // Jet Engine Pod
+    createDebrisPiece({
+      x: x, y: y + 6,
+      vx: (vx || 0) * 0.4 + (Math.random() * 60 - 30),
+      vy: -Math.random() * 60 - 20,
+      width: 12, height: 6,
+      color: '#495057',
+      accentColor: '#00b4d8',
+      type: 'engine',
+      smoking: true,
+      rotSpeed: (Math.random() - 0.5) * 12
+    });
+
+    // Multiple metallic fragments
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 140 + 40;
+      createDebrisPiece({
+        x, y,
+        vx: (vx || 0) * 0.2 + Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 30,
+        width: Math.random() * 5 + 3,
+        height: Math.random() * 4 + 2,
+        color: Math.random() < 0.4 ? '#f8f9fa' : Math.random() < 0.7 ? '#003566' : '#ff9900',
+        smoking: Math.random() < 0.6,
+        gravity: 140
+      });
+    }
+  }
+
+  function createHugeExplosion(x, y, count = 65) {
+    state.shake = Math.min(state.shake + count * 0.35, 22);
+    playSound('big_crash');
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 220 + 40;
+      const r = Math.random();
+      const color = r < 0.4 ? '#ff2200' : r < 0.75 ? '#ff9900' : '#ffe14c';
+
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 30,
+        size: Math.random() * 6 + 3,
+        life: 1.0,
+        decay: Math.random() * 1.0 + 0.6,
+        color,
+        gravity: 80
+      });
+    }
+
+    // Heavy dark smoke cloud expanding upwards
+    for (let i = 0; i < 14; i++) {
+      createSmokePuff(
+        x + (Math.random() - 0.5) * 40,
+        y - Math.random() * 20,
+        (Math.random() - 0.5) * 40,
+        -Math.random() * 50 - 20,
+        Math.random() * 5 + 4,
+        'rgba(40,40,40,'
+      );
+    }
+  }
+
+  function createNearMissBurst(x, y) {
+    const colors = ['#00ffff', '#ffffff', '#70e000', '#ffd700'];
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 120 + 40;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: Math.random() * 3 + 1.5,
+        life: 0.7,
+        decay: Math.random() * 1.5 + 1.2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        gravity: 20
+      });
+    }
+  }
+
+  // --- BALLOON ENTITY ---
+  class Balloon {
+    constructor(x, y, type = 'red') {
+      this.x = x;
+      this.y = y;
+      this.baseY = y;
+      this.type = type; // 'red', 'blue', 'green', 'gold', 'rainbow'
+      this.id = `${Math.round(x)}_${Math.round(y)}_${type}`;
+      this.radius = type === 'gold' ? 14 : 12;
+      this.bobOffset = Math.random() * Math.PI * 2;
+      this.bobSpeed = 2.0 + Math.random() * 1.5;
+      this.stringSway = Math.random() * Math.PI * 2;
+      this.popped = false;
+
+      // Color palettes
+      if (type === 'red') {
+        this.mainColor = '#e63946';
+        this.highlightColor = '#ff858d';
+        this.points = 100;
+      } else if (type === 'blue') {
+        this.mainColor = '#1d3557';
+        this.highlightColor = '#457b9d';
+        this.points = 150;
+      } else if (type === 'green') {
+        this.mainColor = '#2a9d8f';
+        this.highlightColor = '#52b788';
+        this.points = 150;
+      } else if (type === 'gold') {
+        this.mainColor = '#f4a261';
+        this.highlightColor = '#ffe3a8';
+        this.points = 300;
+      } else if (type === 'rainbow') {
+        this.mainColor = '#e76f51';
+        this.highlightColor = '#ffffff';
+        this.points = 500;
+      }
+    }
+
+    update(dt) {
+      if (this.popped) return;
+      this.bobOffset += this.bobSpeed * dt;
+      this.stringSway += 3.0 * dt;
+      this.y = this.baseY + Math.sin(this.bobOffset) * 6;
+    }
+
+    pop() {
+      if (this.popped) return;
+      this.popped = true;
+      poppedBalloonKeys.add(this.id);
+
+      // 1. Check Consecutive Pop along Horizontal Axis
+      let isConsecutive = false;
+      if (state.lastPoppedX !== null && state.lastPoppedId !== null) {
+        const minX = Math.min(state.lastPoppedX, this.x);
+        const maxX = Math.max(state.lastPoppedX, this.x);
+
+        // Check if any unpopped balloon in the course was skipped strictly between minX and maxX
+        const skipped = balloons.some(b => {
+          return !b.popped && b.id !== this.id && b.id !== state.lastPoppedId && b.x > minX + 15 && b.x < maxX - 15;
+        });
+
+        if (!skipped) {
+          isConsecutive = true;
+        }
+      }
+
+      if (isConsecutive) {
+        state.combo++;
+      } else {
+        state.combo = 1;
+      }
+
+      state.lastPoppedX = this.x;
+      state.lastPoppedId = this.id;
+      if (state.combo > state.maxCombo) {
+        state.maxCombo = state.combo;
+      }
+
+      // 2. Score Calculation: Consecutive Multiplier (+5% per streak) + Stall Multiplier (2X)
+      const inStall = !!(player && player.stalled && !player.isDead);
+      const stallMult = inStall ? 2.0 : 1.0;
+      const consecutiveMult = 1.0 + (state.combo - 1) * 0.05;
+      const totalMult = consecutiveMult * stallMult;
+      const earnedScore = Math.round(this.points * totalMult);
+      const comboBonusPct = Math.round((state.combo - 1) * 5);
+
+      // Particles & Audio
+      createConfettiBurst(this.x, this.y, this.type === 'gold' ? 32 : 22, this.type === 'gold');
+      playSound(this.type === 'gold' ? 'gold_pop' : 'pop', Math.min(state.combo, 10));
+
+      addScore(earnedScore);
+      state.balloonsPopped++;
+      state.balloonsPoppedThisWave = (state.balloonsPoppedThisWave || 0) + 1;
+
+      // 3. Floating Score & Multiplier Popups
+      let label = `+${earnedScore}`;
+      let floatColor = this.type === 'gold' ? '#ffd700' : '#ffffff';
+      if (inStall && state.combo > 1) {
+        label += ` (STALL 2X | +${comboBonusPct}%)`;
+        floatColor = '#ffd700';
+      } else if (inStall) {
+        label += ` (STALL 2X!)`;
+        floatColor = '#ffd700';
+      } else if (state.combo > 1) {
+        label += ` (+${comboBonusPct}%)`;
+        floatColor = '#ff9900';
+      }
+      addFloatingText(this.x, this.y - 12, label, floatColor, 10);
+
+      // 4. Special Banner Alerts for Bonuses & Combos (Top-Center)
+      if (inStall) {
+        if (state.combo > 1) {
+          showStatusBanner(`★ STALL POP 2X! COMBO x${state.combo} (+${comboBonusPct}%) ★`, 2.0, 'bonus');
+        } else {
+          showStatusBanner('★ STALL POP BONUS! 2X POINTS ★', 2.0, 'bonus');
+        }
+      } else if (state.combo > 1 && (state.combo % 5 === 0 || state.combo === 2)) {
+        if (state.combo === 2) {
+          showStatusBanner(`CONSECUTIVE POP! +5% COMBO`, 1.5, 'combo');
+        } else {
+          showStatusBanner(`🔥 ${state.combo}X CONSECUTIVE COMBO! (+${comboBonusPct}%)`, 2.2, 'combo');
+        }
+      }
+
+      // Course Wave Milestone (every 15 balloons popped)
+      if (state.balloonsPoppedThisWave >= 15 && !state.gameOver) {
+        state.balloonsPoppedThisWave = 0;
+        state.wave++;
+        playSound('stage_clear');
+        const bonus = 1000 * (state.wave - 1);
+        addScore(bonus);
+        showStatusBanner(`COURSE CLEARED! BONUS +${bonus} (SECTOR ${state.wave})`, 3.0, 'success');
+      }
+
+      // Boost player speed slightly on pop for satisfying chain flow
+      if (player && !player.isDead) {
+        player.airspeed = Math.min(player.maxSpeed, player.airspeed + (this.type === 'gold' ? 20 : 10));
+      }
+
+      updateHUD();
+    }
+
+    draw(ctx, camX) {
+      if (this.popped) return;
+      const renderX = this.x - camX;
+
+      ctx.save();
+
+      // Dangling tether string with natural curve
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      const stringBend = Math.sin(this.stringSway) * 4;
+      ctx.moveTo(renderX, this.y + this.radius);
+      ctx.quadraticCurveTo(renderX + stringBend, this.y + this.radius + 10, renderX, this.y + this.radius + 20);
+      ctx.stroke();
+
+      // Balloon body (oval shape)
+      ctx.fillStyle = this.mainColor;
+      ctx.beginPath();
+      ctx.ellipse(renderX, this.y, this.radius, this.radius * 1.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Top-left shine highlight
+      ctx.fillStyle = this.highlightColor;
+      ctx.beginPath();
+      ctx.ellipse(renderX - this.radius * 0.35, this.y - this.radius * 0.4, this.radius * 0.3, this.radius * 0.5, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bottom tie knot
+      ctx.fillStyle = this.mainColor;
+      ctx.beginPath();
+      ctx.moveTo(renderX - 3, this.y + this.radius * 1.25);
+      ctx.lineTo(renderX + 3, this.y + this.radius * 1.25);
+      ctx.lineTo(renderX, this.y + this.radius * 1.25 + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Gold balloon star emblem
+      if (this.type === 'gold') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('★', renderX, this.y);
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // --- COUNTRYSIDE STRUCTURES & BARNYARD ---
+  class CountryStructure {
+    constructor(x, type = 'barn') {
+      this.x = x;
+      this.type = type; // 'barn', 'house', 'windmill', 'silo_set', 'water_tower', 'church'
+
+      if (type === 'barn') {
+        this.width = 110;
+        this.height = 70;
+        this.y = GROUND_Y - this.height;
+      } else if (type === 'house') {
+        this.width = 85;
+        this.height = 55;
+        this.y = GROUND_Y - this.height;
+      } else if (type === 'windmill') {
+        this.width = 40;
+        this.height = 110;
+        this.y = GROUND_Y - this.height;
+        this.bladeAngle = Math.random() * Math.PI * 2;
+      } else if (type === 'silo_set') {
+        this.width = 95;
+        this.height = 90;
+        this.y = GROUND_Y - this.height;
+      } else if (type === 'water_tower') {
+        this.width = 50;
+        this.height = 95;
+        this.y = GROUND_Y - this.height;
+      } else if (type === 'church') {
+        this.width = 90;
+        this.height = 115;
+        this.y = GROUND_Y - this.height;
+      }
+    }
+
+    update(dt) {
+      if (this.type === 'windmill') {
+        this.bladeAngle += 1.4 * dt; // Spinning windmill sails
+      }
+    }
+
+    // Check collision with airplane
+    checkCollision(plane) {
+      if (plane.isDead || (plane.invulnerableTimer && plane.invulnerableTimer > 0)) return false;
+      const px = plane.x;
+      const py = plane.y;
+
+      if (this.type === 'barn') {
+        // Barn bounding box + roof slope
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+      } else if (this.type === 'house') {
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+      } else if (this.type === 'windmill') {
+        // Tower base + spinning blades
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+        // Hub collision
+        const hubY = this.y + 16;
+        const hubX = this.x + 20;
+        if (Math.hypot(px - hubX, py - hubY) < 32) {
+          return true;
+        }
+      } else if (this.type === 'silo_set') {
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+      } else if (this.type === 'water_tower') {
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+      } else if (this.type === 'church') {
+        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    draw(ctx, camX) {
+      const rx = this.x - camX;
+
+      if (this.type === 'barn') {
+        // Red Barn Body
+        ctx.fillStyle = '#a62b2b';
+        ctx.fillRect(rx, this.y + 25, 78, 45);
+
+        // White Barn Trim & Crosses
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rx + 22, this.y + 35, 34, 35); // Main doors
+        ctx.beginPath();
+        ctx.moveTo(rx + 22, this.y + 35);
+        ctx.lineTo(rx + 56, this.y + 70);
+        ctx.moveTo(rx + 56, this.y + 35);
+        ctx.lineTo(rx + 22, this.y + 70);
+        ctx.stroke();
+
+        // Gambrel Barn Roof (sloped classic roof)
+        ctx.fillStyle = '#6b1c1c';
+        ctx.beginPath();
+        ctx.moveTo(rx - 4, this.y + 25);
+        ctx.lineTo(rx + 16, this.y + 6);
+        ctx.lineTo(rx + 39, this.y);
+        ctx.lineTo(rx + 62, this.y + 6);
+        ctx.lineTo(rx + 82, this.y + 25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Silo attached to barn
+        const siloX = rx + 82;
+        ctx.fillStyle = '#a0aab2';
+        ctx.fillRect(siloX, this.y + 8, 26, 62);
+        // Silo Dome
+        ctx.fillStyle = '#7a858d';
+        ctx.beginPath();
+        ctx.arc(siloX + 13, this.y + 8, 13, Math.PI, 0);
+        ctx.fill();
+
+        // Weather vane
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(rx + 39, this.y);
+        ctx.lineTo(rx + 39, this.y - 10);
+        ctx.stroke();
+        ctx.fillStyle = '#d4af37';
+        ctx.fillRect(rx + 34, this.y - 12, 10, 4);
+
+      } else if (this.type === 'house') {
+        // Country Farmhouse
+        ctx.fillStyle = '#eae2d6';
+        ctx.fillRect(rx, this.y + 22, 85, 33);
+
+        // Windows with warm light
+        ctx.fillStyle = '#ffeaa7';
+        ctx.fillRect(rx + 12, this.y + 30, 14, 14);
+        ctx.fillRect(rx + 58, this.y + 30, 14, 14);
+        ctx.strokeStyle = '#5a4d41';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(rx + 12, this.y + 30, 14, 14);
+        ctx.strokeRect(rx + 58, this.y + 30, 14, 14);
+
+        // Door
+        ctx.fillStyle = '#6b4c35';
+        ctx.fillRect(rx + 36, this.y + 34, 14, 21);
+
+        // Roof
+        ctx.fillStyle = '#4a5568';
+        ctx.beginPath();
+        ctx.moveTo(rx - 6, this.y + 22);
+        ctx.lineTo(rx + 42, this.y);
+        ctx.lineTo(rx + 91, this.y + 22);
+        ctx.closePath();
+        ctx.fill();
+
+        // Chimney with smoke
+        ctx.fillStyle = '#8b263e';
+        ctx.fillRect(rx + 62, this.y - 10, 10, 18);
+        if (Math.random() < 0.25) {
+          createSmokePuff(this.x + 67, this.y - 10, 5, -15, 3, 'rgba(220,220,220,');
+        }
+
+      } else if (this.type === 'windmill') {
+        // Windmill Tower (wooden lattice)
+        ctx.fillStyle = '#795548';
+        ctx.beginPath();
+        ctx.moveTo(rx + 8, GROUND_Y);
+        ctx.lineTo(rx + 14, this.y + 16);
+        ctx.lineTo(rx + 26, this.y + 16);
+        ctx.lineTo(rx + 32, GROUND_Y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Cross braces
+        ctx.strokeStyle = '#4e342e';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let yb = this.y + 28; yb < GROUND_Y; yb += 20) {
+          ctx.moveTo(rx + 10, yb);
+          ctx.lineTo(rx + 30, yb + 12);
+          ctx.moveTo(rx + 30, yb);
+          ctx.lineTo(rx + 10, yb + 12);
+        }
+        ctx.stroke();
+
+        // Rotor Hub & Spinning Sails
+        const hubX = rx + 20;
+        const hubY = this.y + 16;
+        ctx.save();
+        ctx.translate(hubX, hubY);
+        ctx.rotate(this.bladeAngle);
+
+        for (let i = 0; i < 4; i++) {
+          ctx.rotate(Math.PI / 2);
+          // Blade spar
+          ctx.strokeStyle = '#3e2723';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, -38);
+          ctx.stroke();
+          // Blade canvas sail
+          ctx.fillStyle = '#f5f5f5';
+          ctx.fillRect(2, -36, 8, 28);
+        }
+
+        // Center hub cap
+        ctx.fillStyle = '#212121';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+      } else if (this.type === 'silo_set') {
+        // Double Grain Silos
+        ctx.fillStyle = '#b0bec5';
+        ctx.fillRect(rx + 6, this.y + 15, 36, 75);
+        ctx.fillRect(rx + 48, this.y + 15, 36, 75);
+
+        // Silo Domes
+        ctx.fillStyle = '#78909c';
+        ctx.beginPath();
+        ctx.arc(rx + 24, this.y + 15, 18, Math.PI, 0);
+        ctx.arc(rx + 66, this.y + 15, 18, Math.PI, 0);
+        ctx.fill();
+
+        // Connecting catwalk
+        ctx.fillStyle = '#455a64';
+        ctx.fillRect(rx + 38, this.y + 30, 14, 4);
+
+      } else if (this.type === 'water_tower') {
+        // Wooden Stilt Water Tower
+        ctx.fillStyle = '#6d4c41';
+        // Legs
+        ctx.fillRect(rx + 8, this.y + 45, 6, 50);
+        ctx.fillRect(rx + 36, this.y + 45, 6, 50);
+        // Crossbeams
+        ctx.strokeStyle = '#4e342e';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(rx + 8, this.y + 45);
+        ctx.lineTo(rx + 42, GROUND_Y);
+        ctx.moveTo(rx + 42, this.y + 45);
+        ctx.lineTo(rx + 8, GROUND_Y);
+        ctx.stroke();
+
+        // Water Tank Barrel
+        ctx.fillStyle = '#8d6e63';
+        ctx.fillRect(rx + 5, this.y + 14, 40, 32);
+        // Metal Hoops
+        ctx.strokeStyle = '#37474f';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(rx + 5, this.y + 20);
+        ctx.lineTo(rx + 45, this.y + 20);
+        ctx.moveTo(rx + 5, this.y + 36);
+        ctx.lineTo(rx + 45, this.y + 36);
+        ctx.stroke();
+
+        // Conical Roof
+        ctx.fillStyle = '#5d4037';
+        ctx.beginPath();
+        ctx.moveTo(rx + 2, this.y + 14);
+        ctx.lineTo(rx + 25, this.y);
+        ctx.lineTo(rx + 48, this.y + 14);
+        ctx.closePath();
+        ctx.fill();
+
+      } else if (this.type === 'church') {
+        // Country Chapel & Bell Steeple
+        ctx.fillStyle = '#f5f5f5';
+        ctx.fillRect(rx + 25, this.y + 55, 65, 60); // Chapel nave
+        ctx.fillRect(rx + 4, this.y + 30, 24, 85);  // Steeple tower
+
+        // Steeple Spire
+        ctx.fillStyle = '#37474f';
+        ctx.beginPath();
+        ctx.moveTo(rx + 2, this.y + 30);
+        ctx.lineTo(rx + 16, this.y);
+        ctx.lineTo(rx + 30, this.y + 30);
+        ctx.closePath();
+        ctx.fill();
+
+        // Cross on Spire
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(rx + 16, this.y);
+        ctx.lineTo(rx + 16, this.y - 8);
+        ctx.moveTo(rx + 13, this.y - 5);
+        ctx.lineTo(rx + 19, this.y - 5);
+        ctx.stroke();
+
+        // Chapel Roof
+        ctx.fillStyle = '#8d6e63';
+        ctx.beginPath();
+        ctx.moveTo(rx + 25, this.y + 55);
+        ctx.lineTo(rx + 58, this.y + 35);
+        ctx.lineTo(rx + 92, this.y + 55);
+        ctx.closePath();
+        ctx.fill();
+
+        // Arched Windows
+        ctx.fillStyle = '#90caf9';
+        ctx.fillRect(rx + 42, this.y + 68, 12, 18);
+        ctx.fillRect(rx + 68, this.y + 68, 12, 18);
+        ctx.fillRect(rx + 11, this.y + 50, 10, 14);
+      }
+    }
+  }
+
+  // --- OBSTACLES: AIRLINERS (STEADY AIR TRAFFIC) ---
+  class Airliner {
+    constructor(x, y, speed = 90, direction = -1) {
+      this.x = x;
+      this.y = y;
+      this.speed = speed;
+      this.direction = direction; // -1 = West (Left), 1 = East (Right)
+      this.vx = speed * direction;
+      this.width = 88;
+      this.height = 24;
+      this.contrailTimer = 0;
+      this.isDead = false;
+      this.isCrashing = false;
+      this.hasLostWing = false;
+      this.nearMissAwarded = false;
+      this.crashAngle = 0;
+      this.crashRotSpeed = 0;
+      this.crashVy = 0;
+      this.crashSmokeTimer = 0;
+    }
+
+    triggerCrash(hitX, hitY) {
+      if (this.isCrashing || this.isDead) return;
+      this.isCrashing = true;
+      this.hasLostWing = true;
+      this.crashVy = 40;
+      this.crashRotSpeed = this.direction * 1.35; // Banks steeply towards the severed wing
+      playSound('wing_tear');
+      createAirlinerWingDebris(this.x, this.y, this.direction);
+      createExplosion(hitX || this.x, hitY || this.y, 35);
+    }
+
+    update(dt) {
+      if (this.isDead) return;
+
+      if (this.isCrashing) {
+        // Uncontrolled smoky banking dive
+        this.crashVy += 170 * dt;
+        this.crashAngle += this.crashRotSpeed * dt;
+        this.x += this.vx * 0.95 * dt;
+        this.y += this.crashVy * dt;
+
+        // Heavy dark smoke and flame streaming from severed wing root
+        this.crashSmokeTimer += dt;
+        if (this.crashSmokeTimer > 0.025) {
+          this.crashSmokeTimer = 0;
+          const wingRootX = this.direction === 1 ? this.x - 4 : this.x + 4;
+          const wingRootY = this.y + 4;
+          createSmokePuff(wingRootX, wingRootY, -this.vx * 0.2, -this.crashVy * 0.2, 5.5, 'rgba(30,30,30,');
+          createSmokePuff(wingRootX + (Math.random() - 0.5) * 8, wingRootY, -this.vx * 0.1, -this.crashVy * 0.1, 4.0, 'rgba(70,70,70,');
+          if (Math.random() < 0.45) {
+            createFirePuff(wingRootX, wingRootY, -this.vx * 0.15, -this.crashVy * 0.15, 4.5);
+          }
+        }
+
+        // Ground Impact Detonation
+        if (this.y >= GROUND_Y - 10) {
+          this.isDead = true;
+          createHugeExplosion(this.x, GROUND_Y - 6, 80);
+          createAirlinerDebris(this.x, GROUND_Y - 8, this.vx * 0.5, -50, 18);
+          showStatusBanner('AIRLINER IMPACT DETONATION!', 2.5);
+        }
+        return;
+      }
+
+      this.x += this.vx * dt;
+
+      // Jet Contrails
+      this.contrailTimer += dt;
+      if (this.contrailTimer > 0.05) {
+        this.contrailTimer = 0;
+        const tailX = this.direction === 1 ? this.x - 36 : this.x + 36;
+        createSmokePuff(tailX, this.y - 2, -this.vx * 0.15, 0, 4, 'rgba(255,255,255,');
+        createSmokePuff(tailX, this.y + 6, -this.vx * 0.15, 0, 4, 'rgba(255,255,255,');
+      }
+    }
+
+    checkCollision(plane) {
+      if (this.isDead || this.isCrashing || plane.isDead || (plane.invulnerableTimer && plane.invulnerableTimer > 0)) return false;
+      const dx = Math.abs(plane.x - this.x);
+      const dy = Math.abs(plane.y - this.y);
+      return (dx < 42 && dy < 16);
+    }
+
+    draw(ctx, camX) {
+      if (this.isDead) return;
+      const rx = this.x - camX;
+      ctx.save();
+      ctx.translate(rx, this.y);
+      if (this.isCrashing) {
+        ctx.rotate(this.crashAngle);
+      }
+      if (this.direction === -1) {
+        ctx.scale(-1, 1);
+      }
+
+      // Main Fuselage (White airliner)
+      ctx.fillStyle = '#f8f9fa';
+      ctx.fillRect(-38, -7, 72, 14);
+      // Nose Cone
+      ctx.beginPath();
+      ctx.moveTo(34, -7);
+      ctx.lineTo(46, 0);
+      ctx.lineTo(34, 7);
+      ctx.closePath();
+      ctx.fill();
+
+      // Airline Stripe (Navy blue & cyan)
+      ctx.fillStyle = '#003566';
+      ctx.fillRect(-36, 0, 74, 3);
+      ctx.fillStyle = '#00b4d8';
+      ctx.fillRect(-36, 3, 74, 1.5);
+
+      // Cockpit Windshield & Passenger Windows
+      ctx.fillStyle = '#212529';
+      ctx.fillRect(28, -5, 6, 3); // Cockpit
+      for (let wx = -28; wx <= 20; wx += 6) {
+        ctx.fillRect(wx, -4, 3, 3); // Passenger windows
+      }
+
+      // Wings & Engines
+      if (!this.hasLostWing) {
+        // Swept Wings
+        ctx.fillStyle = '#ced4da';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(-4, 16);
+        ctx.lineTo(8, 16);
+        ctx.lineTo(12, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Jet Engines under wings
+        ctx.fillStyle = '#495057';
+        ctx.fillRect(-2, 8, 12, 5);
+        ctx.fillStyle = '#00b4d8';
+        ctx.fillRect(10, 9, 2, 3); // Fan glow
+      } else {
+        // Jagged sheared wing stump with sparks and scorch
+        ctx.fillStyle = '#333333';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(-6, 5);
+        ctx.lineTo(-1, 2);
+        ctx.lineTo(4, 6);
+        ctx.lineTo(10, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Glowing severed root
+        ctx.fillStyle = '#ff4500';
+        ctx.fillRect(-4, 1, 8, 3);
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(-2, 2, 4, 2);
+      }
+
+      // Tail Fin (Vertical Stabilizer)
+      ctx.fillStyle = '#003566';
+      ctx.beginPath();
+      ctx.moveTo(-38, -7);
+      ctx.lineTo(-46, -22);
+      ctx.lineTo(-32, -22);
+      ctx.lineTo(-24, -7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  // --- OBSTACLES: STUNT BIPLANES (ACROBATIC COMPETITORS) ---
+  class StuntBiplane {
+    constructor(x, y, pattern = 'loop') {
+      this.x = x;
+      this.y = y;
+      this.pattern = pattern; // 'loop', 'wave'
+      this.theta = Math.PI; // Heading West initially
+      this.airspeed = 122; // 30% reduced speed (was 175)
+      this.vx = -122;
+      this.vy = 0;
+      this.timer = Math.random() * Math.PI * 2;
+      this.smokeTimer = 0;
+      this.nearMissAwarded = false;
+      this.isDead = false;
+      this.ribbonColor = pattern === 'loop' ? 'rgba(255, 60, 180,' : 'rgba(0, 220, 255,';
+    }
+
+    explode() {
+      if (this.isDead) return;
+      this.isDead = true;
+      createExplosion(this.x, this.y, 45);
+      createBiplaneDebris(this.x, this.y, this.vx, this.vy, 'stunt', 1.4);
+    }
+
+    update(dt) {
+      if (this.isDead) return;
+      this.timer += 1.25 * dt;
+
+      if (this.pattern === 'loop') {
+        // Continuous giant loop-the-loop maneuver
+        this.theta += 1.30 * dt;
+        this.vx = Math.cos(this.theta) * this.airspeed;
+        this.vy = -Math.sin(this.theta) * this.airspeed;
+      } else if (this.pattern === 'wave') {
+        // Undulating rollercoaster dive & climb
+        this.theta = Math.PI + Math.sin(this.timer) * 0.65;
+        this.vx = Math.cos(this.theta) * this.airspeed;
+        this.vy = -Math.sin(this.theta) * this.airspeed;
+      }
+
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+
+      // Trailing Acrobatic Smoke Ribbons
+      this.smokeTimer += dt;
+      if (this.smokeTimer > 0.04) {
+        this.smokeTimer = 0;
+        createSmokePuff(this.x, this.y, -this.vx * 0.3, -this.vy * 0.3, 3.2, this.ribbonColor);
+      }
+    }
+
+    checkCollision(plane) {
+      if (this.isDead || plane.isDead || (plane.invulnerableTimer && plane.invulnerableTimer > 0)) return false;
+      return Math.hypot(plane.x - this.x, plane.y - this.y) < 26;
+    }
+
+    draw(ctx, camX) {
+      if (this.isDead) return;
+      const renderX = this.x - camX;
+
+      ctx.save();
+      ctx.translate(renderX, this.y);
+      ctx.rotate(-this.theta);
+
+      // Yellow & Black Checker Stunt Sprite
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(-14, -3, 26, 6);
+      ctx.fillStyle = '#111111';
+      ctx.fillRect(-6, -3, 6, 6); // Checker center
+      ctx.fillRect(8, -3, 4, 6);  // Cowl ring
+
+      // Wings
+      ctx.fillStyle = '#9b5de5';
+      ctx.fillRect(-6, -11, 16, 3);
+      ctx.fillRect(-6, 8, 16, 3);
+
+      // Tail
+      ctx.fillStyle = '#111111';
+      ctx.fillRect(-16, -7, 4, 7);
+
+      ctx.restore();
+    }
+  }
+
+  // --- BIRD FLOCK PARTICLES & OBSTACLES ---
+  class BirdFlock {
+    constructor(x, y, count = 5) {
+      this.x = x;
+      this.y = y;
+      this.count = count;
+      this.speed = 45 + Math.random() * 20;
+      this.vx = -this.speed;
+      this.birds = [];
+      for (let i = 0; i < count; i++) {
+        this.birds.push({
+          relX: -i * 14 - (i % 2) * 6,
+          relY: (i % 2 === 0 ? 1 : -1) * (i * 8),
+          flapTimer: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    update(dt) {
+      this.x += this.vx * dt;
+      for (const b of this.birds) {
+        b.flapTimer += 8.0 * dt;
+      }
+    }
+
+    checkCollision(plane) {
+      if (plane.isDead || (plane.invulnerableTimer && plane.invulnerableTimer > 0)) return false;
+      for (const b of this.birds) {
+        const bx = this.x + b.relX;
+        const by = this.y + b.relY;
+        if (Math.hypot(plane.x - bx, plane.y - by) < 18) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    draw(ctx, camX) {
+      for (const b of this.birds) {
+        const rx = this.x + b.relX - camX;
+        const ry = this.y + b.relY;
+        const wingFlap = Math.sin(b.flapTimer);
+
+        ctx.save();
+        ctx.strokeStyle = '#2d3436';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        // V-wing flapping silhouette
+        const wingTipY = ry - wingFlap * 5;
+        ctx.moveTo(rx - 6, wingTipY);
+        ctx.lineTo(rx, ry);
+        ctx.lineTo(rx + 6, wingTipY);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // --- PLAYER PLANE & FLIGHT DYNAMICS ---
+  class PlayerPlane {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+
+      // Flight Vector & Orientation (0 = right, PI = left)
+      this.theta = 0;
+      this.airspeed = 140;
+      this.vx = 140;
+      this.vy = 0;
+
+      // Aerodynamics & Energy Speeds
+      this.cruiseSpeed = 140;   // Base unboosted level flight speed
+      this.maxLevelSpeed = 195; // Max level flight speed achievable under boost
+      this.maxDiveSpeed = 330;  // Terminal dive velocity achievable in power dive
+      this.maxSpeed = 330;      // Hard speed ceiling
+      this.stallSpeed = 52;
+      this.recoverSpeed = 77;
+      this.minSpeed = 20;
+      this.pitchRate = 2.85;
+
+      // Flight State
+      this.stalled = false;
+      this.stallTime = 0;
+      this.baseFacing = 1; // 1 = East (Right), -1 = West (Left)
+      this.invertedTimer = 0;
+      this.rollTimer = 0;
+      this.rollDuration = 0.38;
+      this.onGround = false;
+      this.isStopped = false;
+      this.isBraking = false;
+      this.isIdle = false; // false = Max throttle (full power), true = Idle
+      this.lastSpaceState = false;
+      this.fuel = 100;
+      this.maxFuel = 100;
+      this.boostTimer = 0;
+      this.propAngle = 0;
+      this.invulnerableTimer = 2.5; // Safe spawn grace period
+
+      // Runway service, refueling & takeoff roll states
+      this.stopTimer = 0;
+      this.isParkedForService = false;
+      this.throttleUp = false;
+      this.rpm = 0.2;
+      this.takeoffTimer = 0;
+
+      // Visuals & Damage States
+      this.width = 34;
+      this.height = 18;
+      this.smokeTimer = 0;
+      this.isDead = false;
+      this.handledDeath = false;
+
+      // Bird strike damage & wobbly crash state
+      this.isWobblingCrash = false;
+      this.wobbleTimer = 0;
+      this.wobblePhase = 0;
+      this.sputterSoundTimer = 0;
+      this.engineFailed = false;
+      this.missingTail = false;
+    }
+
+    get flightAngle() {
+      return Math.atan2(-this.vy, this.vx);
+    }
+
+    get angleOfAttack() {
+      let diff = this.theta - this.flightAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      return diff;
+    }
+
+    triggerBirdStrike() {
+      if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0) || this.isWobblingCrash) return;
+
+      this.isWobblingCrash = true;
+      this.wobbleTimer = 0;
+      this.wobblePhase = 0;
+      this.missingTail = true;
+      this.engineFailed = true;
+      this.fuel = 0;
+      this.airspeed = Math.min(this.airspeed, 110);
+
+      playSound('bird_strike');
+      playSound('wing_tear');
+      playSound('engine_sputter');
+
+      createFeatherBurst(this.x, this.y, 28);
+      state.shake = Math.min(state.shake + 12, 16);
+
+      // Tail piece flies off
+      createDebrisPiece({
+        x: this.x - 14,
+        y: this.y - 4,
+        vx: this.vx * 0.3 - (Math.random() * 70 + 40),
+        vy: -Math.random() * 60 - 30,
+        width: 8,
+        height: 10,
+        color: '#2b7a78',
+        accentColor: '#def2f1',
+        type: 'tail',
+        smoking: true,
+        rotSpeed: (Math.random() - 0.5) * 12
+      });
+
+      showStatusBanner('COLLIDED WITH BIRDS!', 2.5, 'warning');
+    }
+
+    breakApart(cause = 'general') {
+      if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0)) return;
+      this.isDead = true;
+      createExplosion(this.x, this.y, 50);
+      createBiplaneDebris(this.x, this.y, this.vx, this.vy, 'player', cause === 'stunt' ? 1.5 : 1.7);
+    }
+
+    crash() {
+      if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0)) return;
+      this.isDead = true;
+      createExplosion(this.x, this.y, 45);
+      createBiplaneDebris(this.x, this.y, this.vx, this.vy, 'player', 1.1);
+    }
+
+    update(dt, input) {
+      if (this.isDead) return;
+
+      if (this.invulnerableTimer > 0) {
+        this.invulnerableTimer -= dt;
+      }
+
+      // Edge-triggered spacebar press detection
+      const spacePressed = (input.space || input.boost);
+      const spaceJustPressed = spacePressed && !this.lastSpaceState;
+      this.lastSpaceState = !!spacePressed;
+
+      // Special Handling for Bird-Strike Wobbly Descent
+      if (this.isWobblingCrash) {
+        this.wobbleTimer += dt;
+        this.wobblePhase += 11.0 * dt;
+
+        // Propeller sputters down to stop
+        this.propAngle += Math.max(0, 18 - this.wobbleTimer * 6) * dt;
+
+        // Sputter sound effect intermittently
+        this.sputterSoundTimer += dt;
+        if (this.sputterSoundTimer > 0.35 && this.wobbleTimer < 2.0) {
+          this.sputterSoundTimer = 0;
+          if (Math.random() < 0.5) playSound('engine_sputter');
+        }
+
+        // Aerodynamic tail-loss pitch instability: oscillating nose wobble + increasing downward pitch
+        const wobbleAmp = Math.min(1.2, 0.4 + this.wobbleTimer * 0.4);
+        this.theta += Math.sin(this.wobblePhase) * 4.8 * dt * wobbleAmp - 0.65 * dt;
+
+        while (this.theta > Math.PI) this.theta -= Math.PI * 2;
+        while (this.theta < -Math.PI) this.theta += Math.PI * 2;
+
+        // Ballistic fall with gravity and drag (exponential damping)
+        this.vy += 135 * dt;
+        this.vx *= Math.exp(-0.18 * dt);
+        this.airspeed = Math.hypot(this.vx, this.vy);
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+
+        // Smoke and coughing fire sparks
+        this.smokeTimer += dt;
+        if (this.smokeTimer > 0.035) {
+          this.smokeTimer = 0;
+          const noseX = Math.cos(this.theta);
+          const noseY = -Math.sin(this.theta);
+
+          // Dark engine smoke from nose
+          createSmokePuff(
+            this.x + noseX * 14,
+            this.y + noseY * 14,
+            -this.vx * 0.15,
+            -this.vy * 0.15,
+            4.2,
+            'rgba(50,50,50,'
+          );
+
+          // Damaged tail stump smoke
+          createSmokePuff(
+            this.x - noseX * 16,
+            this.y - noseY * 16,
+            -this.vx * 0.2,
+            -this.vy * 0.2,
+            3.5,
+            'rgba(80,80,80,'
+          );
+
+          if (Math.random() < 0.35) {
+            createFirePuff(this.x + noseX * 12, this.y + noseY * 12, -this.vx * 0.1, -this.vy * 0.1, 3.5);
+          }
+        }
+
+        // Impact with ground
+        if (this.y >= GROUND_Y - 8) {
+          this.crash();
+          showStatusBanner('COLLIDED WITH GROUND!', 2.0);
+          return;
+        }
+        return;
+      }
+
+      if (this.isParkedForService || this.isStopped) {
+        const spinRate = this.throttleUp ? (120 + this.rpm * 350) : 45;
+        this.propAngle += spinRate * dt * 0.2;
+      } else if (this.throttleUp && this.onGround) {
+        const spinRate = 120 + this.rpm * 350;
+        this.propAngle += spinRate * dt * 0.2;
+      } else if (this.isIdle && !this.onGround) {
+        this.propAngle += 35 * dt * 0.2;
+      } else {
+        this.propAngle += (this.airspeed + 60) * dt * 0.2;
+      }
+
+      // 1. Ground & Landing Mechanics
+      const groundContactY = GROUND_Y - 8;
+      if (this.y >= groundContactY) {
+        this.y = groundContactY;
+
+        const pitchSin = Math.abs(Math.sin(this.theta));
+        const gentleDescent = this.vy <= 75;
+        const levelAttitude = pitchSin < 0.38;
+
+        if (levelAttitude && gentleDescent) {
+          const justLanded = !this.onGround;
+          this.onGround = true;
+          this.vy = 0;
+          this.stalled = false;
+          this.invertedTimer = 0;
+          this.theta = 0;
+          this.baseFacing = 1;
+
+          if (justLanded) {
+            this.isStopped = false;
+            this.throttleUp = false;
+            this.isBraking = false;
+            this.isIdle = false;
+            this.takeoffTimer = 0;
+            this.stopTimer = 0;
+            showStatusBanner('TOUCHDOWN! HOLD SPACE TO BRAKE', 1.5, 'info');
+          }
+
+          const currentRunway = getRunwayAtPoint(this.x);
+
+          // State A: Plane is stopped on ground / runway
+          if (this.isStopped) {
+            // Refueling while stopped (4-second full refill)
+            if (this.fuel < this.maxFuel) {
+              this.fuel = Math.min(this.maxFuel, this.fuel + (this.maxFuel / 4.0) * dt);
+            }
+
+            // After being stopped, space applies full throttle!
+            if (spaceJustPressed || spacePressed) {
+              this.throttleUp = true;
+              this.isStopped = false;
+              this.isIdle = false;
+              this.takeoffTimer = 0;
+            }
+
+            if (!this.throttleUp) {
+              this.airspeed = 0;
+              this.vx = 0;
+              this.rpm = 0.2;
+              if (this.fuel < this.maxFuel) {
+                const fuelPct = Math.round((this.fuel / this.maxFuel) * 100);
+                showStatusBanner(`REFUELING: ${fuelPct}%... PRESS SPACE FOR FULL THROTTLE`, 0.2, 'info');
+              } else {
+                showStatusBanner('STOPPED & READY! PRESS SPACE FOR FULL THROTTLE & TAKEOFF', 0.2, 'success');
+              }
+              return;
+            }
+          }
+
+          // State B: Full throttle acceleration on ground towards takeoff
+          if (this.throttleUp) {
+            // Engine spools up rapidly to max RPM (max level flight sound)
+            this.rpm = Math.min(1.0, this.rpm + 2.0 * dt);
+
+            // Plane accelerates pretty quickly up to a max of 75% of level flight speed (0.75 * 140 = 105)
+            const maxGroundSpeed = this.cruiseSpeed * 0.75;
+            const groundAccel = 110;
+            this.airspeed = Math.min(maxGroundSpeed, this.airspeed + groundAccel * dt);
+            this.vx = this.airspeed;
+            this.x += this.vx * dt;
+
+            showStatusBanner(`FULL THROTTLE! AIRSPEED: ${Math.round(this.airspeed)} - PULL UP TO CLIMB`, 0.2, 'info');
+
+            // Liftoff when reaching speed and pilot pulls back (or automatically when exceeding max ground speed)
+            if (this.airspeed >= 70 && (input.pitchUp || this.airspeed >= maxGroundSpeed)) {
+              this.onGround = false;
+              this.isParkedForService = false;
+              this.throttleUp = false;
+              this.isStopped = false;
+              this.isBraking = false;
+              this.isIdle = false;
+              this.takeoffTimer = 1.0;
+              this.vy = -32;
+              this.y -= 6;
+              showStatusBanner('AIRBORNE! MAX THROTTLE', 2.0, 'success');
+            }
+            return;
+          }
+
+          // State C: Landing roll (transitioned from airborne to ground, moving forward before stopping)
+          // Space bar applies brakes!
+          if (spacePressed) {
+            this.isBraking = true;
+            // Strong brake deceleration
+            this.airspeed = Math.max(0, this.airspeed - 130 * dt);
+            if (Math.random() < 0.35 && this.airspeed > 15) {
+              createSmokePuff(this.x - 8, groundContactY + 6, -this.vx * 0.2, -10, 2.5, 'rgba(210,210,210,');
+            }
+            showStatusBanner(`BRAKING... AIRSPEED: ${Math.round(this.airspeed)}`, 0.2, 'info');
+          } else {
+            this.isBraking = false;
+            // Gentle rolling friction deceleration
+            const rollFriction = currentRunway ? 50 : 40;
+            this.airspeed = Math.max(0, this.airspeed - rollFriction * dt);
+            showStatusBanner('LANDED. HOLD SPACE TO BRAKE', 0.2, 'info');
+          }
+
+          this.vx = this.airspeed;
+          this.x += this.vx * dt;
+
+          // Check if speed has reached zero / stopped
+          if (this.airspeed <= 2.0) {
+            this.airspeed = 0;
+            this.vx = 0;
+            this.isBraking = false;
+            this.isStopped = true;
+            this.throttleUp = false;
+            this.stopTimer = 0;
+
+            if (currentRunway) {
+              this.isParkedForService = true;
+            }
+            showStatusBanner('STOPPED! PRESS SPACE FOR FULL THROTTLE', 1.5, 'success');
+          }
+          return;
+        } else {
+          // Hard landing crash (only if not in spawn invulnerability)
+          if (this.invulnerableTimer <= 0) {
+            this.crash();
+            showStatusBanner('COLLIDED WITH GROUND!', 2.0, 'danger');
+            return;
+          }
+        }
+      } else {
+        this.onGround = false;
+        this.isParkedForService = false;
+        this.throttleUp = false;
+        this.isStopped = false;
+        this.isBraking = false;
+        this.stopTimer = 0;
+      }
+
+      // Decay takeoffTimer when airborne to smoothly settle into normal flight acoustics
+      if (this.takeoffTimer > 0) {
+        this.takeoffTimer = Math.max(0, this.takeoffTimer - 0.7 * dt);
+      }
+
+      // 2. Inverted Flight Auto-Roll (Disabled for intuitive left-to-right flight)
+      this.invertedTimer = 0;
+      this.rollTimer = 0;
+
+      // 3. Airborne Engine Throttle Toggle (Space bar toggles Max Throttle / Idle)
+      if (spaceJustPressed) {
+        this.isIdle = !this.isIdle;
+        showStatusBanner(this.isIdle ? 'THROTTLE: IDLE (GLIDING)' : 'THROTTLE: MAX (FULL POWER)', 1.5, 'info');
+      }
+
+      // Fuel consumption (idle consumes less fuel)
+      const fuelBurnRate = this.isIdle ? 0.15 : 0.7;
+      this.fuel = Math.max(0, this.fuel - fuelBurnRate * dt);
+      this.boostTimer = 0;
+      const isBoosting = false;
+      const hasThrust = this.fuel > 0;
+
+      // 4. Pitch Controls
+      let pitchAuthority = this.stalled ? 0.35 : Math.min(1.25, Math.max(0.5, this.airspeed / this.cruiseSpeed));
+      const pitchDir = 1;
+
+      if (input.pitchUp) {
+        this.theta += pitchDir * this.pitchRate * pitchAuthority * dt;
+      }
+      if (input.pitchDown) {
+        this.theta -= pitchDir * this.pitchRate * pitchAuthority * dt;
+      }
+
+      while (this.theta > Math.PI) this.theta -= Math.PI * 2;
+      while (this.theta < -Math.PI) this.theta += Math.PI * 2;
+
+      // 5. Energy Management & Aerodynamics
+      const pitchSin = Math.sin(this.theta);
+      const noseX = Math.cos(this.theta);
+      const noseY = -pitchSin;
+
+      if (!this.stalled) {
+        // Angle of Attack (AoA): angle between aircraft nose and true flight velocity vector
+        const aoa = Math.abs(this.angleOfAttack);
+
+        // Critical AoA threshold (~37° - 40°): exceeding this triggers an aerodynamic stall
+        const criticalAoA = 0.65; // ~37.2 degrees
+        const isExceedingAoA = aoa >= criticalAoA;
+
+        // Progressive AoA induced drag: increases quadratically as AoA approaches critical limit
+        const aoaRatio = Math.min(1.5, aoa / criticalAoA);
+        const aoaDrag = Math.pow(aoaRatio, 2) * 55;
+
+        // Gravitational acceleration / deceleration:
+        // Dives accelerate strongly (+175), while climbs bleed airspeed at a brisk rate (-125)
+        const gravityAccel = pitchSin < 0 ? (-pitchSin * 175) : (-pitchSin * 125);
+
+        // Level flight & climb engine thrust equilibrium:
+        const targetLevelSpeed = this.isIdle ? 30 : this.cruiseSpeed;
+        const thrustResponse = (hasThrust && !this.isIdle) ? (this.airspeed < targetLevelSpeed ? 0.85 : 0.6) : 0.25;
+        const levelDrag = (targetLevelSpeed - this.airspeed) * thrustResponse;
+
+        // Transonic / terminal dive drag (resists exceeding maxDiveSpeed in steep dives)
+        let highSpeedDrag = 0;
+        if (this.airspeed > this.maxLevelSpeed) {
+          const excess = (this.airspeed - this.maxLevelSpeed) / (this.maxDiveSpeed - this.maxLevelSpeed);
+          highSpeedDrag = Math.pow(Math.max(0, excess), 2) * 200;
+        }
+
+        // Engine unpowered penalty if out of fuel or in idle
+        const enginePenalty = (!hasThrust || this.isIdle) ? -35 : 0;
+
+        const dAirspeed = (gravityAccel + levelDrag + enginePenalty - aoaDrag - highSpeedDrag) * dt;
+        this.airspeed = Math.max(this.minSpeed, Math.min(this.maxDiveSpeed, this.airspeed + dAirspeed));
+
+        const targetVx = noseX * this.airspeed;
+        const targetVy = noseY * this.airspeed;
+
+        // Frame-rate independent velocity response
+        const responsiveness = 1 - Math.exp(-11.0 * dt);
+        this.vx += (targetVx - this.vx) * responsiveness;
+        this.vy += (targetVy - this.vy) * responsiveness;
+
+        // Stall conditions:
+        // 1. Low airspeed stall (airspeed < stallSpeed)
+        // 2. Critical AoA stall (AoA >= criticalAoA ~37°-40°)
+        if (this.airspeed < this.stallSpeed || isExceedingAoA) {
+          this.stalled = true;
+        }
+
+      } else {
+        // Stalled ballistic fall with frame-rate independent drag & orientation alignment
+        this.stallTime = (this.stallTime || 0) + dt;
+        this.vy += 135 * dt;
+        this.vx *= Math.exp(-0.25 * dt);
+        this.airspeed = Math.hypot(this.vx, this.vy);
+
+        const fallAngle = this.flightAngle;
+        let angleDiff = fallAngle - this.theta;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        this.theta += angleDiff * (1 - Math.exp(-2.2 * dt));
+
+        // Stall recovery: point nose down with velocity vector and build airspeed past recoverSpeed
+        const aoa = Math.abs(this.angleOfAttack);
+        if (aoa < 0.40 && this.airspeed > this.recoverSpeed) {
+          this.stalled = false;
+          if (this.stallTime > 0.8) {
+            addScore(150);
+            addFloatingText(this.x, this.y - 14, '+150 STALL RECOVER!', '#55ff77', 10);
+            showStatusBanner('★ STALL RECOVERED! +150 BONUS ★', 1.8, 'bonus');
+          }
+          this.stallTime = 0;
+        }
+      }
+
+      // 6. Position Integration
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+
+      // Sky ceiling (max altitude limit)
+      if (this.y <= 18) {
+        this.y = 18;
+        if (this.vy < 0) this.vy = 0;
+        // Pushing nose up against the ceiling bleeds airspeed and triggers a stall
+        if (pitchSin > 0.20) {
+          this.airspeed = Math.max(this.minSpeed, this.airspeed - 135 * dt);
+          if (this.airspeed < this.stallSpeed || Math.abs(this.angleOfAttack) > 0.45) {
+            this.stalled = true;
+          }
+        }
+      }
+
+      // 7. Smoke trails on stall
+      this.smokeTimer += dt;
+      if (this.stalled) {
+        if (this.smokeTimer > 0.05) {
+          this.smokeTimer = 0;
+          createSmokePuff(
+            this.x - noseX * 14, 
+            this.y - noseY * 14, 
+            -this.vx, 
+            -this.vy, 
+            3.5,
+            'rgba(180,180,180,'
+          );
+        }
+      }
+    }
+
+    draw(ctx, camX) {
+      if (this.isDead) return;
+      const renderX = this.x - camX;
+
+      ctx.save();
+      ctx.translate(renderX, this.y);
+
+      // Blinking effect during spawn invulnerability grace period
+      if (this.invulnerableTimer > 0) {
+        if (Math.floor(this.invulnerableTimer * 10) % 2 === 0) {
+          ctx.globalAlpha = 0.45;
+        }
+      }
+
+      ctx.rotate(-this.theta);
+      this.drawBiplaneSprite(ctx, false);
+
+      ctx.restore();
+    }
+
+    drawBiplaneSprite(ctx, facingWest) {
+      if (facingWest) {
+        ctx.scale(-1, 1);
+      }
+
+      // Vibrant Fly By Sky Blue & Crimson Aero Paint
+      const primaryColor = '#2b7a78';
+      const wingColor = '#3aafa9';
+      const accentColor = '#def2f1';
+
+      // 1. Fuselage
+      ctx.fillStyle = primaryColor;
+      ctx.fillRect(-14, -4, 28, 8);
+      ctx.fillRect(-18, -2, 4, 4);
+      ctx.fillStyle = '#17252a';
+      ctx.fillRect(14, -3, 3, 6);
+
+      // 2. Cockpit & Pilot
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-2, -6, 6, 3);
+      ctx.fillStyle = '#f5cba7';
+      ctx.fillRect(0, -8, 4, 4);
+      ctx.fillStyle = '#8b4513';
+      ctx.fillRect(-1, -9, 6, 2); // Leather aviator helmet
+      if (this.airspeed > 40 && !this.isWobblingCrash) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-5, -6, 4, 2); // Flowing white silk scarf!
+      }
+
+      // 3. Wings
+      ctx.fillStyle = wingColor;
+      ctx.fillRect(-10, -11, 22, 4); // Top
+      ctx.fillRect(-8, 5, 20, 3);    // Bottom
+      ctx.fillStyle = '#2b3a4a';
+      ctx.fillRect(2, -7, 2, 12);
+      ctx.fillRect(-6, -7, 2, 12);
+
+      // 4. Tail & Rudder (if not severed)
+      if (!this.tailLost) {
+        ctx.fillStyle = primaryColor;
+        ctx.fillRect(-20, -10, 5, 8);
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(-21, -8, 2, 5);
+      } else {
+        // Jagged charred tail stump with embers
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-18, -4, 4, 6);
+        ctx.fillStyle = '#ff4500';
+        ctx.fillRect(-19, -2, 2, 3);
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(-18, -1, 1.5, 1.5);
+      }
+
+      // 5. Landing Gear
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 8, 2, 4);
+      ctx.fillRect(-1, 11, 4, 4);
+
+      // 6. Spinning Propeller
+      ctx.save();
+      ctx.translate(17, 0);
+      ctx.fillStyle = 'rgba(240, 240, 240, 0.8)';
+      const propHeight = Math.sin(this.propAngle) * 14;
+      ctx.fillRect(-1, -propHeight / 2, 2, propHeight);
+      ctx.restore();
+    }
+  }
+
+  // --- DYNAMIC PROCEDURAL WORLD & CHUNK MANAGER ---
+  const CHUNK_SIZE = 1000;
+  let player = new PlayerPlane(80, 220);
+  let airfields = [];
+  let structures = [];
+  let balloons = [];
+  let airliners = [];
+  let stuntPlanes = [];
+  let birdFlocks = [];
+  let generatedChunks = new Set();
+  let poppedBalloonKeys = new Set();
+  let worldSeed = Math.floor(Math.random() * 1000000) + 1;
+
+  class Airfield {
+    constructor(startX, length = 380) {
+      this.startX = startX;
+      this.length = length;
+      this.endX = startX + length;
+      this.hangarX = startX - 50;
+      this.windsockX = this.endX + 20;
+    }
+  }
+
+  function makePRNG(seed) {
+    let s = (seed ^ 0x9e3779b9) >>> 0;
+    return function() {
+      let t = s += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function isPointOnAnyRunway(x, margin = 30) {
+    for (const af of airfields) {
+      if (x >= af.startX - margin && x <= af.endX + margin) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function getRunwayAtPoint(x, margin = 40) {
+    for (const af of airfields) {
+      if (x >= af.startX - margin && x <= af.endX + margin) {
+        return af;
+      }
+    }
+    return null;
+  }
+
+  function isRangeOverlappingRunway(startX, endX, buffer = 80) {
+    for (const af of airfields) {
+      if (endX >= af.startX - buffer && startX <= af.endX + buffer) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function generateChunk(k) {
+    if (generatedChunks.has(k)) return;
+    generatedChunks.add(k);
+
+    const rand = makePRNG(worldSeed + k * 7919);
+    const chunkStart = k * CHUNK_SIZE;
+
+    // 1. Airfield Placement (Every 2 chunks: ~2000px, e.g. chunk 0, 2, 4, -2, etc.)
+    let chunkHasRunway = false;
+    if (k === 0) {
+      // Initial home spawn airfield
+      chunkHasRunway = true;
+      airfields.push(new Airfield(RUNWAY_START, RUNWAY_END - RUNWAY_START));
+    } else if (Math.abs(k) % 2 === 0) {
+      chunkHasRunway = true;
+      const rwStart = chunkStart + 120 + rand() * 100;
+      const rwLength = 360 + rand() * 80;
+      airfields.push(new Airfield(rwStart, rwLength));
+    }
+
+    // 2. Countryside Structures & Dives
+    const structureTypes = ['barn', 'house', 'windmill', 'silo_set', 'water_tower', 'church'];
+    const numStructures = chunkHasRunway ? 1 : 2;
+
+    for (let i = 0; i < numStructures; i++) {
+      let sx;
+      if (chunkHasRunway) {
+        sx = chunkStart + (rand() < 0.5 ? 600 + rand() * 200 : 80 + rand() * 100);
+        if (isRangeOverlappingRunway(sx - 20, sx + 130)) {
+          sx = chunkStart + 750;
+        }
+      } else {
+        const baseOffset = i === 0 ? 150 : 650;
+        sx = chunkStart + baseOffset + (rand() - 0.5) * 160;
+      }
+
+      if (isRangeOverlappingRunway(sx - 30, sx + 130)) continue;
+
+      const stype = structureTypes[Math.floor(rand() * structureTypes.length)];
+      const struct = new CountryStructure(sx, stype);
+      structures.push(struct);
+
+      // Place Low Dive / Roof Balloon
+      let diveY = GROUND_Y - struct.height - 18;
+      if (stype === 'windmill') diveY = GROUND_Y - 125;
+      else if (stype === 'silo_set') diveY = GROUND_Y - 105;
+      else if (stype === 'barn') diveY = GROUND_Y - 82;
+      else if (stype === 'church') diveY = GROUND_Y - 128;
+      else if (stype === 'water_tower') diveY = GROUND_Y - 110;
+
+      const diveType = rand() < 0.4 ? 'gold' : 'rainbow';
+      const diveBalloon = new Balloon(sx + struct.width / 2, diveY, diveType);
+      if (!poppedBalloonKeys.has(diveBalloon.id)) {
+        balloons.push(diveBalloon);
+      }
+    }
+
+    // 3. Aerial Sine-wave & Slalom Balloon Courses
+    for (let x = chunkStart + 40; x < chunkStart + CHUNK_SIZE; x += 110) {
+      // Avoid overlap with structure dive balloons
+      let nearStructure = false;
+      for (const s of structures) {
+        if (Math.abs(x - (s.x + s.width / 2)) < 55) {
+          nearStructure = true;
+          break;
+        }
+      }
+      if (nearStructure) continue;
+
+      // Undulating sine wave altitude
+      const waveY = 220 + Math.sin(x * 0.008) * 110;
+      const rVal = rand();
+      const bType = rVal < 0.5 ? 'red' : rVal < 0.75 ? 'blue' : rVal < 0.9 ? 'green' : 'gold';
+      const b = new Balloon(x, waveY, bType);
+      if (!poppedBalloonKeys.has(b.id)) {
+        balloons.push(b);
+      }
+
+      // High altitude climb balloon
+      if (Math.abs(x % 330) < 60 && rand() < 0.6) {
+        const highB = new Balloon(x, 70 + Math.sin(x * 0.01) * 30, 'gold');
+        if (!poppedBalloonKeys.has(highB.id)) {
+          balloons.push(highB);
+        }
+      }
+    }
+  }
+
+  function ensureChunksGenerated(centerX) {
+    const minChunk = Math.floor((centerX - 2500) / CHUNK_SIZE);
+    const maxChunk = Math.floor((centerX + 2500) / CHUNK_SIZE);
+
+    for (let k = minChunk; k <= maxChunk; k++) {
+      generateChunk(k);
+    }
+
+    // Cull entities that are too far away (> 4500px) to keep performance snappy
+    if (balloons.length > 300) {
+      balloons = balloons.filter(b => Math.abs(b.x - centerX) < 4500);
+    }
+    if (structures.length > 80) {
+      structures = structures.filter(s => Math.abs(s.x - centerX) < 4500);
+    }
+    if (airfields.length > 30) {
+      airfields = airfields.filter(af => Math.abs(af.startX - centerX) < 5000);
+    }
+  }
+
+  function updateHazards(dt, player) {
+    // Despawn hazards that are far behind or dead
+    for (let i = airliners.length - 1; i >= 0; i--) {
+      const al = airliners[i];
+      al.update(dt);
+      if (al.isDead || Math.abs(al.x - player.x) > 2500) {
+        airliners.splice(i, 1);
+      }
+    }
+
+    for (let i = stuntPlanes.length - 1; i >= 0; i--) {
+      const sp = stuntPlanes[i];
+      sp.update(dt);
+      if (sp.isDead || Math.abs(sp.x - player.x) > 2500) {
+        stuntPlanes.splice(i, 1);
+      }
+    }
+
+    for (let i = birdFlocks.length - 1; i >= 0; i--) {
+      const bf = birdFlocks[i];
+      bf.update(dt);
+      if (bf.isDead || Math.abs(bf.x - player.x) > 2500) {
+        birdFlocks.splice(i, 1);
+      }
+    }
+
+    // Desired traffic targets based on current course wave
+    const targetAirliners = Math.min(1 + Math.floor(state.wave / 2), 3);
+    const targetStuntPlanes = Math.min(1 + Math.floor((state.wave - 1) / 2), 3);
+    const targetBirdFlocks = Math.min(2 + Math.floor(state.wave / 2), 4);
+
+    // Spawn airliners ahead/east of player (strictly right-to-left flight)
+    if (airliners.length < targetAirliners && Math.random() < 0.05) {
+      const dir = -1;
+      const spawnX = player.x + 950 + Math.random() * 500;
+      const spawnY = 80 + Math.random() * 150;
+      airliners.push(new Airliner(spawnX, spawnY, 85 + Math.random() * 25, dir));
+    }
+
+    // Spawn stunt biplanes ahead of player
+    if (stuntPlanes.length < targetStuntPlanes && Math.random() < 0.04) {
+      const dir = player.vx >= 0 ? -1 : 1;
+      const spawnX = player.x + (dir === -1 ? 1100 + Math.random() * 600 : -1100 - Math.random() * 600);
+      const spawnY = 140 + Math.random() * 120;
+      const pattern = Math.random() < 0.5 ? 'loop' : 'wave';
+      stuntPlanes.push(new StuntBiplane(spawnX, spawnY, pattern));
+    }
+
+    // Spawn bird flocks ahead of player
+    if (birdFlocks.length < targetBirdFlocks && Math.random() < 0.05) {
+      const dir = player.vx >= 0 ? -1 : 1;
+      const spawnX = player.x + (dir === -1 ? 850 + Math.random() * 450 : -850 - Math.random() * 450);
+      const spawnY = 120 + Math.random() * 180;
+      birdFlocks.push(new BirdFlock(spawnX, spawnY, 5));
+    }
+  }
+
+  function initWorldCourse(wave = 1) {
+    worldSeed = Math.floor(Math.random() * 1000000) + 1;
+    generatedChunks.clear();
+    poppedBalloonKeys.clear();
+    airfields = [];
+    structures = [];
+    balloons = [];
+    airliners = [];
+    stuntPlanes = [];
+    birdFlocks = [];
+    state.balloonsPoppedThisWave = 0;
+    state.combo = 1;
+    state.lastPoppedX = null;
+    state.lastPoppedId = null;
+
+    player = new PlayerPlane(80, 220);
+    ensureChunksGenerated(player.x);
+    showStatusBanner(`COURSE ${wave}: FLY BY BALLOONS & BARNS!`, 3.0, 'info');
+  }
+
+  function addScore(pts) {
+    state.score += pts;
+    if (state.score > state.highScore) {
+      state.highScore = state.score;
+      Storage.set('flyby_highscore', state.highScore.toString());
+    }
+    updateHUD();
+  }
+
+  function showStatusBanner(text, duration = 2.0, type = 'info') {
+    state.bannerText = text;
+    state.bannerTimer = duration;
+    const banner = domCache.statusBanner;
+    if (banner) {
+      banner.textContent = text;
+      banner.className = `status-banner-${type}`;
+      banner.classList.remove('hidden');
+    }
+  }
+
+  function triggerNearMiss(targetX, targetY, typeName, points) {
+    addScore(points);
+    state.nearMisses = (state.nearMisses || 0) + 1;
+    const midX = (player.x + targetX) / 2;
+    const midY = (player.y + targetY) / 2;
+    addFloatingText(midX, midY - 14, `+${points} NEAR MISS!`, '#00ffff', 11);
+    showStatusBanner(`★ DARING NEAR MISS! +${points} (${typeName}) ★`, 1.8, 'bonus');
+    playSound('near_miss');
+    createNearMissBurst(midX, midY);
+    state.shake = Math.min(state.shake + 3.5, 7);
+  }
+
+  // --- COLLISION DETECTION ---
+  function checkCollisions() {
+    if (player.isDead) return;
+
+    // 1. Player vs Balloons (Pop!)
+    for (const b of balloons) {
+      if (!b.popped) {
+        if (Math.hypot(player.x - b.x, player.y - b.y) < player.width * 0.7 + b.radius) {
+          b.pop();
+        }
+      }
+    }
+
+    // 2. Player vs Country Structures (Barns, Silos, Houses, Windmills, Water Towers, Churches)
+    for (const s of structures) {
+      if (s.checkCollision(player)) {
+        player.crash();
+        const names = {
+          barn: 'BARN',
+          house: 'HOUSE',
+          windmill: 'WINDMILL',
+          silo_set: 'SILO',
+          water_tower: 'WATER TOWER',
+          church: 'CHURCH'
+        };
+        const structName = names[s.type] || 'STRUCTURE';
+        showStatusBanner(`COLLIDED WITH ${structName}!`, 2.0, 'danger');
+        return;
+      }
+    }
+
+    // 3. Player vs Airliners (Midair Catastrophe: Player shatters, Airliner loses wing and plunges flaming)
+    for (const al of airliners) {
+      if (!al.isDead && !al.isCrashing) {
+        if (al.checkCollision(player)) {
+          al.triggerCrash(player.x, player.y);
+          player.breakApart('airliner');
+          showStatusBanner('COLLIDED WITH AIRLINER!', 2.5, 'danger');
+          return;
+        } else if (!al.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+          const dx = Math.abs(player.x - al.x);
+          const dy = Math.abs(player.y - al.y);
+          if (dx < 75 && dy < 38) {
+            al.nearMissAwarded = true;
+            triggerNearMiss(al.x, al.y, 'AIRLINER', 300);
+          }
+        }
+      }
+    }
+
+    // 4. Player vs Stunt Biplanes (Mutual Midair Annihilation: Both explode into pieces)
+    for (const sp of stuntPlanes) {
+      if (!sp.isDead) {
+        if (sp.checkCollision(player)) {
+          sp.explode();
+          player.breakApart('stunt');
+          createExplosion((player.x + sp.x) / 2, (player.y + sp.y) / 2, 50);
+          state.shake = Math.min(state.shake + 18, 24);
+          showStatusBanner('COLLIDED WITH BIPLANE!', 2.5, 'danger');
+          return;
+        } else if (!sp.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+          const dist = Math.hypot(player.x - sp.x, player.y - sp.y);
+          if (dist < 56) {
+            sp.nearMissAwarded = true;
+            triggerNearMiss(sp.x, sp.y, 'BIPLANE', 200);
+          }
+        }
+      }
+    }
+
+    // 5. Player vs Bird Flocks (Bird Strike: Lose tail & engine power -> Wobbly descent)
+    for (const bf of birdFlocks) {
+      if (bf.checkCollision(player)) {
+        player.triggerBirdStrike();
+        return;
+      }
+    }
+  }
+
+  // --- BACKGROUND & PARALLAX RENDERING ---
+  const clouds = [
+    { x: 100, y: 55, scale: 1.2, speed: 12 },
+    { x: 420, y: 100, scale: 0.9, speed: 8 },
+    { x: 800, y: 40, scale: 1.5, speed: 15 },
+    { x: 1300, y: 85, scale: 1.0, speed: 10 },
+    { x: 1800, y: 120, scale: 1.3, speed: 14 },
+    { x: 2300, y: 65, scale: 1.1, speed: 11 }
+  ];
+
+  function drawBackground(ctx, camX) {
+    // 1. Sky Gradient (Vibrant Sunny Aero Atmosphere)
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    skyGrad.addColorStop(0, '#1e6091');   // Deep cobalt
+    skyGrad.addColorStop(0.4, '#52b69a'); // Emerald teal mid-sky
+    skyGrad.addColorStop(0.85, '#99d98c'); // Golden-lime horizon
+    skyGrad.addColorStop(1, '#d9ed92');   // Bright sun haze
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // 2. Warm Sun (Seamless gentle parallax)
+    const sunCycle = GAME_WIDTH + 140;
+    const sunRenderX = ((GAME_WIDTH * 0.82 - (camX * 0.04) % sunCycle) + sunCycle) % sunCycle - 70;
+    ctx.fillStyle = '#fff4cc';
+    ctx.beginPath();
+    ctx.arc(sunRenderX, 65, 32, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Distant Mountain Range (Continuous Parallax 0.08x)
+    ctx.fillStyle = '#1d3557';
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    const mStep = 35;
+    for (let x = -mStep; x <= GAME_WIDTH + mStep; x += mStep) {
+      const worldX = x + camX * 0.08;
+      const my = GROUND_Y - 95 - Math.sin(worldX * 0.003) * 45 - Math.cos(worldX * 0.009) * 25;
+      ctx.lineTo(x, my);
+    }
+    ctx.lineTo(GAME_WIDTH, GROUND_Y);
+    ctx.fill();
+
+    // 4. Rolling Country Hills (Continuous Parallax 0.25x)
+    ctx.fillStyle = '#2d6a4f';
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    const hStep = 30;
+    for (let x = -hStep; x <= GAME_WIDTH + hStep; x += hStep) {
+      const worldX = x + camX * 0.25;
+      const hy = GROUND_Y - 45 - Math.sin(worldX * 0.006) * 22;
+      ctx.lineTo(x, hy);
+    }
+    ctx.lineTo(GAME_WIDTH, GROUND_Y);
+    ctx.fill();
+
+    // 5. Fluffy Pixel Clouds (Continuous streaming)
+    for (const cloud of clouds) {
+      cloud.x += cloud.speed * 0.016;
+      while (cloud.x < camX - 300) cloud.x += GAME_WIDTH + 600;
+      while (cloud.x > camX + GAME_WIDTH + 300) cloud.x -= GAME_WIDTH + 600;
+
+      const renderX = cloud.x - camX * 0.5;
+      drawPixelCloud(ctx, renderX, cloud.y, cloud.scale);
+    }
+
+    // 6. Ground & Farmland
+    ctx.fillStyle = '#52b788'; // Lush grass field
+    ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+
+    ctx.fillStyle = '#2d6a4f'; // Soil underneath
+    ctx.fillRect(0, GROUND_Y + 14, GAME_WIDTH, GAME_HEIGHT - GROUND_Y - 14);
+
+    // Continuous Country fence posts (skips active airfields)
+    ctx.strokeStyle = '#8d6e63';
+    ctx.lineWidth = 1.5;
+    const startFence = Math.floor((camX - 75) / 75) * 75;
+    const endFence = camX + GAME_WIDTH + 75;
+    for (let fx = startFence; fx <= endFence; fx += 75) {
+      if (isPointOnAnyRunway(fx, 10)) continue; // Don't build fences across runways!
+      const rfx = fx - camX;
+      ctx.beginPath();
+      ctx.moveTo(rfx, GROUND_Y - 12);
+      ctx.lineTo(rfx, GROUND_Y);
+      ctx.moveTo(rfx, GROUND_Y - 8);
+      ctx.lineTo(rfx + 75, GROUND_Y - 8);
+      ctx.stroke();
+    }
+
+    // 7. Dynamic Airfields (Runway Tarmac, Markings, Hangars, Windsocks)
+    for (const af of airfields) {
+      const rwRenderStart = af.startX - camX;
+      const rwRenderEnd = af.endX - camX;
+
+      if (rwRenderEnd < -100 || rwRenderStart > GAME_WIDTH + 100) continue;
+
+      // Runway Tarmac
+      ctx.fillStyle = '#495057';
+      ctx.fillRect(rwRenderStart, GROUND_Y - 2, af.length, 6);
+
+      // Runway white markings
+      ctx.fillStyle = '#ffffff';
+      for (let rx = af.startX + 15; rx < af.endX - 15; rx += 35) {
+        ctx.fillRect(rx - camX, GROUND_Y, 18, 2);
+      }
+
+      // Airfield Hangar
+      const hangarX = af.hangarX - camX;
+      ctx.fillStyle = '#6c757d';
+      ctx.fillRect(hangarX, GROUND_Y - 28, 42, 28);
+      ctx.fillStyle = '#212529';
+      ctx.fillRect(hangarX + 6, GROUND_Y - 20, 30, 20);
+      ctx.fillStyle = '#9e2a2b';
+      ctx.fillRect(hangarX - 2, GROUND_Y - 32, 46, 5);
+
+      // Windsock
+      const windsockX = af.windsockX - camX;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(windsockX, GROUND_Y - 24, 2, 24);
+      ctx.fillStyle = '#e63946';
+      ctx.fillRect(windsockX + 2, GROUND_Y - 22, 14, 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(windsockX + 6, GROUND_Y - 22, 4, 6);
+    }
+  }
+
+  function drawPixelCloud(ctx, x, y, scale) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.beginPath();
+    ctx.arc(x, y, 16 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 18 * scale, y - 6 * scale, 22 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 40 * scale, y, 18 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 22 * scale, y + 6 * scale, 16 * scale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- CACHED DOM ELEMENTS ---
+  const domCache = {
+    // HUD
+    score: document.getElementById('score-display'),
+    highScore: document.getElementById('high-score-display'),
+    balloons: document.getElementById('balloons-display'),
+    combo: document.getElementById('combo-display'),
+    wave: document.getElementById('wave-display'),
+    lives: document.getElementById('lives-display'),
+    fuelBar: document.getElementById('fuel-bar'),
+    stallWarning: document.getElementById('stall-warning'),
+    statusBanner: document.getElementById('status-banner'),
+    // Gauges
+    barSpd: document.getElementById('bar-spd'),
+    valSpd: document.getElementById('val-spd'),
+    barAlt: document.getElementById('bar-alt'),
+    valAlt: document.getElementById('val-alt'),
+    barAoa: document.getElementById('bar-aoa'),
+    valAoa: document.getElementById('val-aoa'),
+    barThr: document.getElementById('bar-thr'),
+    valThr: document.getElementById('val-thr'),
+    instrumentPanel: document.getElementById('instrument-panel'),
+    crtOverlay: document.getElementById('crt-overlay'),
+    // Screens & Overlays
+    settingsModal: document.getElementById('settings-modal'),
+    gameoverScreen: document.getElementById('gameover-screen'),
+    titleScreen: document.getElementById('title-screen'),
+    finalScore: document.getElementById('final-score'),
+    finalWave: document.getElementById('final-wave'),
+    finalPopped: document.getElementById('final-popped'),
+    finalNearMisses: document.getElementById('final-nearmisses'),
+    finalCombo: document.getElementById('final-combo'),
+    // Settings inputs
+    settingInvertY: document.getElementById('setting-invert-y'),
+    settingInstruments: document.getElementById('setting-instruments'),
+    settingScanlines: document.getElementById('setting-scanlines'),
+    settingEngineSound: document.getElementById('setting-engine-sound')
+  };
+
+  // --- DIRTY-CHECKING STATE TRACKERS ---
+  const hudDirty = {
+    score: -1,
+    highScore: -1,
+    balloons: -1,
+    combo: -1,
+    comboActive: null,
+    wave: -1,
+    lives: -1,
+    fuelPct: -1,
+    fuelLow: null,
+    stalled: null
+  };
+
+  const gaugeDirty = {
+    spdRatio: -1,
+    spdVal: -1,
+    altRatio: -1,
+    altVal: -1,
+    aoaTop: '',
+    aoaBottom: '',
+    aoaHeight: '',
+    aoaColor: '',
+    aoaStalled: null,
+    aoaValText: '',
+    aoaValColor: '',
+    thrRatio: -1,
+    thrText: ''
+  };
+
+  // --- COCKPIT INSTRUMENTS DASHBOARD ---
+  function updateInstruments() {
+    if (!settings.showInstruments || !player) return;
+
+    // 1. SPD (Speed)
+    const v = player.airspeed;
+    const minSpd = player.stallSpeed || 52;
+    const maxSpd = player.maxDiveSpeed || 330;
+    let spdRatio = 0;
+    if (!player.isStopped && !player.stalled && v > minSpd) {
+      spdRatio = Math.max(0, Math.min(1, (v - minSpd) / (maxSpd - minSpd)));
+    }
+    const roundedSpd = Math.round(v);
+    const spdPct = (spdRatio * 100).toFixed(1);
+    if (spdRatio !== gaugeDirty.spdRatio && domCache.barSpd) {
+      domCache.barSpd.style.height = `${spdPct}%`;
+      gaugeDirty.spdRatio = spdRatio;
+    }
+    if (roundedSpd !== gaugeDirty.spdVal && domCache.valSpd) {
+      domCache.valSpd.textContent = roundedSpd.toString();
+      gaugeDirty.spdVal = roundedSpd;
+    }
+
+    // 2. ALT (Altitude)
+    const alt = Math.max(0, GROUND_Y - player.y);
+    const maxAlt = GROUND_Y - 18;
+    const altRatio = Math.max(0, Math.min(1, alt / maxAlt));
+    const roundedAlt = Math.round(alt);
+    if (altRatio !== gaugeDirty.altRatio && domCache.barAlt) {
+      domCache.barAlt.style.height = `${(altRatio * 100).toFixed(1)}%`;
+      gaugeDirty.altRatio = altRatio;
+    }
+    if (roundedAlt !== gaugeDirty.altVal && domCache.valAlt) {
+      domCache.valAlt.textContent = roundedAlt.toString();
+      gaugeDirty.altVal = roundedAlt;
+    }
+
+    // 3. AOA (Angle of Attack)
+    const aoa = player.angleOfAttack;
+    const criticalAoA = 0.65;
+    let normAoA = 0;
+    if (player.stalled) {
+      normAoA = aoa >= 0 ? 1 : -1;
+    } else {
+      normAoA = Math.max(-1, Math.min(1, aoa / criticalAoA));
+    }
+    const fillPct = `${(Math.abs(normAoA) * 50).toFixed(1)}%`;
+    const isTop = normAoA < 0;
+    const bottomVal = isTop ? 'auto' : '50%';
+    const topVal = isTop ? '50%' : 'auto';
+
+    if (domCache.barAoa) {
+      if (bottomVal !== gaugeDirty.aoaBottom || topVal !== gaugeDirty.aoaTop || fillPct !== gaugeDirty.aoaHeight) {
+        domCache.barAoa.style.bottom = bottomVal;
+        domCache.barAoa.style.top = topVal;
+        domCache.barAoa.style.height = fillPct;
+        gaugeDirty.aoaBottom = bottomVal;
+        gaugeDirty.aoaTop = topVal;
+        gaugeDirty.aoaHeight = fillPct;
+      }
+
+      const absNorm = Math.abs(normAoA);
+      let aoaColor = '#38ef7d';
+      const isAoAStalled = !!(player.stalled || absNorm >= 0.80);
+      if (isAoAStalled) {
+        aoaColor = '#ff2222';
+      } else if (absNorm >= 0.42) {
+        aoaColor = '#ffcc00';
+      }
+
+      if (aoaColor !== gaugeDirty.aoaColor) {
+        domCache.barAoa.style.backgroundColor = aoaColor;
+        domCache.barAoa.style.boxShadow = `0 0 6px ${aoaColor}`;
+        gaugeDirty.aoaColor = aoaColor;
+      }
+
+      if (isAoAStalled !== gaugeDirty.aoaStalled) {
+        if (isAoAStalled) domCache.barAoa.classList.add('stalled');
+        else domCache.barAoa.classList.remove('stalled');
+        gaugeDirty.aoaStalled = isAoAStalled;
+      }
+    }
+
+    if (domCache.valAoa) {
+      let aoaText = '';
+      let aoaTextColor = '#ffdf40';
+      if (player.stalled) {
+        aoaText = 'STALL';
+        aoaTextColor = '#ff2222';
+      } else {
+        const deg = Math.round(aoa * (180 / Math.PI));
+        aoaText = `${deg > 0 ? '+' : ''}${deg}°`;
+        aoaTextColor = '#ffdf40';
+      }
+
+      if (aoaText !== gaugeDirty.aoaText || aoaTextColor !== gaugeDirty.aoaTextColor) {
+        domCache.valAoa.textContent = aoaText;
+        domCache.valAoa.style.color = aoaTextColor;
+        gaugeDirty.aoaText = aoaText;
+        gaugeDirty.aoaTextColor = aoaTextColor;
+      }
+    }
+
+    // 4. THR (Throttle)
+    let thrRatio = 0;
+    let thrText = 'IDLE';
+
+    if (player.onGround) {
+      if (player.isStopped) {
+        thrRatio = player.throttleUp ? player.rpm : 0;
+        thrText = player.throttleUp ? 'MAX' : 'STOP';
+      } else if (player.isBraking) {
+        thrRatio = 0;
+        thrText = 'BRK';
+      } else if (player.throttleUp) {
+        thrRatio = player.rpm;
+        thrText = 'MAX';
+      } else {
+        thrRatio = 0.15;
+        thrText = 'ROLL';
+      }
+    } else {
+      if (player.fuel <= 0) {
+        thrRatio = 0;
+        thrText = 'CUT';
+      } else if (player.isIdle) {
+        thrRatio = 0;
+        thrText = 'IDLE';
+      } else {
+        thrRatio = 1.0;
+        thrText = 'MAX';
+      }
+    }
+
+    if (thrRatio !== gaugeDirty.thrRatio && domCache.barThr) {
+      domCache.barThr.style.height = `${(thrRatio * 100).toFixed(1)}%`;
+      gaugeDirty.thrRatio = thrRatio;
+    }
+    if (thrText !== gaugeDirty.thrText && domCache.valThr) {
+      domCache.valThr.textContent = thrText;
+      gaugeDirty.thrText = thrText;
+    }
+  }
+
+  function updateHUD() {
+    if (state.score !== hudDirty.score && domCache.score) {
+      domCache.score.textContent = state.score.toString().padStart(5, '0');
+      hudDirty.score = state.score;
+    }
+
+    if (state.highScore !== hudDirty.highScore && domCache.highScore) {
+      domCache.highScore.textContent = state.highScore.toString().padStart(5, '0');
+      hudDirty.highScore = state.highScore;
+    }
+
+    if (state.balloonsPopped !== hudDirty.balloons && domCache.balloons) {
+      domCache.balloons.textContent = state.balloonsPopped.toString();
+      hudDirty.balloons = state.balloonsPopped;
+    }
+
+    if (state.combo !== hudDirty.combo && domCache.combo) {
+      if (state.combo > 1) {
+        const bonusPct = Math.round((state.combo - 1) * 5);
+        const mult = (1 + (state.combo - 1) * 0.05).toFixed(2);
+        domCache.combo.textContent = `x${mult} (+${bonusPct}%)`;
+        if (!hudDirty.comboActive) {
+          domCache.combo.classList.add('active');
+          hudDirty.comboActive = true;
+        }
+      } else {
+        domCache.combo.textContent = 'x1.00';
+        if (hudDirty.comboActive) {
+          domCache.combo.classList.remove('active');
+          hudDirty.comboActive = false;
+        }
+      }
+      hudDirty.combo = state.combo;
+    }
+
+    if (state.wave !== hudDirty.wave && domCache.wave) {
+      domCache.wave.textContent = state.wave.toString();
+      hudDirty.wave = state.wave;
+    }
+
+    if (state.lives !== hudDirty.lives && domCache.lives) {
+      domCache.lives.textContent = '✈ '.repeat(Math.max(0, state.lives)).trim();
+      hudDirty.lives = state.lives;
+    }
+
+    if (player) {
+      const fuelPercent = Math.round((player.fuel / player.maxFuel) * 100);
+      if (fuelPercent !== hudDirty.fuelPct && domCache.fuelBar) {
+        domCache.fuelBar.style.width = `${fuelPercent}%`;
+        const isLow = fuelPercent < 25;
+        if (isLow !== hudDirty.fuelLow) {
+          if (isLow) domCache.fuelBar.classList.add('low');
+          else domCache.fuelBar.classList.remove('low');
+          hudDirty.fuelLow = isLow;
+        }
+        hudDirty.fuelPct = fuelPercent;
+      }
+
+      const isStalled = !!(player.stalled && !player.isDead);
+      if (isStalled !== hudDirty.stalled && domCache.stallWarning) {
+        if (isStalled) domCache.stallWarning.classList.remove('hidden');
+        else domCache.stallWarning.classList.add('hidden');
+        hudDirty.stalled = isStalled;
+      }
+    }
+  }
+
+  // --- GAME OVER & RESPAWN ---
+  function handlePlayerDeath() {
+    state.lives--;
+    state.combo = 1;
+    state.lastPoppedX = null;
+    state.lastPoppedId = null;
+    updateHUD();
+
+    if (state.lives <= 0) {
+      state.gameOver = true;
+      if (domCache.finalScore) domCache.finalScore.textContent = state.score;
+      if (domCache.finalWave) domCache.finalWave.textContent = state.wave;
+      if (domCache.finalPopped) domCache.finalPopped.textContent = state.balloonsPopped;
+      if (domCache.finalNearMisses) domCache.finalNearMisses.textContent = state.nearMisses || 0;
+      const maxBonusPct = Math.round((state.maxCombo - 1) * 5);
+      const maxMult = (1 + (state.maxCombo - 1) * 0.05).toFixed(2);
+      if (domCache.finalCombo) {
+        domCache.finalCombo.textContent = state.maxCombo > 1
+          ? `x${maxMult} (+${maxBonusPct}%) [${state.maxCombo} Streak]`
+          : 'x1.00';
+      }
+      setTimeout(() => {
+        if (domCache.gameoverScreen) domCache.gameoverScreen.classList.remove('hidden');
+      }, 1200);
+    } else {
+      setTimeout(() => {
+        if (!state.gameOver) {
+          player = new PlayerPlane(player.x, 220);
+          showStatusBanner('NEW BIPLANE AIRBORNE!', 2.0, 'info');
+        }
+      }, 1800);
+    }
+  }
+
+  function restartGame() {
+    initAudio();
+    state.score = 0;
+    state.wave = 1;
+    state.lives = 3;
+    state.balloonsPopped = 0;
+    state.nearMisses = 0;
+    state.combo = 1;
+    state.maxCombo = 1;
+    state.lastPoppedX = null;
+    state.lastPoppedId = null;
+    state.gameOver = false;
+    state.running = true;
+
+    player = new PlayerPlane(80, 220);
+    particles.length = 0;
+    floatingTexts.length = 0;
+
+    initWorldCourse(1);
+    updateHUD();
+
+    if (domCache.gameoverScreen) domCache.gameoverScreen.classList.add('hidden');
+    if (domCache.titleScreen) domCache.titleScreen.classList.add('hidden');
+  }
+
+  // --- MAIN UPDATE & RENDER LOOP ---
+  let lastTime = performance.now();
+
+  function gameLoop(currentTime) {
+    const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
+    lastTime = currentTime;
+
+    if (state.running && !state.paused) {
+      update(dt);
+    } else {
+      updateEngineSound(player, dt);
+      updateAirlinersSound(player, dt);
+    }
+
+    render();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function update(dt) {
+    // 1. Player Input
+    let pitchUp = false;
+    let pitchDown = false;
+
+    if (settings.invertY) {
+      if (keys.down) pitchUp = true;
+      if (keys.up) pitchDown = true;
+    } else {
+      if (keys.up) pitchUp = true;
+      if (keys.down) pitchDown = true;
+    }
+
+    if (!player.isDead) {
+      player.update(dt, {
+        pitchUp,
+        pitchDown,
+        space: keys.space || keys.boost,
+        boost: keys.boost
+      });
+    } else if (state.lives > 0 && !player.handledDeath) {
+      player.handledDeath = true;
+      handlePlayerDeath();
+    }
+
+    // 3. Dynamic World & Camera Tracking
+    ensureChunksGenerated(player.x);
+    state.cameraX = player.x - GAME_WIDTH * 0.33;
+
+    // 4. Screen Shake Decay
+    if (state.shake > 0) {
+      state.shake = Math.max(0, state.shake - 20 * dt);
+    }
+
+    // 5. Status Banner Timer
+    if (state.bannerTimer > 0) {
+      state.bannerTimer -= dt;
+      if (state.bannerTimer <= 0 && domCache.statusBanner) {
+        domCache.statusBanner.classList.add('hidden');
+      }
+    }
+
+    // 6. Balloons Update
+    for (const b of balloons) {
+      b.update(dt);
+    }
+
+    // 7. Countryside Structures Update
+    for (const s of structures) {
+      s.update(dt);
+    }
+
+    // 8. Dynamic Hazards Update
+    updateHazards(dt, player);
+
+    // 9. Floating Text Update (Fast swap-and-pop O(1) removal)
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+      const ft = floatingTexts[i];
+      ft.y += ft.vy * dt;
+      ft.life -= dt * 1.2;
+      if (ft.life <= 0) {
+        floatingTexts[i] = floatingTexts[floatingTexts.length - 1];
+        floatingTexts.pop();
+      }
+    }
+
+    // 10. Particles Update (Fast swap-and-pop O(1) removal)
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+
+      if (p.isFeather) {
+        p.flutter += p.flutterSpeed * dt;
+        p.x += (p.vx + Math.sin(p.flutter) * 18) * dt;
+        p.y += (p.vy + 22) * dt;
+        p.rotation += p.rotSpeed * dt;
+        p.life -= p.decay * dt;
+        if (p.y >= GROUND_Y - 2) {
+          p.y = GROUND_Y - 2;
+          p.vx *= 0.85;
+          p.rotSpeed = 0;
+        }
+      } else if (p.isDebris) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += p.gravity * dt;
+        p.rotation += p.rotSpeed * dt;
+        p.life -= p.decay * dt;
+
+        if (p.smoking) {
+          p.smokeTimer += dt;
+          if (p.smokeTimer > 0.05) {
+            p.smokeTimer = 0;
+            createSmokePuff(p.x, p.y, -p.vx * 0.1, -p.vy * 0.1, 3.2, 'rgba(70,70,70,');
+          }
+        }
+
+        // Ground bounce physics
+        if (p.y >= GROUND_Y - 2) {
+          p.y = GROUND_Y - 2;
+          p.vy = -p.vy * p.bounce;
+          p.vx *= 0.65;
+          p.rotSpeed *= 0.5;
+          if (Math.abs(p.vy) < 18) {
+            p.vy = 0;
+            p.rotSpeed = 0;
+          }
+        }
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.gravity) p.vy += p.gravity * dt;
+        p.life -= p.decay * dt;
+        if (p.rotSpeed) p.rotation += p.rotSpeed * dt;
+      }
+
+      if (p.life <= 0 || p.y > GROUND_Y + 20) {
+        particles[i] = particles[particles.length - 1];
+        particles.pop();
+      }
+    }
+
+    // 11. Collisions & Instruments
+    checkCollisions();
+    updateInstruments();
+    updateHUD();
+
+    // 12. Dynamic Airplane & Airliner Sound
+    updateEngineSound(player, dt);
+    updateAirlinersSound(player, dt);
+  }
+
+  function render() {
+    ctx.save();
+
+    // Apply Screen Shake
+    if (state.shake > 0) {
+      const rx = (Math.random() - 0.5) * state.shake;
+      const ry = (Math.random() - 0.5) * state.shake;
+      ctx.translate(rx, ry);
+    }
+
+    // 1. Draw Parallax World Background
+    drawBackground(ctx, state.cameraX);
+
+    // 2. Draw Country Structures (Barns, Silos, Windmills, Water Towers, Churches)
+    for (const s of structures) {
+      if (s.x - state.cameraX >= -200 && s.x - state.cameraX <= GAME_WIDTH + 200) {
+        s.draw(ctx, state.cameraX);
+      }
+    }
+
+    // 3. Draw Balloons
+    for (const b of balloons) {
+      if (!b.popped && b.x - state.cameraX >= -80 && b.x - state.cameraX <= GAME_WIDTH + 80) {
+        b.draw(ctx, state.cameraX);
+      }
+    }
+
+    // 4. Draw Airliners
+    for (const al of airliners) {
+      al.draw(ctx, state.cameraX);
+    }
+
+    // 5. Draw Stunt Biplanes
+    for (const sp of stuntPlanes) {
+      sp.draw(ctx, state.cameraX);
+    }
+
+    // 6. Draw Bird Flocks
+    for (const bf of birdFlocks) {
+      bf.draw(ctx, state.cameraX);
+    }
+
+    // 7. Draw Player Plane
+    player.draw(ctx, state.cameraX);
+
+    // 8. Draw Particles (Smoke, Fire, Feathers, Debris & Confetti)
+    for (const p of particles) {
+      const rx = p.x - state.cameraX;
+
+      if (p.isSmoke) {
+        ctx.fillStyle = `${p.color}${p.life * 0.75})`;
+        ctx.beginPath();
+        ctx.arc(rx, p.y, p.size * (2.2 - p.life), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.isFire) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.beginPath();
+        ctx.arc(rx, p.y, p.size * (1.5 - p.life * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      } else if (p.isFeather) {
+        ctx.save();
+        ctx.translate(rx, p.y);
+        ctx.rotate(p.rotation + Math.sin(p.flutter) * 0.4);
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size * 1.8, p.size * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (p.isConfetti) {
+        ctx.save();
+        ctx.translate(rx, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 1.5);
+        ctx.restore();
+      } else if (p.isDebris) {
+        ctx.save();
+        ctx.translate(rx, p.y);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = Math.min(1.0, p.life / 0.5);
+
+        if (p.type === 'wing') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+          if (p.accentColor) {
+            ctx.fillStyle = p.accentColor;
+            ctx.fillRect(-p.width / 2 + 2, -p.height / 2 + 1, 3, p.height - 2);
+          }
+        } else if (p.type === 'fuselage') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+          ctx.fillStyle = '#111111';
+          ctx.fillRect(-p.width / 4, -p.height / 2, p.width / 2, 2);
+        } else if (p.type === 'prop') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+          ctx.fillStyle = '#333333';
+          ctx.beginPath();
+          ctx.arc(0, 0, 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'tail') {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(-p.width / 2, p.height / 2);
+          ctx.lineTo(p.width / 2, p.height / 2);
+          ctx.lineTo(p.width / 4, -p.height / 2);
+          ctx.lineTo(-p.width / 4, -p.height / 2);
+          ctx.closePath();
+          ctx.fill();
+        } else if (p.type === 'airliner_wing') {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(-p.width / 2, -p.height / 4);
+          ctx.lineTo(p.width / 2, -p.height / 2);
+          ctx.lineTo(p.width / 3, p.height / 2);
+          ctx.lineTo(-p.width / 3, p.height / 2);
+          ctx.closePath();
+          ctx.fill();
+          // Engine pod
+          ctx.fillStyle = p.accentColor || '#495057';
+          ctx.fillRect(-4, 0, 10, 5);
+        } else if (p.type === 'airliner_hull') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+          if (p.accentColor) {
+            ctx.fillStyle = p.accentColor;
+            ctx.fillRect(-p.width / 2, -1, p.width, 3);
+          }
+        } else if (p.type === 'airliner_nose') {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(-p.width / 2, -p.height / 2);
+          ctx.lineTo(p.width / 2, 0);
+          ctx.lineTo(-p.width / 2, p.height / 2);
+          ctx.closePath();
+          ctx.fill();
+        } else if (p.type === 'airliner_tail') {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(-p.width / 2, p.height / 2);
+          ctx.lineTo(p.width / 2, p.height / 2);
+          ctx.lineTo(-p.width / 4, -p.height / 2);
+          ctx.lineTo(-p.width / 2, -p.height / 2);
+          ctx.closePath();
+          ctx.fill();
+        } else if (p.type === 'engine') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+          ctx.fillStyle = '#00b4d8';
+          ctx.fillRect(p.width / 2 - 2, -p.height / 4, 2, p.height / 2);
+        } else if (p.type === 'wheel') {
+          ctx.fillStyle = '#333333';
+          ctx.beginPath();
+          ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.type === 'scarf') {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+        }
+
+        ctx.restore();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(rx - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      }
+    }
+
+    // 9. Draw Floating Texts
+    for (const ft of floatingTexts) {
+      const rx = ft.x - state.cameraX;
+      ctx.save();
+      ctx.fillStyle = ft.color;
+      ctx.globalAlpha = Math.max(0, ft.life);
+      ctx.font = `${ft.size}px "Press Start 2P", monospace`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 4;
+      ctx.fillText(ft.text, rx, ft.y);
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    // 10. Pause Screen Indicator (when paused during active flight)
+    if (state.running && !state.gameOver && state.paused && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 12, 18, 0.65)';
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+      ctx.fillStyle = '#ffdf40';
+      ctx.font = '20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 6;
+      ctx.fillText('PAUSED', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10);
+
+      ctx.fillStyle = '#79a6d2';
+      ctx.font = '9px "Press Start 2P", monospace';
+      ctx.fillText('PRESS P TO RESUME | ESC FOR SETTINGS', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25);
+      ctx.restore();
+    }
+  }
+
+  // --- SETTINGS MODAL & UI HANDLERS ---
+  function toggleSettings() {
+    if (!domCache.settingsModal) return;
+    if (domCache.settingsModal.classList.contains('hidden')) {
+      openSettings();
+    } else {
+      closeSettings();
+    }
+  }
+
+  function toggleMute() {
+    settings.engineSound = !settings.engineSound;
+    if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
+
+    if (masterAudioGain && audioCtx) {
+      masterAudioGain.gain.setTargetAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime, 0.04);
+    }
+
+    if (!settings.engineSound) {
+      showStatusBanner('AUDIO MUTED (M)', 1.5, 'warning');
+    } else {
+      initAudio();
+      showStatusBanner('AUDIO ENABLED (M)', 1.5, 'info');
+    }
+  }
+
+  function openSettings() {
+    initAudio();
+    state.paused = true;
+    if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+    if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
+    if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
+    if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
+    if (domCache.settingsModal) domCache.settingsModal.classList.remove('hidden');
+  }
+
+  function closeSettings() {
+    if (domCache.settingInvertY) settings.invertY = domCache.settingInvertY.checked;
+    if (domCache.settingInstruments) settings.showInstruments = domCache.settingInstruments.checked;
+    if (domCache.settingScanlines) settings.scanlines = domCache.settingScanlines.checked;
+    if (domCache.settingEngineSound) {
+      settings.engineSound = domCache.settingEngineSound.checked;
+      if (masterAudioGain && audioCtx) {
+        masterAudioGain.gain.setTargetAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime, 0.04);
+      }
+    }
+
+    if (domCache.instrumentPanel) {
+      domCache.instrumentPanel.style.display = settings.showInstruments ? 'flex' : 'none';
+    }
+    if (domCache.crtOverlay) {
+      domCache.crtOverlay.style.display = settings.scanlines ? 'block' : 'none';
+    }
+
+    if (domCache.settingsModal) domCache.settingsModal.classList.add('hidden');
+    if (state.running && !state.gameOver) {
+      state.paused = false;
+    }
+  }
+
+  const settingsBtn = document.getElementById('settings-btn');
+  if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+
+  const titleSettingsBtn = document.getElementById('title-settings-btn');
+  if (titleSettingsBtn) titleSettingsBtn.addEventListener('click', openSettings);
+
+  const closeSettingsBtn = document.getElementById('close-settings-btn');
+  if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
+
+  const startBtn = document.getElementById('start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      restartGame();
+    });
+  }
+
+  const restartBtn = document.getElementById('restart-btn');
+  if (restartBtn) {
+    restartBtn.addEventListener('click', () => {
+      restartGame();
+    });
+  }
+
+  // Initial setup
+  initWorldCourse(1);
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+
+})();
