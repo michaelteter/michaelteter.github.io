@@ -3111,6 +3111,18 @@
       banner.textContent = text;
       banner.className = `status-banner-${type}`;
       banner.classList.remove('hidden');
+
+      if (duration > 0.3) {
+        // Trigger smooth slide-up and fade-out animation matching announcement duration
+        banner.style.animation = 'none';
+        void banner.offsetWidth; // Force reflow to restart CSS keyframe animation
+        banner.style.animation = `banner-slide-fade ${duration}s cubic-bezier(0.2, 0.8, 0.3, 1) forwards`;
+      } else {
+        // Continuous telemetry updates (e.g. refueling progress, braking airspeed)
+        banner.style.animation = 'none';
+        banner.style.opacity = '1';
+        banner.style.transform = 'translateY(0)';
+      }
     }
   }
 
@@ -3979,6 +3991,7 @@
       state.bannerTimer -= dt;
       if (state.bannerTimer <= 0 && domCache.statusBanner) {
         domCache.statusBanner.classList.add('hidden');
+        domCache.statusBanner.style.animation = 'none';
       }
     }
 
