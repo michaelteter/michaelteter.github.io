@@ -651,8 +651,8 @@ body {
 
 .touch-cluster-left {
   position: absolute;
-  bottom: 24px;
-  left: 20px;
+  bottom: 20px;
+  left: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -661,11 +661,13 @@ body {
 
 .touch-cluster-right {
   position: absolute;
-  bottom: 24px;
-  right: 20px;
+  top: 56px;
+  bottom: 20px;
+  right: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  justify-content: flex-end;
+  gap: 12px;
   pointer-events: auto;
 }
 
@@ -691,19 +693,23 @@ body {
 }
 
 .pitch-btn {
-  width: 80px;
-  height: 64px;
+  width: 82px;
+  flex: 1 1 auto;
+  max-height: 125px;
+  min-height: 64px;
+  padding: 8px 4px;
+  gap: 6px;
 }
 
 .pitch-btn .touch-icon {
-  font-size: 16px;
+  font-size: 18px;
   color: #ffdf40;
   text-shadow: 0 0 6px rgba(255, 223, 64, 0.5);
   pointer-events: none;
 }
 
 .pitch-btn .touch-label {
-  font-size: 7.5px;
+  font-size: 8px;
   color: #b0c4de;
   letter-spacing: 0.5px;
   pointer-events: none;
@@ -792,7 +798,7 @@ body {
 }
 
 /* Mobile Responsive Tweaks */
-@media (max-width: 800px) {
+@media (max-width: 800px), (max-height: 520px) {
   #hud {
     padding: 0 10px;
     height: 42px;
@@ -813,23 +819,38 @@ body {
   }
 
   .touch-cluster-left {
-    bottom: 14px;
-    left: 12px;
+    bottom: 12px;
+    left: 10px;
   }
 
   .touch-cluster-right {
-    bottom: 14px;
-    right: 12px;
+    top: 46px;
+    bottom: 12px;
+    right: 10px;
+    gap: 10px;
+    justify-content: stretch;
   }
 
   .pitch-btn {
-    width: 68px;
-    height: 56px;
+    width: 74px;
+    flex: 1 1 auto;
+    max-height: 140px;
+    min-height: 60px;
+    padding: 6px 4px;
+    gap: 6px;
+  }
+
+  .pitch-btn .touch-icon {
+    font-size: 16px;
+  }
+
+  .pitch-btn .touch-label {
+    font-size: 7.5px;
   }
 
   .throttle-btn {
-    width: 82px;
-    height: 58px;
+    width: 84px;
+    height: 66px;
   }
 
   .screen-card {
