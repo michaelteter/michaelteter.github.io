@@ -31,6 +31,7 @@
   // --- SETTINGS & CONFIG ---
   const settings = {
     invertY: true,         // Aviation default: Down Arrow / S = Pull Back (Climb)
+    touchControls: Storage.get('flyby_touch_controls') || 'auto', // 'auto', 'always', 'off'
     showInstruments: true, // Cockpit side bar gauges
     scanlines: true,       // CRT filter
     engineSound: true,     // Dynamic engine pitch & volume audio
@@ -792,6 +793,18 @@
     boost: false
   };
 
+  const touchState = {
+    climb: false,
+    dive: false,
+    throttle: false
+  };
+
+  function updatePauseBtnIcon() {
+    if (domCache.pauseBtn) {
+      domCache.pauseBtn.textContent = state.paused ? '▶' : '⏸';
+    }
+  }
+
   window.addEventListener('keydown', (e) => {
     initAudio();
     if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = true;
@@ -802,6 +815,7 @@
     if (e.code === 'KeyP') {
       if (state.running && !state.gameOver) {
         state.paused = !state.paused;
+        updatePauseBtnIcon();
       }
     }
     if (e.code === 'Escape') {
@@ -810,7 +824,7 @@
     if (e.code === 'KeyM') {
       toggleMute();
     }
-    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && settingsModal.classList.contains('hidden'))) {
+    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden'))) {
       if (state.gameOver || !state.running) {
         restartGame();
       }
@@ -828,6 +842,37 @@
   window.addEventListener('pointerdown', () => {
     initAudio();
   });
+
+  function bindTouchButton(btn, onDown, onUp) {
+    if (!btn) return;
+    const handleDown = (e) => {
+      e.preventDefault();
+      initAudio();
+      btn.classList.add('active');
+      try {
+        if (e.pointerId !== undefined && btn.setPointerCapture) {
+          btn.setPointerCapture(e.pointerId);
+        }
+      } catch (_) {}
+      onDown();
+    };
+
+    const handleUp = (e) => {
+      e.preventDefault();
+      btn.classList.remove('active');
+      try {
+        if (e.pointerId !== undefined && btn.releasePointerCapture) {
+          btn.releasePointerCapture(e.pointerId);
+        }
+      } catch (_) {}
+      onUp();
+    };
+
+    btn.addEventListener('pointerdown', handleDown);
+    btn.addEventListener('pointerup', handleUp);
+    btn.addEventListener('pointercancel', handleUp);
+    btn.addEventListener('pointerleave', handleUp);
+  }
 
   // --- FLOATING TEXT & POPUPS ---
   const floatingTexts = [];
@@ -3403,10 +3448,18 @@
     finalCombo: document.getElementById('final-combo'),
     // Settings inputs
     settingInvertY: document.getElementById('setting-invert-y'),
+    settingTouchControls: document.getElementById('setting-touch-controls'),
     settingInstruments: document.getElementById('setting-instruments'),
     settingScanlines: document.getElementById('setting-scanlines'),
     settingEngineSound: document.getElementById('setting-engine-sound'),
-    settingWind: document.getElementById('setting-wind')
+    settingWind: document.getElementById('setting-wind'),
+    // Action buttons & touch overlays
+    pauseBtn: document.getElementById('pause-btn'),
+    touchControls: document.getElementById('touch-controls'),
+    touchBtnThrottle: document.getElementById('touch-btn-throttle'),
+    touchBtnUp: document.getElementById('touch-btn-up'),
+    touchBtnDown: document.getElementById('touch-btn-down'),
+    orientationHint: document.getElementById('orientation-hint')
   };
 
   let windGaugeCtx = null;
@@ -3827,12 +3880,15 @@
       if (keys.down) pitchDown = true;
     }
 
+    if (touchState.climb) pitchUp = true;
+    if (touchState.dive) pitchDown = true;
+
     if (!player.isDead) {
       player.update(dt, {
         pitchUp,
         pitchDown,
-        space: keys.space || keys.boost,
-        boost: keys.boost
+        space: keys.space || keys.boost || touchState.throttle,
+        boost: keys.boost || touchState.throttle
       });
     } else if (state.lives > 0 && !player.handledDeath) {
       player.handledDeath = true;
@@ -4154,12 +4210,23 @@
 
       ctx.fillStyle = '#79a6d2';
       ctx.font = '9px "Press Start 2P", monospace';
-      ctx.fillText('PRESS P TO RESUME | ESC FOR SETTINGS', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25);
+      ctx.fillText('PRESS P / ⏸ TO RESUME | ESC FOR SETTINGS', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25);
       ctx.restore();
     }
   }
 
   // --- SETTINGS MODAL & UI HANDLERS ---
+  function applyTouchControlsVisibility() {
+    const wrapper = document.getElementById('game-wrapper');
+    if (!wrapper) return;
+    wrapper.classList.remove('force-show-touch', 'force-hide-touch');
+    if (settings.touchControls === 'always') {
+      wrapper.classList.add('force-show-touch');
+    } else if (settings.touchControls === 'off') {
+      wrapper.classList.add('force-hide-touch');
+    }
+  }
+
   function toggleSettings() {
     if (!domCache.settingsModal) return;
     if (domCache.settingsModal.classList.contains('hidden')) {
@@ -4188,7 +4255,9 @@
   function openSettings() {
     initAudio();
     state.paused = true;
+    updatePauseBtnIcon();
     if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+    if (domCache.settingTouchControls) domCache.settingTouchControls.value = settings.touchControls || 'auto';
     if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
     if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
     if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
@@ -4198,6 +4267,11 @@
 
   function closeSettings() {
     if (domCache.settingInvertY) settings.invertY = domCache.settingInvertY.checked;
+    if (domCache.settingTouchControls) {
+      settings.touchControls = domCache.settingTouchControls.value;
+      Storage.set('flyby_touch_controls', settings.touchControls);
+      applyTouchControlsVisibility();
+    }
     if (domCache.settingInstruments) settings.showInstruments = domCache.settingInstruments.checked;
     if (domCache.settingScanlines) settings.scanlines = domCache.settingScanlines.checked;
     if (domCache.settingEngineSound) {
@@ -4224,6 +4298,7 @@
     if (domCache.settingsModal) domCache.settingsModal.classList.add('hidden');
     if (state.running && !state.gameOver) {
       state.paused = false;
+      updatePauseBtnIcon();
     }
   }
 
@@ -4235,6 +4310,16 @@
 
   const closeSettingsBtn = document.getElementById('close-settings-btn');
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
+
+  if (domCache.pauseBtn) {
+    domCache.pauseBtn.addEventListener('click', () => {
+      initAudio();
+      if (state.running && !state.gameOver) {
+        state.paused = !state.paused;
+        updatePauseBtnIcon();
+      }
+    });
+  }
 
   const startBtn = document.getElementById('start-btn');
   if (startBtn) {
@@ -4250,7 +4335,47 @@
     });
   }
 
+  // Bind On-Screen Touch Controls
+  if (domCache.touchBtnUp) {
+    bindTouchButton(
+      domCache.touchBtnUp,
+      () => { touchState.climb = true; },
+      () => { touchState.climb = false; }
+    );
+  }
+
+  if (domCache.touchBtnDown) {
+    bindTouchButton(
+      domCache.touchBtnDown,
+      () => { touchState.dive = true; },
+      () => { touchState.dive = false; }
+    );
+  }
+
+  if (domCache.touchBtnThrottle) {
+    bindTouchButton(
+      domCache.touchBtnThrottle,
+      () => { touchState.throttle = true; },
+      () => { touchState.throttle = false; }
+    );
+  }
+
+  // Device orientation hint check
+  function checkOrientation() {
+    if (!domCache.orientationHint) return;
+    const isPortrait = window.innerHeight > window.innerWidth && window.innerWidth < 850;
+    const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+    if (isPortrait && isTouch && state.running && !state.gameOver) {
+      domCache.orientationHint.classList.remove('hidden');
+    } else {
+      domCache.orientationHint.classList.add('hidden');
+    }
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
+
   // Initial setup
+  applyTouchControlsVisibility();
   initWorldCourse(1);
   updateHUD();
   requestAnimationFrame(gameLoop);

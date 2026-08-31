@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Fly By: Retro 8-bit biplane flight game. Pop balloons, dive barns, dodge airliners, and perform aerobatic stunt maneuvers!">
   <title>Fly By: Balloon Pop & Stunt Flight</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310141c'/%3E%3Crect x='6' y='14' width='20' height='4' fill='%232b7a78'/%3E%3Crect x='12' y='8' width='8' height='3' fill='%233aafa9'/%3E%3Crect x='14' y='11' width='4' height='3' fill='%23def2f1'/%3E%3Ccircle cx='24' cy='10' r='4' fill='%23ff3366'/%3E%3Cpath d='M24 14 L23 18' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E" type="image/svg+xml">
@@ -48,7 +48,10 @@
           <div id="fuel-bar" class="fuel-bar-fill"></div>
         </div>
       </div>
-      <button id="settings-btn" class="retro-btn icon-btn" title="Settings (ESC)">⚙</button>
+      <div class="hud-actions">
+        <button id="pause-btn" class="retro-btn icon-btn" title="Pause / Resume (P)">⏸</button>
+        <button id="settings-btn" class="retro-btn icon-btn" title="Settings (ESC)">⚙</button>
+      </div>
     </div>
 
     <!-- Alert Notification Center (Top/Center Overlay) -->
@@ -110,15 +113,36 @@
       </div>
     </div>
 
+    <!-- On-Screen Touch Controls (Mobile / Touchscreen) -->
+    <div id="touch-controls" class="touch-layer">
+      <div class="touch-cluster-left">
+        <button id="touch-btn-throttle" class="touch-btn throttle-btn" aria-label="Throttle / Brake">
+          <span class="touch-icon">⚡</span>
+          <span class="touch-label">THRUST</span>
+          <span class="touch-sublabel">HOLD=BRK</span>
+        </button>
+      </div>
+      <div class="touch-cluster-right">
+        <button id="touch-btn-up" class="touch-btn pitch-btn" aria-label="Climb / Pitch Up">
+          <span class="touch-icon">▲</span>
+          <span class="touch-label">CLIMB</span>
+        </button>
+        <button id="touch-btn-down" class="touch-btn pitch-btn" aria-label="Dive / Pitch Down">
+          <span class="touch-icon">▼</span>
+          <span class="touch-label">DIVE</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Title / Start Screen Overlay -->
     <div id="title-screen" class="overlay-screen">
       <div class="screen-card">
         <h1 class="pixel-title">FLY BY</h1>
         <div class="card-body">
           <ul class="briefing-list">
-            <li><span class="key-badge">▲</span> / <span class="key-badge">▼</span> or <span class="key-badge">W</span> / <span class="key-badge">S</span> : Pitch (Nose Up / Down)</li>
-            <li><span class="key-badge">SPACE</span> : Throttle / Brakes</li>
-            <li><span class="key-badge">P</span> : Pause &nbsp;|&nbsp; <span class="key-badge">M</span> : Mute &nbsp;|&nbsp; <span class="key-badge">ESC</span> : Settings</li>
+            <li><span class="key-badge">▲</span> / <span class="key-badge">▼</span> or <span class="key-badge">W</span> / <span class="key-badge">S</span> : Pitch (Climb / Dive)</li>
+            <li><span class="key-badge">SPACE</span> or <span class="key-badge">⚡</span> : Throttle / Brakes / Takeoff</li>
+            <li><span class="key-badge">P</span> / <span class="key-badge">⏸</span> : Pause &nbsp;|&nbsp; <span class="key-badge">M</span> : Mute &nbsp;|&nbsp; <span class="key-badge">ESC</span> : Settings</li>
           </ul>
           <div class="btn-row">
             <button id="start-btn" class="retro-btn primary-btn">START FLIGHT</button>
@@ -139,7 +163,7 @@
           <p>BALLOONS POPPED: <span id="final-popped" class="highlight-val">0</span></p>
           <p>NEAR MISSES: <span id="final-nearmisses" class="highlight-val">0</span></p>
           <p>MAX COMBO: <span id="final-combo" class="highlight-val">x1</span></p>
-          <button id="restart-btn" class="retro-btn primary-btn">FLY AGAIN (F)</button>
+          <button id="restart-btn" class="retro-btn primary-btn">FLY AGAIN</button>
         </div>
       </div>
     </div>
@@ -152,6 +176,14 @@
           <label class="setting-item">
             <span>Invert Y (Aviation Standard: Pull Back = Climb)</span>
             <input type="checkbox" id="setting-invert-y" checked>
+          </label>
+          <label class="setting-item">
+            <span>On-Screen Touch Controls</span>
+            <select id="setting-touch-controls" class="retro-select">
+              <option value="auto">Auto (Touch Devices)</option>
+              <option value="always">Always Show</option>
+              <option value="off">Off (Keyboard Only)</option>
+            </select>
           </label>
           <label class="setting-item">
             <span>Show Instrument Dashboard</span>
@@ -171,6 +203,14 @@
           </label>
         </div>
         <button id="close-settings-btn" class="retro-btn primary-btn">SAVE & RESUME</button>
+      </div>
+    </div>
+
+    <!-- Portrait Orientation Hint (Mobile) -->
+    <div id="orientation-hint" class="orientation-overlay hidden">
+      <div class="orientation-content">
+        <div class="rotate-icon">↺</div>
+        <p>Rotate to Landscape for optimal flight view</p>
       </div>
     </div>
 
