@@ -287,6 +287,25 @@ body {
   text-align: center;
 }
 
+.gauge-wind-box {
+  position: relative;
+  width: 34px;
+  height: 24px;
+  background: #080d14;
+  border: 1.5px solid #2d3b4e;
+  border-radius: 2px;
+  box-shadow: inset 0 0 6px #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#wind-gauge-canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
 .gauge-bar-track {
   position: relative;
   width: 20px;

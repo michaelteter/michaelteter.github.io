@@ -33,7 +33,8 @@
     invertY: true,         // Aviation default: Down Arrow / S = Pull Back (Climb)
     showInstruments: true, // Cockpit side bar gauges
     scanlines: true,       // CRT filter
-    engineSound: true      // Dynamic engine pitch & volume audio
+    engineSound: true,     // Dynamic engine pitch & volume audio
+    wind: true             // Atmospheric wind simulation & windsock dynamics
   };
 
   // --- GAME STATE ---
@@ -56,6 +57,65 @@
     shake: 0,
     bannerText: '',
     bannerTimer: 0
+  };
+
+  // --- LEVEL DIFFICULTY & PROGRESSION SCALING (+5% PER LEVEL) ---
+  function getLevelSpeedScale(wave = state.wave) {
+    return Math.pow(1.05, Math.max(0, (wave || 1) - 1));
+  }
+
+  function getLevelSpawnScale(wave = state.wave) {
+    return Math.pow(1.05, Math.max(0, (wave || 1) - 1));
+  }
+
+  // --- ATMOSPHERIC WIND SIMULATION ---
+  const wind = {
+    speed: 0,           // Current horizontal wind speed in px/s (+ = East/Right tailwind, - = West/Left headwind)
+    targetSpeed: 0,     // Target wind speed
+    changeTimer: 0,     // Time until next target change
+    changeInterval: 7,  // Interval between target selections (5-11 seconds)
+    accel: 4.0,         // Rate of change (px/s^2) for smooth, gradual rise and fall
+
+    reset() {
+      if (!settings.wind) {
+        this.speed = 0;
+        this.targetSpeed = 0;
+        this.changeTimer = 5;
+        return;
+      }
+      const diffScale = getLevelSpeedScale();
+      const maxWind = 168 * 0.20 * diffScale; // 20% of boosted cruise speed
+      this.speed = (Math.random() * 2 - 1) * (maxWind * 0.5);
+      this.targetSpeed = (Math.random() * 2 - 1) * maxWind;
+      this.changeInterval = 6 + Math.random() * 5;
+      this.changeTimer = this.changeInterval;
+    },
+
+    update(dt) {
+      if (!settings.wind) {
+        this.speed = 0;
+        this.targetSpeed = 0;
+        return;
+      }
+
+      const diffScale = getLevelSpeedScale();
+      this.changeTimer -= dt;
+      if (this.changeTimer <= 0) {
+        this.changeInterval = 5 + Math.random() * 6; // 5 to 11 seconds
+        this.changeTimer = this.changeInterval;
+        const maxWind = 168 * 0.20 * diffScale;
+        this.targetSpeed = (Math.random() * 2 - 1) * maxWind;
+      }
+
+      // Smooth gradual rise/fall towards target speed
+      const diff = this.targetSpeed - this.speed;
+      const step = (this.accel * diffScale) * dt;
+      if (Math.abs(diff) <= step) {
+        this.speed = this.targetSpeed;
+      } else {
+        this.speed += Math.sign(diff) * step;
+      }
+    }
   };
 
   // --- RETRO SOUND SYNTHESIZER (Web Audio API) ---
@@ -333,8 +393,8 @@
       return;
     }
 
-    const cruiseSpeed = plane.cruiseSpeed || 140;
-    const maxDive = plane.maxDiveSpeed || 330;
+    const cruiseSpeed = plane.cruiseSpeed || 168;
+    const maxDive = plane.maxDiveSpeed || 396;
     const cruiseRatio = cruiseSpeed / maxDive; // ~0.424
     const maxLevelPitch = 34 + cruiseRatio * 180; // ~110.4 Hz (max level flight pitch)
     const maxLevelFilter = 200 + cruiseRatio * 1250; // ~730 Hz
@@ -1200,34 +1260,43 @@
       this.stringSway = Math.random() * Math.PI * 2;
       this.popped = false;
 
-      // Color palettes
+      // Color palettes & Base point values
       if (type === 'red') {
         this.mainColor = '#e63946';
         this.highlightColor = '#ff858d';
-        this.points = 100;
+        this.basePoints = 100;
       } else if (type === 'blue') {
         this.mainColor = '#1d3557';
         this.highlightColor = '#457b9d';
-        this.points = 150;
+        this.basePoints = 150;
       } else if (type === 'green') {
         this.mainColor = '#2a9d8f';
         this.highlightColor = '#52b788';
-        this.points = 150;
+        this.basePoints = 150;
       } else if (type === 'gold') {
         this.mainColor = '#f4a261';
         this.highlightColor = '#ffe3a8';
-        this.points = 300;
+        this.basePoints = 300;
       } else if (type === 'rainbow') {
         this.mainColor = '#e76f51';
         this.highlightColor = '#ffffff';
-        this.points = 500;
+        this.basePoints = 500;
       }
+
+      // Altitude-dependent value scaling:
+      // Base value at lowest balloon altitude (y ~ 410), 2x value at highest balloon altitude (y ~ 40)
+      const LOWEST_BALLOON_ALT_Y = 410;
+      const HIGHEST_BALLOON_ALT_Y = 40;
+      const altProgress = Math.max(0, Math.min(1, (LOWEST_BALLOON_ALT_Y - this.baseY) / (LOWEST_BALLOON_ALT_Y - HIGHEST_BALLOON_ALT_Y)));
+      const altMultiplier = 1.0 + altProgress;
+      this.points = Math.round(this.basePoints * altMultiplier);
     }
 
     update(dt) {
       if (this.popped) return;
-      this.bobOffset += this.bobSpeed * dt;
-      this.stringSway += 3.0 * dt;
+      const diffScale = getLevelSpeedScale();
+      this.bobOffset += (this.bobSpeed * diffScale) * dt;
+      this.stringSway += (3.0 * diffScale) * dt;
       this.y = this.baseY + Math.sin(this.bobOffset) * 6;
     }
 
@@ -1317,7 +1386,22 @@
         playSound('stage_clear');
         const bonus = 1000 * (state.wave - 1);
         addScore(bonus);
-        showStatusBanner(`COURSE CLEARED! BONUS +${bonus} (SECTOR ${state.wave})`, 3.0, 'success');
+        const speedBonusPct = Math.round((getLevelSpeedScale(state.wave) - 1) * 100);
+        showStatusBanner(`COURSE CLEARED! BONUS +${bonus} (SECTOR ${state.wave} • SPEED +${speedBonusPct}%)`, 3.0, 'success');
+
+        // Dynamically scale player and active hazards to new wave difficulty
+        if (player && !player.isDead) {
+          player.applyLevelSpeedScale();
+        }
+        for (const al of airliners) {
+          al.applyLevelSpeedScale();
+        }
+        for (const sp of stuntPlanes) {
+          sp.applyLevelSpeedScale();
+        }
+        for (const bf of birdFlocks) {
+          bf.applyLevelSpeedScale();
+        }
       }
 
       // Boost player speed slightly on pop for satisfying chain flow
@@ -1382,6 +1466,7 @@
     constructor(x, type = 'barn') {
       this.x = x;
       this.type = type; // 'barn', 'house', 'windmill', 'silo_set', 'water_tower', 'church'
+      this.nearMissAwarded = false;
 
       if (type === 'barn') {
         this.width = 110;
@@ -1413,7 +1498,8 @@
 
     update(dt) {
       if (this.type === 'windmill') {
-        this.bladeAngle += 1.4 * dt; // Spinning windmill sails
+        const diffScale = getLevelSpeedScale();
+        this.bladeAngle += (1.4 * diffScale) * dt; // Spinning windmill sails
       }
     }
 
@@ -1698,11 +1784,13 @@
   // --- OBSTACLES: AIRLINERS (STEADY AIR TRAFFIC) ---
   class Airliner {
     constructor(x, y, speed = 90, direction = -1) {
+      const diffScale = getLevelSpeedScale();
       this.x = x;
       this.y = y;
-      this.speed = speed;
+      this.baseSpeed = speed;
+      this.speed = speed * diffScale;
       this.direction = direction; // -1 = West (Left), 1 = East (Right)
-      this.vx = speed * direction;
+      this.vx = this.speed * direction;
       this.width = 88;
       this.height = 24;
       this.contrailTimer = 0;
@@ -1716,12 +1804,21 @@
       this.crashSmokeTimer = 0;
     }
 
+    applyLevelSpeedScale() {
+      const diffScale = getLevelSpeedScale();
+      this.speed = this.baseSpeed * diffScale;
+      if (!this.isCrashing) {
+        this.vx = this.speed * this.direction;
+      }
+    }
+
     triggerCrash(hitX, hitY) {
       if (this.isCrashing || this.isDead) return;
+      const diffScale = getLevelSpeedScale();
       this.isCrashing = true;
       this.hasLostWing = true;
-      this.crashVy = 40;
-      this.crashRotSpeed = this.direction * 1.35; // Banks steeply towards the severed wing
+      this.crashVy = 40 * diffScale;
+      this.crashRotSpeed = this.direction * 1.35 * diffScale; // Banks steeply towards the severed wing
       playSound('wing_tear');
       createAirlinerWingDebris(this.x, this.y, this.direction);
       createExplosion(hitX || this.x, hitY || this.y, 35);
@@ -1729,10 +1826,11 @@
 
     update(dt) {
       if (this.isDead) return;
+      const diffScale = getLevelSpeedScale();
 
       if (this.isCrashing) {
         // Uncontrolled smoky banking dive
-        this.crashVy += 170 * dt;
+        this.crashVy += (170 * diffScale) * dt;
         this.crashAngle += this.crashRotSpeed * dt;
         this.x += this.vx * 0.95 * dt;
         this.y += this.crashVy * dt;
@@ -1868,18 +1966,25 @@
   // --- OBSTACLES: STUNT BIPLANES (ACROBATIC COMPETITORS) ---
   class StuntBiplane {
     constructor(x, y, pattern = 'loop') {
+      const diffScale = getLevelSpeedScale();
       this.x = x;
       this.y = y;
       this.pattern = pattern; // 'loop', 'wave'
       this.theta = Math.PI; // Heading West initially
-      this.airspeed = 122; // 30% reduced speed (was 175)
-      this.vx = -122;
+      this.baseAirspeed = 122; // Base speed
+      this.airspeed = 122 * diffScale;
+      this.vx = -this.airspeed;
       this.vy = 0;
       this.timer = Math.random() * Math.PI * 2;
       this.smokeTimer = 0;
       this.nearMissAwarded = false;
       this.isDead = false;
       this.ribbonColor = pattern === 'loop' ? 'rgba(255, 60, 180,' : 'rgba(0, 220, 255,';
+    }
+
+    applyLevelSpeedScale() {
+      const diffScale = getLevelSpeedScale();
+      this.airspeed = this.baseAirspeed * diffScale;
     }
 
     explode() {
@@ -1891,11 +1996,12 @@
 
     update(dt) {
       if (this.isDead) return;
-      this.timer += 1.25 * dt;
+      const diffScale = getLevelSpeedScale();
+      this.timer += (1.25 * diffScale) * dt;
 
       if (this.pattern === 'loop') {
         // Continuous giant loop-the-loop maneuver
-        this.theta += 1.30 * dt;
+        this.theta += (1.30 * diffScale) * dt;
         this.vx = Math.cos(this.theta) * this.airspeed;
         this.vy = -Math.sin(this.theta) * this.airspeed;
       } else if (this.pattern === 'wave') {
@@ -1952,11 +2058,14 @@
   // --- BIRD FLOCK PARTICLES & OBSTACLES ---
   class BirdFlock {
     constructor(x, y, count = 5) {
+      const diffScale = getLevelSpeedScale();
       this.x = x;
       this.y = y;
       this.count = count;
-      this.speed = 45 + Math.random() * 20;
+      this.baseSpeed = 45 + Math.random() * 20;
+      this.speed = this.baseSpeed * diffScale;
       this.vx = -this.speed;
+      this.nearMissAwarded = false;
       this.birds = [];
       for (let i = 0; i < count; i++) {
         this.birds.push({
@@ -1967,10 +2076,17 @@
       }
     }
 
+    applyLevelSpeedScale() {
+      const diffScale = getLevelSpeedScale();
+      this.speed = this.baseSpeed * diffScale;
+      this.vx = -this.speed;
+    }
+
     update(dt) {
+      const diffScale = getLevelSpeedScale();
       this.x += this.vx * dt;
       for (const b of this.birds) {
-        b.flapTimer += 8.0 * dt;
+        b.flapTimer += (8.0 * diffScale) * dt;
       }
     }
 
@@ -2015,19 +2131,10 @@
 
       // Flight Vector & Orientation (0 = right, PI = left)
       this.theta = 0;
-      this.airspeed = 140;
-      this.vx = 140;
+      this.initAeroStats();
+      this.airspeed = this.cruiseSpeed;
+      this.vx = this.cruiseSpeed;
       this.vy = 0;
-
-      // Aerodynamics & Energy Speeds
-      this.cruiseSpeed = 140;   // Base unboosted level flight speed
-      this.maxLevelSpeed = 195; // Max level flight speed achievable under boost
-      this.maxDiveSpeed = 330;  // Terminal dive velocity achievable in power dive
-      this.maxSpeed = 330;      // Hard speed ceiling
-      this.stallSpeed = 52;
-      this.recoverSpeed = 77;
-      this.minSpeed = 20;
-      this.pitchRate = 2.85;
 
       // Flight State
       this.stalled = false;
@@ -2046,6 +2153,7 @@
       this.boostTimer = 0;
       this.propAngle = 0;
       this.invulnerableTimer = 2.5; // Safe spawn grace period
+      this.canGroundNearMiss = false; // Armed once plane climbs to safe altitude
 
       // Runway service, refueling & takeoff roll states
       this.stopTimer = 0;
@@ -2070,8 +2178,33 @@
       this.missingTail = false;
     }
 
+    initAeroStats() {
+      const diffScale = getLevelSpeedScale();
+      // Aerodynamics & Energy Speeds (Boosted +20% base, scaled +5% per level)
+      this.cruiseSpeed = 168 * diffScale;   // Base unboosted level flight speed (+20% from 140) * diffScale
+      this.maxLevelSpeed = 234 * diffScale; // Max level flight speed achievable under boost * diffScale
+      this.maxDiveSpeed = 396 * diffScale;  // Terminal dive velocity achievable in power dive * diffScale
+      this.maxSpeed = 396 * diffScale;      // Hard speed ceiling * diffScale
+      this.stallSpeed = 52 * diffScale;
+      this.recoverSpeed = 82 * diffScale;
+      this.minSpeed = 20 * diffScale;
+      this.pitchRate = 2.85 * diffScale;
+    }
+
+    applyLevelSpeedScale() {
+      const prevCruise = this.cruiseSpeed || 168;
+      this.initAeroStats();
+      const ratio = this.cruiseSpeed / prevCruise;
+      if (!this.onGround && !this.isWobblingCrash) {
+        this.airspeed = Math.max(this.minSpeed, this.airspeed * ratio);
+        this.vx *= ratio;
+        this.vy *= ratio;
+      }
+    }
+
     get flightAngle() {
-      return Math.atan2(-this.vy, this.vx);
+      const wSpeed = settings.wind ? wind.speed : 0;
+      return Math.atan2(-this.vy, this.vx - wSpeed);
     }
 
     get angleOfAttack() {
@@ -2090,7 +2223,7 @@
       this.missingTail = true;
       this.engineFailed = true;
       this.fuel = 0;
-      this.airspeed = Math.min(this.airspeed, 110);
+      this.airspeed = Math.min(this.airspeed, 110 * getLevelSpeedScale());
 
       playSound('bird_strike');
       playSound('wing_tear');
@@ -2138,6 +2271,9 @@
         this.invulnerableTimer -= dt;
       }
 
+      const diffScale = getLevelSpeedScale();
+      const wSpeed = settings.wind ? wind.speed : 0;
+
       // Edge-triggered spacebar press detection
       const spacePressed = (input.space || input.boost);
       const spaceJustPressed = spacePressed && !this.lastSpaceState;
@@ -2165,10 +2301,11 @@
         while (this.theta > Math.PI) this.theta -= Math.PI * 2;
         while (this.theta < -Math.PI) this.theta += Math.PI * 2;
 
-        // Ballistic fall with gravity and drag (exponential damping)
-        this.vy += 135 * dt;
-        this.vx *= Math.exp(-0.18 * dt);
-        this.airspeed = Math.hypot(this.vx, this.vy);
+        // Ballistic fall with gravity and drag (exponential damping towards ambient air)
+        this.vy += (135 * diffScale) * dt;
+        const relVx = this.vx - wSpeed;
+        this.vx = wSpeed + relVx * Math.exp(-0.18 * dt);
+        this.airspeed = Math.hypot(this.vx - wSpeed, this.vy);
 
         this.x += this.vx * dt;
         this.y += this.vy * dt;
@@ -2232,7 +2369,7 @@
         this.y = groundContactY;
 
         const pitchSin = Math.abs(Math.sin(this.theta));
-        const gentleDescent = this.vy <= 75;
+        const gentleDescent = this.vy <= (75 * diffScale);
         const levelAttitude = pitchSin < 0.38;
 
         if (levelAttitude && gentleDescent) {
@@ -2272,8 +2409,8 @@
             }
 
             if (!this.throttleUp) {
-              this.airspeed = 0;
               this.vx = 0;
+              this.airspeed = Math.abs(wSpeed); // Ground airspeed reading from wind
               this.rpm = 0.2;
               if (this.fuel < this.maxFuel) {
                 const fuelPct = Math.round((this.fuel / this.maxFuel) * 100);
@@ -2290,17 +2427,17 @@
             // Engine spools up rapidly to max RPM (max level flight sound)
             this.rpm = Math.min(1.0, this.rpm + 2.0 * dt);
 
-            // Plane accelerates pretty quickly up to a max of 75% of level flight speed (0.75 * 140 = 105)
+            // Accelerate ground speed up to max ground speed
             const maxGroundSpeed = this.cruiseSpeed * 0.75;
-            const groundAccel = 110;
-            this.airspeed = Math.min(maxGroundSpeed, this.airspeed + groundAccel * dt);
-            this.vx = this.airspeed;
+            const groundAccel = 110 * diffScale;
+            this.vx = Math.min(maxGroundSpeed, (this.vx || 0) + groundAccel * dt);
+            this.airspeed = Math.max(0, this.vx - wSpeed);
             this.x += this.vx * dt;
 
             showStatusBanner(`FULL THROTTLE! AIRSPEED: ${Math.round(this.airspeed)} - PULL UP TO CLIMB`, 0.2, 'info');
 
-            // Liftoff when reaching speed and pilot pulls back (or automatically when exceeding max ground speed)
-            if (this.airspeed >= 70 && (input.pitchUp || this.airspeed >= maxGroundSpeed)) {
+            // Liftoff when reaching wing airspeed >= 70 * diffScale
+            if (this.airspeed >= (70 * diffScale) && (input.pitchUp || this.vx >= maxGroundSpeed)) {
               this.onGround = false;
               this.isParkedForService = false;
               this.throttleUp = false;
@@ -2308,7 +2445,7 @@
               this.isBraking = false;
               this.isIdle = false;
               this.takeoffTimer = 1.0;
-              this.vy = -32;
+              this.vy = -32 * diffScale;
               this.y -= 6;
               showStatusBanner('AIRBORNE! MAX THROTTLE', 2.0, 'success');
             }
@@ -2320,26 +2457,27 @@
           if (spacePressed) {
             this.isBraking = true;
             // Strong brake deceleration
-            this.airspeed = Math.max(0, this.airspeed - 130 * dt);
-            if (Math.random() < 0.35 && this.airspeed > 15) {
+            this.vx = Math.max(0, this.vx - (130 * diffScale) * dt);
+            if (Math.random() < 0.35 && this.vx > 15) {
               createSmokePuff(this.x - 8, groundContactY + 6, -this.vx * 0.2, -10, 2.5, 'rgba(210,210,210,');
             }
+            this.airspeed = Math.max(0, this.vx - wSpeed);
             showStatusBanner(`BRAKING... AIRSPEED: ${Math.round(this.airspeed)}`, 0.2, 'info');
           } else {
             this.isBraking = false;
             // Gentle rolling friction deceleration
-            const rollFriction = currentRunway ? 50 : 40;
-            this.airspeed = Math.max(0, this.airspeed - rollFriction * dt);
+            const rollFriction = (currentRunway ? 50 : 40) * diffScale;
+            this.vx = Math.max(0, this.vx - rollFriction * dt);
+            this.airspeed = Math.max(0, this.vx - wSpeed);
             showStatusBanner('LANDED. HOLD SPACE TO BRAKE', 0.2, 'info');
           }
 
-          this.vx = this.airspeed;
           this.x += this.vx * dt;
 
           // Check if speed has reached zero / stopped
-          if (this.airspeed <= 2.0) {
-            this.airspeed = 0;
+          if (this.vx <= 2.0) {
             this.vx = 0;
+            this.airspeed = Math.abs(wSpeed);
             this.isBraking = false;
             this.isStopped = true;
             this.throttleUp = false;
@@ -2368,6 +2506,11 @@
         this.stopTimer = 0;
       }
 
+      // Arm ground near miss when flying safely above low altitude
+      if (this.y < GROUND_Y - 55 && !this.onGround) {
+        this.canGroundNearMiss = true;
+      }
+
       // Decay takeoffTimer when airborne to smoothly settle into normal flight acoustics
       if (this.takeoffTimer > 0) {
         this.takeoffTimer = Math.max(0, this.takeoffTimer - 0.7 * dt);
@@ -2387,7 +2530,6 @@
       const fuelBurnRate = this.isIdle ? 0.15 : 0.7;
       this.fuel = Math.max(0, this.fuel - fuelBurnRate * dt);
       this.boostTimer = 0;
-      const isBoosting = false;
       const hasThrust = this.fuel > 0;
 
       // 4. Pitch Controls
@@ -2410,50 +2552,68 @@
       const noseY = -pitchSin;
 
       if (!this.stalled) {
-        // Angle of Attack (AoA): angle between aircraft nose and true flight velocity vector
+        // Angle of Attack (AoA): angle between aircraft nose and true relative air velocity vector
         const aoa = Math.abs(this.angleOfAttack);
 
-        // Critical AoA threshold (~37° - 40°): exceeding this triggers an aerodynamic stall
-        const criticalAoA = 0.65; // ~37.2 degrees
+        // Critical AoA threshold (~37.2 degrees): tolerant to digital keyboard full-stick inputs
+        const criticalAoA = 0.65;
         const isExceedingAoA = aoa >= criticalAoA;
 
         // Progressive AoA induced drag: increases quadratically as AoA approaches critical limit
         const aoaRatio = Math.min(1.5, aoa / criticalAoA);
-        const aoaDrag = Math.pow(aoaRatio, 2) * 55;
+        const aoaDrag = Math.pow(aoaRatio, 2) * (45 * diffScale);
 
         // Gravitational acceleration / deceleration:
-        // Dives accelerate strongly (+175), while climbs bleed airspeed at a brisk rate (-125)
-        const gravityAccel = pitchSin < 0 ? (-pitchSin * 175) : (-pitchSin * 125);
+        // Dives accelerate powerfully (+330), while climbs bleed airspeed at a balanced rate (-205)
+        const gravityAccel = (pitchSin < 0 ? (-pitchSin * 330) : (-pitchSin * 205)) * diffScale;
 
-        // Level flight & climb engine thrust equilibrium:
-        const targetLevelSpeed = this.isIdle ? 30 : this.cruiseSpeed;
-        const thrustResponse = (hasThrust && !this.isIdle) ? (this.airspeed < targetLevelSpeed ? 0.85 : 0.6) : 0.25;
-        const levelDrag = (targetLevelSpeed - this.airspeed) * thrustResponse;
-
-        // Transonic / terminal dive drag (resists exceeding maxDiveSpeed in steep dives)
-        let highSpeedDrag = 0;
-        if (this.airspeed > this.maxLevelSpeed) {
-          const excess = (this.airspeed - this.maxLevelSpeed) / (this.maxDiveSpeed - this.maxLevelSpeed);
-          highSpeedDrag = Math.pow(Math.max(0, excess), 2) * 200;
+        // Level flight, dive, and climb engine thrust equilibrium:
+        let engineThrustDrag = 0;
+        if (pitchSin < 0) {
+          // In a power dive: engine provides forward pull, without braking against gravity
+          const idlePenalty = this.isIdle ? (-45 * diffScale) : 0;
+          let highSpeedDrag = 0;
+          if (this.airspeed > this.maxLevelSpeed) {
+            const excess = (this.airspeed - this.maxLevelSpeed) / (this.maxDiveSpeed - this.maxLevelSpeed);
+            highSpeedDrag = Math.pow(Math.max(0, excess), 2) * (240 * diffScale);
+          }
+          engineThrustDrag = (hasThrust && !this.isIdle ? (40 * diffScale) : 0) + idlePenalty - highSpeedDrag;
+        } else {
+          // In level flight or climb: engine thrust capability drops with climb steepness
+          const climbPenalty = pitchSin * (125 * diffScale);
+          const targetLevelSpeed = this.isIdle ? (30 * diffScale) : Math.max(25 * diffScale, this.cruiseSpeed - climbPenalty);
+          const thrustResponse = (hasThrust && !this.isIdle) ? (this.airspeed < targetLevelSpeed ? 0.85 : 0.65) : 0.30;
+          const enginePenalty = (!hasThrust || this.isIdle) ? (-35 * diffScale) : 0;
+          let highSpeedDrag = 0;
+          if (this.airspeed > this.maxLevelSpeed) {
+            const excess = (this.airspeed - this.maxLevelSpeed) / (this.maxDiveSpeed - this.maxLevelSpeed);
+            highSpeedDrag = Math.pow(Math.max(0, excess), 2) * (200 * diffScale);
+          }
+          engineThrustDrag = (targetLevelSpeed - this.airspeed) * thrustResponse + enginePenalty - highSpeedDrag;
         }
 
-        // Engine unpowered penalty if out of fuel or in idle
-        const enginePenalty = (!hasThrust || this.isIdle) ? -35 : 0;
-
-        const dAirspeed = (gravityAccel + levelDrag + enginePenalty - aoaDrag - highSpeedDrag) * dt;
+        const dAirspeed = (gravityAccel + engineThrustDrag - aoaDrag) * dt;
         this.airspeed = Math.max(this.minSpeed, Math.min(this.maxDiveSpeed, this.airspeed + dAirspeed));
 
-        const targetVx = noseX * this.airspeed;
-        const targetVy = noseY * this.airspeed;
+        // Aerodynamic forces project relative to the ambient air mass:
+        const targetAirVx = noseX * this.airspeed;
+        const targetAirVy = noseY * this.airspeed;
 
-        // Frame-rate independent velocity response
-        const responsiveness = 1 - Math.exp(-11.0 * dt);
-        this.vx += (targetVx - this.vx) * responsiveness;
-        this.vy += (targetVy - this.vy) * responsiveness;
+        // Ground velocity target = air velocity + horizontal wind
+        const targetGroundVx = targetAirVx + wSpeed;
+        const targetGroundVy = targetAirVy;
+
+        // Aerodynamic velocity inertia: tuned for clean digital keyboard controls
+        const responsiveness = 1 - Math.exp(-9.0 * dt);
+        this.vx += (targetGroundVx - this.vx) * responsiveness;
+        this.vy += (targetGroundVy - this.vy) * responsiveness;
+
+        // Recompute true airspeed relative to air mass
+        this.airspeed = Math.hypot(this.vx - wSpeed, this.vy);
 
         // Stall conditions:
         // 1. Low airspeed stall (airspeed < stallSpeed)
-        // 2. Critical AoA stall (AoA >= criticalAoA ~37°-40°)
+        // 2. Critical AoA stall (AoA >= criticalAoA ~37.2°)
         if (this.airspeed < this.stallSpeed || isExceedingAoA) {
           this.stalled = true;
         }
@@ -2461,9 +2621,12 @@
       } else {
         // Stalled ballistic fall with frame-rate independent drag & orientation alignment
         this.stallTime = (this.stallTime || 0) + dt;
-        this.vy += 135 * dt;
-        this.vx *= Math.exp(-0.25 * dt);
-        this.airspeed = Math.hypot(this.vx, this.vy);
+        this.vy += (135 * diffScale) * dt;
+
+        // Air drag damps relative horizontal air velocity toward 0 (drifting with wind)
+        const relAirVx = this.vx - wSpeed;
+        this.vx = wSpeed + relAirVx * Math.exp(-0.25 * dt);
+        this.airspeed = Math.hypot(this.vx - wSpeed, this.vy);
 
         const fallAngle = this.flightAngle;
         let angleDiff = fallAngle - this.theta;
@@ -2471,7 +2634,7 @@
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
         this.theta += angleDiff * (1 - Math.exp(-2.2 * dt));
 
-        // Stall recovery: point nose down with velocity vector and build airspeed past recoverSpeed
+        // Stall recovery: point nose down with relative velocity vector and build airspeed past recoverSpeed
         const aoa = Math.abs(this.angleOfAttack);
         if (aoa < 0.40 && this.airspeed > this.recoverSpeed) {
           this.stalled = false;
@@ -2494,7 +2657,7 @@
         if (this.vy < 0) this.vy = 0;
         // Pushing nose up against the ceiling bleeds airspeed and triggers a stall
         if (pitchSin > 0.20) {
-          this.airspeed = Math.max(this.minSpeed, this.airspeed - 135 * dt);
+          this.airspeed = Math.max(this.minSpeed, this.airspeed - (135 * diffScale) * dt);
           if (this.airspeed < this.stallSpeed || Math.abs(this.angleOfAttack) > 0.45) {
             this.stalled = true;
           }
@@ -2625,7 +2788,7 @@
       this.length = length;
       this.endX = startX + length;
       this.hangarX = startX - 50;
-      this.windsockX = this.endX + 20;
+      this.windsockX = startX - 29; // Positioned on top of hangar (hangarX + 21)
     }
   }
 
@@ -2805,8 +2968,10 @@
     const targetStuntPlanes = Math.min(1 + Math.floor((state.wave - 1) / 2), 3);
     const targetBirdFlocks = Math.min(2 + Math.floor(state.wave / 2), 4);
 
+    const spawnScale = getLevelSpawnScale();
+
     // Spawn airliners ahead/east of player (strictly right-to-left flight)
-    if (airliners.length < targetAirliners && Math.random() < 0.05) {
+    if (airliners.length < targetAirliners && Math.random() < (0.05 * spawnScale)) {
       const dir = -1;
       const spawnX = player.x + 950 + Math.random() * 500;
       const spawnY = 80 + Math.random() * 150;
@@ -2814,7 +2979,7 @@
     }
 
     // Spawn stunt biplanes ahead of player
-    if (stuntPlanes.length < targetStuntPlanes && Math.random() < 0.04) {
+    if (stuntPlanes.length < targetStuntPlanes && Math.random() < (0.04 * spawnScale)) {
       const dir = player.vx >= 0 ? -1 : 1;
       const spawnX = player.x + (dir === -1 ? 1100 + Math.random() * 600 : -1100 - Math.random() * 600);
       const spawnY = 140 + Math.random() * 120;
@@ -2823,7 +2988,7 @@
     }
 
     // Spawn bird flocks ahead of player
-    if (birdFlocks.length < targetBirdFlocks && Math.random() < 0.05) {
+    if (birdFlocks.length < targetBirdFlocks && Math.random() < (0.05 * spawnScale)) {
       const dir = player.vx >= 0 ? -1 : 1;
       const spawnX = player.x + (dir === -1 ? 850 + Math.random() * 450 : -850 - Math.random() * 450);
       const spawnY = 120 + Math.random() * 180;
@@ -2832,6 +2997,7 @@
   }
 
   function initWorldCourse(wave = 1) {
+    state.wave = wave;
     worldSeed = Math.floor(Math.random() * 1000000) + 1;
     generatedChunks.clear();
     poppedBalloonKeys.clear();
@@ -2846,9 +3012,12 @@
     state.lastPoppedX = null;
     state.lastPoppedId = null;
 
+    wind.reset();
     player = new PlayerPlane(80, 220);
     ensureChunksGenerated(player.x);
-    showStatusBanner(`COURSE ${wave}: FLY BY BALLOONS & BARNS!`, 3.0, 'info');
+    const speedBonusPct = Math.round((getLevelSpeedScale(wave) - 1) * 100);
+    const speedNotice = wave > 1 ? ` (SPEED +${speedBonusPct}%)` : '';
+    showStatusBanner(`COURSE ${wave}: FLY BY BALLOONS & BARNS!${speedNotice}`, 3.0, 'info');
   }
 
   function addScore(pts) {
@@ -2871,13 +3040,25 @@
     }
   }
 
-  function triggerNearMiss(targetX, targetY, typeName, points) {
+  function triggerNearMiss(targetX, targetY, typeName, basePoints, hVx = 0, hVy = 0) {
+    const pVx = player ? player.vx : 0;
+    const pVy = player ? player.vy : 0;
+    const relVx = pVx - hVx;
+    const relVy = pVy - hVy;
+    const relSpeed = Math.hypot(relVx, relVy);
+
+    // Velocity delta multiplier based on relative speed (base cruise reference: 150 px/s)
+    const speedMult = Math.max(1.0, relSpeed / 150);
+    const points = Math.round(basePoints * speedMult);
+
     addScore(points);
     state.nearMisses = (state.nearMisses || 0) + 1;
     const midX = (player.x + targetX) / 2;
     const midY = (player.y + targetY) / 2;
-    addFloatingText(midX, midY - 14, `+${points} NEAR MISS!`, '#00ffff', 11);
-    showStatusBanner(`★ DARING NEAR MISS! +${points} (${typeName}) ★`, 1.8, 'bonus');
+    const speedNotice = speedMult > 1.05 ? ` (${speedMult.toFixed(1)}X SPD)` : '';
+
+    addFloatingText(midX, midY - 14, `+${points} NEAR MISS!${speedNotice}`, '#00ffff', 11);
+    showStatusBanner(`★ DARING NEAR MISS! +${points} (${typeName}${speedNotice}) ★`, 1.8, 'bonus');
     playSound('near_miss');
     createNearMissBurst(midX, midY);
     state.shake = Math.min(state.shake + 3.5, 7);
@@ -2886,6 +3067,14 @@
   // --- COLLISION DETECTION ---
   function checkCollisions() {
     if (player.isDead) return;
+
+    // 0. Player vs Ground Near Miss (Buzzing the deck at high speed)
+    if (!player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+      if (player.canGroundNearMiss && player.y >= GROUND_Y - 32 && player.airspeed >= 50) {
+        player.canGroundNearMiss = false;
+        triggerNearMiss(player.x, GROUND_Y, 'GROUND', 150, 0, 0);
+      }
+    }
 
     // 1. Player vs Balloons (Pop!)
     for (const b of balloons) {
@@ -2911,6 +3100,22 @@
         const structName = names[s.type] || 'STRUCTURE';
         showStatusBanner(`COLLIDED WITH ${structName}!`, 2.0, 'danger');
         return;
+      } else if (!s.nearMissAwarded && !player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        const inNearX = (player.x >= s.x - 25 && player.x <= s.x + s.width + 25);
+        const inNearY = (player.y >= s.y - 28 && player.y <= s.y + 12);
+        if (inNearX && inNearY) {
+          s.nearMissAwarded = true;
+          const names = {
+            barn: 'BARN',
+            house: 'HOUSE',
+            windmill: 'WINDMILL',
+            silo_set: 'SILO',
+            water_tower: 'WATER TOWER',
+            church: 'CHURCH'
+          };
+          const structName = names[s.type] || 'STRUCTURE';
+          triggerNearMiss(s.x + s.width / 2, s.y, structName, 200, 0, 0);
+        }
       }
     }
 
@@ -2927,7 +3132,7 @@
           const dy = Math.abs(player.y - al.y);
           if (dx < 75 && dy < 38) {
             al.nearMissAwarded = true;
-            triggerNearMiss(al.x, al.y, 'AIRLINER', 300);
+            triggerNearMiss(al.x, al.y, 'AIRLINER', 300, al.vx, al.isCrashing ? al.crashVy : 0);
           }
         }
       }
@@ -2947,7 +3152,7 @@
           const dist = Math.hypot(player.x - sp.x, player.y - sp.y);
           if (dist < 56) {
             sp.nearMissAwarded = true;
-            triggerNearMiss(sp.x, sp.y, 'BIPLANE', 200);
+            triggerNearMiss(sp.x, sp.y, 'BIPLANE', 200, sp.vx, sp.vy);
           }
         }
       }
@@ -2958,6 +3163,12 @@
       if (bf.checkCollision(player)) {
         player.triggerBirdStrike();
         return;
+      } else if (!bf.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        const dist = Math.hypot(player.x - bf.x, player.y - bf.y);
+        if (dist < 52) {
+          bf.nearMissAwarded = true;
+          triggerNearMiss(bf.x, bf.y, 'BIRDS', 150, bf.vx, 0);
+        }
       }
     }
   }
@@ -3017,8 +3228,9 @@
     ctx.fill();
 
     // 5. Fluffy Pixel Clouds (Continuous streaming)
+    const diffScale = getLevelSpeedScale();
     for (const cloud of clouds) {
-      cloud.x += cloud.speed * 0.016;
+      cloud.x += (cloud.speed * diffScale) * 0.016;
       while (cloud.x < camX - 300) cloud.x += GAME_WIDTH + 600;
       while (cloud.x > camX + GAME_WIDTH + 300) cloud.x -= GAME_WIDTH + 600;
 
@@ -3075,14 +3287,73 @@
       ctx.fillStyle = '#9e2a2b';
       ctx.fillRect(hangarX - 2, GROUND_Y - 32, 46, 5);
 
-      // Windsock
-      const windsockX = af.windsockX - camX;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(windsockX, GROUND_Y - 24, 2, 24);
-      ctx.fillStyle = '#e63946';
-      ctx.fillRect(windsockX + 2, GROUND_Y - 22, 14, 6);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(windsockX + 6, GROUND_Y - 22, 4, 6);
+      // Windsock on top of Hangar Roof (Not a collision hazard)
+      const mastX = hangarX + 21;
+      const roofY = GROUND_Y - 32;
+      const mastTopY = roofY - 14;
+
+      // Mast pole & swivel pivot finial
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(mastX - 1, mastTopY, 2, 14);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(mastX - 2, mastTopY - 2, 4, 3); // Pivot cap
+
+      // Dynamic windsock cloth inflation & deflection
+      const currentWind = settings.wind ? wind.speed : 0;
+      const maxWind = 33.6; // 20% of boosted cruising speed 168
+      const windRatio = currentWind / maxWind;
+      const windMag = Math.min(1.0, Math.abs(windRatio));
+      const windDir = windRatio >= 0 ? 1 : -1;
+
+      // Cloth droop angle: At 0 wind, droops down steeply (~75° from horizontal).
+      // At max wind (windMag = 1), dynamic lift raises it to near horizontal (~8° from horizontal).
+      const droopAngle = (Math.PI / 2) * (1 - Math.pow(windMag, 0.75) * 0.91);
+      const timeMs = Date.now();
+      const flutter = Math.sin(timeMs * 0.012 + af.startX * 0.05) * 1.8 * windMag;
+      const flutter2 = Math.cos(timeMs * 0.016 + af.startX * 0.05) * 1.2 * windMag;
+
+      const sockLength = 17;
+      const numSegments = 4;
+      const bandColors = ['#e63946', '#ffffff', '#e63946', '#ffffff'];
+
+      // Generate cross-section points along the windsock cone
+      const pts = [];
+      for (let i = 0; i <= numSegments; i++) {
+        const s = i / numSegments;
+        const curAngle = droopAngle + (s * flutter * 0.08);
+        const px = mastX + windDir * s * sockLength * Math.cos(curAngle) + (s * s * flutter * windDir);
+        const py = mastTopY + 2 + s * sockLength * Math.sin(curAngle) + (s * s * flutter2);
+        const halfWidth = 3.2 - s * 1.7; // Tapers from 3.2 to 1.5
+        const normX = -Math.sin(curAngle) * halfWidth;
+        const normY = Math.cos(curAngle) * halfWidth;
+
+        pts.push({
+          topX: px + normX,
+          topY: py + normY,
+          botX: px - normX,
+          botY: py - normY
+        });
+      }
+
+      // Draw striped tapered cone segments
+      for (let i = 0; i < numSegments; i++) {
+        ctx.fillStyle = bandColors[i];
+        ctx.beginPath();
+        ctx.moveTo(pts[i].topX, pts[i].topY);
+        ctx.lineTo(pts[i + 1].topX, pts[i + 1].topY);
+        ctx.lineTo(pts[i + 1].botX, pts[i + 1].botY);
+        ctx.lineTo(pts[i].botX, pts[i].botY);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Dark throat ring / opening
+      ctx.strokeStyle = '#212529';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].topX, pts[0].topY);
+      ctx.lineTo(pts[0].botX, pts[0].botY);
+      ctx.stroke();
     }
   }
 
@@ -3117,6 +3388,8 @@
     valAoa: document.getElementById('val-aoa'),
     barThr: document.getElementById('bar-thr'),
     valThr: document.getElementById('val-thr'),
+    windGaugeCanvas: document.getElementById('wind-gauge-canvas'),
+    valWind: document.getElementById('val-wind'),
     instrumentPanel: document.getElementById('instrument-panel'),
     crtOverlay: document.getElementById('crt-overlay'),
     // Screens & Overlays
@@ -3132,8 +3405,11 @@
     settingInvertY: document.getElementById('setting-invert-y'),
     settingInstruments: document.getElementById('setting-instruments'),
     settingScanlines: document.getElementById('setting-scanlines'),
-    settingEngineSound: document.getElementById('setting-engine-sound')
+    settingEngineSound: document.getElementById('setting-engine-sound'),
+    settingWind: document.getElementById('setting-wind')
   };
+
+  let windGaugeCtx = null;
 
   // --- DIRTY-CHECKING STATE TRACKERS ---
   const hudDirty = {
@@ -3150,6 +3426,7 @@
   };
 
   const gaugeDirty = {
+    windText: '',
     spdRatio: -1,
     spdVal: -1,
     altRatio: -1,
@@ -3169,10 +3446,90 @@
   function updateInstruments() {
     if (!settings.showInstruments || !player) return;
 
+    // 0. WIND (Mini Windsock)
+    if (domCache.windGaugeCanvas) {
+      if (!windGaugeCtx) {
+        windGaugeCtx = domCache.windGaugeCanvas.getContext('2d');
+      }
+      if (windGaugeCtx) {
+        const currentWind = settings.wind ? wind.speed : 0;
+        const roundedWind = Math.round(Math.abs(currentWind));
+        const dirSym = currentWind > 1.5 ? '▶' : (currentWind < -1.5 ? '◀' : '');
+        const windText = dirSym ? `${dirSym}${roundedWind}` : `${roundedWind}`;
+
+        if (windText !== gaugeDirty.windText && domCache.valWind) {
+          domCache.valWind.textContent = windText;
+          gaugeDirty.windText = windText;
+        }
+
+        // Draw animated mini windsock on gauge canvas (34 x 24)
+        windGaugeCtx.clearRect(0, 0, 34, 24);
+
+        // Mast pole & finial
+        const mastX = 17;
+        const mastTopY = 4;
+        windGaugeCtx.fillStyle = '#adb5bd';
+        windGaugeCtx.fillRect(mastX - 1, mastTopY, 2, 17);
+        windGaugeCtx.fillStyle = '#ffd166';
+        windGaugeCtx.fillRect(mastX - 2, mastTopY - 1, 4, 2);
+
+        // Dynamic mini windsock
+        const maxWind = 33.6; // 20% of boosted cruising speed 168
+        const windRatio = currentWind / maxWind;
+        const windMag = Math.min(1.0, Math.abs(windRatio));
+        const windDir = windRatio >= 0 ? 1 : -1;
+
+        const droopAngle = (Math.PI / 2) * (1 - Math.pow(windMag, 0.75) * 0.88);
+        const timeMs = Date.now();
+        const flutter = Math.sin(timeMs * 0.012) * 1.3 * windMag;
+        const flutter2 = Math.cos(timeMs * 0.016) * 0.9 * windMag;
+
+        const sockLength = 13;
+        const numSegments = 4;
+        const bandColors = ['#e63946', '#ffffff', '#e63946', '#ffffff'];
+
+        const pts = [];
+        for (let i = 0; i <= numSegments; i++) {
+          const s = i / numSegments;
+          const curAngle = droopAngle + (s * flutter * 0.08);
+          const px = mastX + windDir * s * sockLength * Math.cos(curAngle) + (s * s * flutter * windDir);
+          const py = mastTopY + 2 + s * sockLength * Math.sin(curAngle) + (s * s * flutter2);
+          const halfWidth = 2.4 - s * 1.2;
+          const normX = -Math.sin(curAngle) * halfWidth;
+          const normY = Math.cos(curAngle) * halfWidth;
+
+          pts.push({
+            topX: px + normX,
+            topY: py + normY,
+            botX: px - normX,
+            botY: py - normY
+          });
+        }
+
+        for (let i = 0; i < numSegments; i++) {
+          windGaugeCtx.fillStyle = bandColors[i];
+          windGaugeCtx.beginPath();
+          windGaugeCtx.moveTo(pts[i].topX, pts[i].topY);
+          windGaugeCtx.lineTo(pts[i + 1].topX, pts[i + 1].topY);
+          windGaugeCtx.lineTo(pts[i + 1].botX, pts[i + 1].botY);
+          windGaugeCtx.lineTo(pts[i].botX, pts[i].botY);
+          windGaugeCtx.closePath();
+          windGaugeCtx.fill();
+        }
+
+        windGaugeCtx.strokeStyle = '#212529';
+        windGaugeCtx.lineWidth = 0.8;
+        windGaugeCtx.beginPath();
+        windGaugeCtx.moveTo(pts[0].topX, pts[0].topY);
+        windGaugeCtx.lineTo(pts[0].botX, pts[0].botY);
+        windGaugeCtx.stroke();
+      }
+    }
+
     // 1. SPD (Speed)
     const v = player.airspeed;
     const minSpd = player.stallSpeed || 52;
-    const maxSpd = player.maxDiveSpeed || 330;
+    const maxSpd = player.maxDiveSpeed || 396;
     let spdRatio = 0;
     if (!player.isStopped && !player.stalled && v > minSpd) {
       spdRatio = Math.max(0, Math.min(1, (v - minSpd) / (maxSpd - minSpd)));
@@ -3424,6 +3781,7 @@
     state.gameOver = false;
     state.running = true;
 
+    wind.reset();
     player = new PlayerPlane(80, 220);
     particles.length = 0;
     floatingTexts.length = 0;
@@ -3454,6 +3812,9 @@
   }
 
   function update(dt) {
+    // 0. Dynamic Atmospheric Wind Simulation
+    wind.update(dt);
+
     // 1. Player Input
     let pitchUp = false;
     let pitchDown = false;
@@ -3520,12 +3881,13 @@
     }
 
     // 10. Particles Update (Fast swap-and-pop O(1) removal)
+    const currentWind = settings.wind ? wind.speed : 0;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
 
       if (p.isFeather) {
         p.flutter += p.flutterSpeed * dt;
-        p.x += (p.vx + Math.sin(p.flutter) * 18) * dt;
+        p.x += (p.vx + Math.sin(p.flutter) * 18 + currentWind * 0.4) * dt;
         p.y += (p.vy + 22) * dt;
         p.rotation += p.rotSpeed * dt;
         p.life -= p.decay * dt;
@@ -3534,6 +3896,10 @@
           p.vx *= 0.85;
           p.rotSpeed = 0;
         }
+      } else if (p.isSmoke) {
+        p.x += (p.vx + currentWind * 0.35) * dt;
+        p.y += p.vy * dt;
+        p.life -= p.decay * dt;
       } else if (p.isDebris) {
         p.x += p.vx * dt;
         p.y += p.vy * dt;
@@ -3826,6 +4192,7 @@
     if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
     if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
     if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
+    if (domCache.settingWind) domCache.settingWind.checked = settings.wind;
     if (domCache.settingsModal) domCache.settingsModal.classList.remove('hidden');
   }
 
@@ -3837,6 +4204,13 @@
       settings.engineSound = domCache.settingEngineSound.checked;
       if (masterAudioGain && audioCtx) {
         masterAudioGain.gain.setTargetAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime, 0.04);
+      }
+    }
+    if (domCache.settingWind) {
+      settings.wind = domCache.settingWind.checked;
+      if (!settings.wind) {
+        wind.speed = 0;
+        wind.targetSpeed = 0;
       }
     }
 

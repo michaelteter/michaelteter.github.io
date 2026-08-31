@@ -59,6 +59,15 @@
 
     <!-- Cockpit Instrument Panel (Left Side Bar) -->
     <div id="instrument-panel">
+      <!-- WIND Gauge (Mini Windsock) -->
+      <div class="gauge" id="gauge-wind-container">
+        <span class="gauge-label">WIND</span>
+        <div class="gauge-wind-box">
+          <canvas id="wind-gauge-canvas" width="34" height="24"></canvas>
+        </div>
+        <span class="gauge-val" id="val-wind">0</span>
+      </div>
+
       <!-- SPD Gauge -->
       <div class="gauge" id="gauge-spd-container">
         <span class="gauge-label">SPD</span>
@@ -155,6 +164,10 @@
           <label class="setting-item">
             <span>Airplane Engine Sound FX</span>
             <input type="checkbox" id="setting-engine-sound" checked>
+          </label>
+          <label class="setting-item">
+            <span>Atmospheric Wind Dynamics</span>
+            <input type="checkbox" id="setting-wind" checked>
           </label>
         </div>
         <button id="close-settings-btn" class="retro-btn primary-btn">SAVE & RESUME</button>
