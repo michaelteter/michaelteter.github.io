@@ -28,14 +28,34 @@
     }
   };
 
+  // --- DETECT DEVICE TYPE ---
+  const isMobileDevice = (() => {
+    try {
+      return (
+        window.matchMedia('(pointer: coarse)').matches ||
+        ('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '')
+      );
+    } catch {
+      return false;
+    }
+  })();
+
+  const storedInvertY = Storage.get('flyby_invert_y');
+  // For mobile touch devices, default to false (non-inverted) so up/down is simpler.
+  // For desktop, default to true (aviation standard: Pull Back = Climb).
+  // If the user previously saved a preference, respect the saved preference.
+  const initialInvertY = storedInvertY !== null ? storedInvertY === 'true' : !isMobileDevice;
+
   // --- SETTINGS & CONFIG ---
   const settings = {
-    invertY: true,         // Aviation default: Down Arrow / S = Pull Back (Climb)
+    invertY: initialInvertY,
     touchControls: Storage.get('flyby_touch_controls') || 'auto', // 'auto', 'always', 'off'
-    showInstruments: true, // Cockpit side bar gauges
-    scanlines: true,       // CRT filter
-    engineSound: true,     // Dynamic engine pitch & volume audio
-    wind: true             // Atmospheric wind simulation & windsock dynamics
+    showInstruments: Storage.get('flyby_instruments') !== null ? Storage.get('flyby_instruments') === 'true' : true, // Cockpit side bar gauges
+    scanlines: Storage.get('flyby_scanlines') !== null ? Storage.get('flyby_scanlines') === 'true' : true,       // CRT filter
+    engineSound: Storage.get('flyby_engine_sound') !== null ? Storage.get('flyby_engine_sound') === 'true' : true,   // Dynamic engine pitch & volume audio
+    wind: Storage.get('flyby_wind') !== null ? Storage.get('flyby_wind') === 'true' : true                 // Atmospheric wind simulation & windsock dynamics
   };
 
   // --- GAME STATE ---
@@ -794,8 +814,8 @@
   };
 
   const touchState = {
-    climb: false,
-    dive: false,
+    btnUp: false,
+    btnDown: false,
     throttle: false
   };
 
@@ -1512,6 +1532,7 @@
       this.x = x;
       this.type = type; // 'barn', 'house', 'windmill', 'silo_set', 'water_tower', 'church'
       this.nearMissAwarded = false;
+      this.nearMissPending = false;
 
       if (type === 'barn') {
         this.width = 110;
@@ -1843,6 +1864,7 @@
       this.isCrashing = false;
       this.hasLostWing = false;
       this.nearMissAwarded = false;
+      this.nearMissPending = false;
       this.crashAngle = 0;
       this.crashRotSpeed = 0;
       this.crashVy = 0;
@@ -2023,6 +2045,7 @@
       this.timer = Math.random() * Math.PI * 2;
       this.smokeTimer = 0;
       this.nearMissAwarded = false;
+      this.nearMissPending = false;
       this.isDead = false;
       this.ribbonColor = pattern === 'loop' ? 'rgba(255, 60, 180,' : 'rgba(0, 220, 255,';
     }
@@ -2111,6 +2134,7 @@
       this.speed = this.baseSpeed * diffScale;
       this.vx = -this.speed;
       this.nearMissAwarded = false;
+      this.nearMissPending = false;
       this.birds = [];
       for (let i = 0; i < count; i++) {
         this.birds.push({
@@ -2199,6 +2223,7 @@
       this.propAngle = 0;
       this.invulnerableTimer = 2.5; // Safe spawn grace period
       this.canGroundNearMiss = false; // Armed once plane climbs to safe altitude
+      this.groundNearMissPending = false;
 
       // Runway service, refueling & takeoff roll states
       this.stopTimer = 0;
@@ -2262,6 +2287,7 @@
     triggerBirdStrike() {
       if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0) || this.isWobblingCrash) return;
 
+      this.groundNearMissPending = false;
       this.isWobblingCrash = true;
       this.wobbleTimer = 0;
       this.wobblePhase = 0;
@@ -2297,6 +2323,7 @@
 
     breakApart(cause = 'general') {
       if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0)) return;
+      this.groundNearMissPending = false;
       this.isDead = true;
       createExplosion(this.x, this.y, 50);
       createBiplaneDebris(this.x, this.y, this.vx, this.vy, 'player', cause === 'stunt' ? 1.5 : 1.7);
@@ -2304,6 +2331,7 @@
 
     crash() {
       if (this.isDead || (this.invulnerableTimer && this.invulnerableTimer > 0)) return;
+      this.groundNearMissPending = false;
       this.isDead = true;
       createExplosion(this.x, this.y, 45);
       createBiplaneDebris(this.x, this.y, this.vx, this.vy, 'player', 1.1);
@@ -2420,6 +2448,7 @@
         if (levelAttitude && gentleDescent) {
           const justLanded = !this.onGround;
           this.onGround = true;
+          this.groundNearMissPending = false;
           this.vy = 0;
           this.stalled = false;
           this.invertedTimer = 0;
@@ -3109,16 +3138,22 @@
     state.shake = Math.min(state.shake + 3.5, 7);
   }
 
-  // --- COLLISION DETECTION ---
+  // --- COLLISION DETECTION & TWO-PHASE NEAR MISS SYSTEM ---
   function checkCollisions() {
     if (player.isDead) return;
 
-    // 0. Player vs Ground Near Miss (Buzzing the deck at high speed)
+    // 0. Player vs Ground Near Miss (Buzzing the deck at high speed, awarded upon pulling away)
     if (!player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
       if (player.canGroundNearMiss && player.y >= GROUND_Y - 32 && player.airspeed >= 50) {
         player.canGroundNearMiss = false;
+        player.groundNearMissPending = true;
+      } else if (player.groundNearMissPending && player.y < GROUND_Y - 55) {
+        player.groundNearMissPending = false;
+        player.canGroundNearMiss = true;
         triggerNearMiss(player.x, GROUND_Y, 'GROUND', 150, 0, 0);
       }
+    } else {
+      player.groundNearMissPending = false;
     }
 
     // 1. Player vs Balloons (Pop!)
@@ -3133,6 +3168,8 @@
     // 2. Player vs Country Structures (Barns, Silos, Houses, Windmills, Water Towers, Churches)
     for (const s of structures) {
       if (s.checkCollision(player)) {
+        s.nearMissPending = false;
+        s.nearMissAwarded = true;
         player.crash();
         const names = {
           barn: 'BARN',
@@ -3145,22 +3182,31 @@
         const structName = names[s.type] || 'STRUCTURE';
         showStatusBanner(`COLLIDED WITH ${structName}!`, 2.0, 'danger');
         return;
-      } else if (!s.nearMissAwarded && !player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+      } else if (!player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
         const inNearX = (player.x >= s.x - 25 && player.x <= s.x + s.width + 25);
         const inNearY = (player.y >= s.y - 28 && player.y <= s.y + 12);
-        if (inNearX && inNearY) {
-          s.nearMissAwarded = true;
-          const names = {
-            barn: 'BARN',
-            house: 'HOUSE',
-            windmill: 'WINDMILL',
-            silo_set: 'SILO',
-            water_tower: 'WATER TOWER',
-            church: 'CHURCH'
-          };
-          const structName = names[s.type] || 'STRUCTURE';
-          triggerNearMiss(s.x + s.width / 2, s.y, structName, 200, 0, 0);
+        if (!s.nearMissAwarded && !s.nearMissPending && inNearX && inNearY) {
+          s.nearMissPending = true;
+        } else if (s.nearMissPending && !s.nearMissAwarded) {
+          const clearedX = (player.x < s.x - 55 || player.x > s.x + s.width + 55);
+          const clearedY = (player.y < s.y - 50 || player.y > s.y + 35);
+          if (clearedX || clearedY) {
+            s.nearMissAwarded = true;
+            s.nearMissPending = false;
+            const names = {
+              barn: 'BARN',
+              house: 'HOUSE',
+              windmill: 'WINDMILL',
+              silo_set: 'SILO',
+              water_tower: 'WATER TOWER',
+              church: 'CHURCH'
+            };
+            const structName = names[s.type] || 'STRUCTURE';
+            triggerNearMiss(s.x + s.width / 2, s.y, structName, 200, 0, 0);
+          }
         }
+      } else {
+        s.nearMissPending = false;
       }
     }
 
@@ -3168,17 +3214,26 @@
     for (const al of airliners) {
       if (!al.isDead && !al.isCrashing) {
         if (al.checkCollision(player)) {
+          al.nearMissPending = false;
+          al.nearMissAwarded = true;
           al.triggerCrash(player.x, player.y);
           player.breakApart('airliner');
           showStatusBanner('COLLIDED WITH AIRLINER!', 2.5, 'danger');
           return;
-        } else if (!al.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        } else if (!player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
           const dx = Math.abs(player.x - al.x);
           const dy = Math.abs(player.y - al.y);
-          if (dx < 75 && dy < 38) {
-            al.nearMissAwarded = true;
-            triggerNearMiss(al.x, al.y, 'AIRLINER', 300, al.vx, al.isCrashing ? al.crashVy : 0);
+          if (!al.nearMissAwarded && !al.nearMissPending && dx < 75 && dy < 38) {
+            al.nearMissPending = true;
+          } else if (al.nearMissPending && !al.nearMissAwarded) {
+            if (dx > 115 || dy > 55) {
+              al.nearMissAwarded = true;
+              al.nearMissPending = false;
+              triggerNearMiss(al.x, al.y, 'AIRLINER', 300, al.vx, al.isCrashing ? al.crashVy : 0);
+            }
           }
+        } else {
+          al.nearMissPending = false;
         }
       }
     }
@@ -3187,18 +3242,27 @@
     for (const sp of stuntPlanes) {
       if (!sp.isDead) {
         if (sp.checkCollision(player)) {
+          sp.nearMissPending = false;
+          sp.nearMissAwarded = true;
           sp.explode();
           player.breakApart('stunt');
           createExplosion((player.x + sp.x) / 2, (player.y + sp.y) / 2, 50);
           state.shake = Math.min(state.shake + 18, 24);
           showStatusBanner('COLLIDED WITH BIPLANE!', 2.5, 'danger');
           return;
-        } else if (!sp.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        } else if (!player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
           const dist = Math.hypot(player.x - sp.x, player.y - sp.y);
-          if (dist < 56) {
-            sp.nearMissAwarded = true;
-            triggerNearMiss(sp.x, sp.y, 'BIPLANE', 200, sp.vx, sp.vy);
+          if (!sp.nearMissAwarded && !sp.nearMissPending && dist < 56) {
+            sp.nearMissPending = true;
+          } else if (sp.nearMissPending && !sp.nearMissAwarded) {
+            if (dist > 85) {
+              sp.nearMissAwarded = true;
+              sp.nearMissPending = false;
+              triggerNearMiss(sp.x, sp.y, 'BIPLANE', 200, sp.vx, sp.vy);
+            }
           }
+        } else {
+          sp.nearMissPending = false;
         }
       }
     }
@@ -3206,14 +3270,23 @@
     // 5. Player vs Bird Flocks (Bird Strike: Lose tail & engine power -> Wobbly descent)
     for (const bf of birdFlocks) {
       if (bf.checkCollision(player)) {
+        bf.nearMissPending = false;
+        bf.nearMissAwarded = true;
         player.triggerBirdStrike();
         return;
-      } else if (!bf.nearMissAwarded && !player.isDead && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+      } else if (!player.isDead && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
         const dist = Math.hypot(player.x - bf.x, player.y - bf.y);
-        if (dist < 52) {
-          bf.nearMissAwarded = true;
-          triggerNearMiss(bf.x, bf.y, 'BIRDS', 150, bf.vx, 0);
+        if (!bf.nearMissAwarded && !bf.nearMissPending && dist < 52) {
+          bf.nearMissPending = true;
+        } else if (bf.nearMissPending && !bf.nearMissAwarded) {
+          if (dist > 80) {
+            bf.nearMissAwarded = true;
+            bf.nearMissPending = false;
+            triggerNearMiss(bf.x, bf.y, 'BIRDS', 150, bf.vx, 0);
+          }
         }
+      } else {
+        bf.nearMissPending = false;
       }
     }
   }
@@ -3873,15 +3946,12 @@
     let pitchDown = false;
 
     if (settings.invertY) {
-      if (keys.down) pitchUp = true;
-      if (keys.up) pitchDown = true;
+      if (keys.down || touchState.btnDown) pitchUp = true;
+      if (keys.up || touchState.btnUp) pitchDown = true;
     } else {
-      if (keys.up) pitchUp = true;
-      if (keys.down) pitchDown = true;
+      if (keys.up || touchState.btnUp) pitchUp = true;
+      if (keys.down || touchState.btnDown) pitchDown = true;
     }
-
-    if (touchState.climb) pitchUp = true;
-    if (touchState.dive) pitchDown = true;
 
     if (!player.isDead) {
       player.update(dt, {
@@ -4216,6 +4286,35 @@
   }
 
   // --- SETTINGS MODAL & UI HANDLERS ---
+  function updateTouchControlsUI() {
+    if (domCache.touchBtnUp) {
+      const icon = domCache.touchBtnUp.querySelector('.touch-icon');
+      const label = domCache.touchBtnUp.querySelector('.touch-label');
+      if (settings.invertY) {
+        if (icon) icon.textContent = '▲';
+        if (label) label.textContent = 'DIVE';
+        domCache.touchBtnUp.setAttribute('aria-label', 'Dive / Pitch Down (Stick Forward)');
+      } else {
+        if (icon) icon.textContent = '▲';
+        if (label) label.textContent = 'CLIMB';
+        domCache.touchBtnUp.setAttribute('aria-label', 'Climb / Pitch Up');
+      }
+    }
+    if (domCache.touchBtnDown) {
+      const icon = domCache.touchBtnDown.querySelector('.touch-icon');
+      const label = domCache.touchBtnDown.querySelector('.touch-label');
+      if (settings.invertY) {
+        if (icon) icon.textContent = '▼';
+        if (label) label.textContent = 'CLIMB';
+        domCache.touchBtnDown.setAttribute('aria-label', 'Climb / Pitch Up (Stick Back)');
+      } else {
+        if (icon) icon.textContent = '▼';
+        if (label) label.textContent = 'DIVE';
+        domCache.touchBtnDown.setAttribute('aria-label', 'Dive / Pitch Down');
+      }
+    }
+  }
+
   function applyTouchControlsVisibility() {
     const wrapper = document.getElementById('game-wrapper');
     if (!wrapper) return;
@@ -4238,6 +4337,7 @@
 
   function toggleMute() {
     settings.engineSound = !settings.engineSound;
+    Storage.set('flyby_engine_sound', settings.engineSound.toString());
     if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
 
     if (masterAudioGain && audioCtx) {
@@ -4266,22 +4366,34 @@
   }
 
   function closeSettings() {
-    if (domCache.settingInvertY) settings.invertY = domCache.settingInvertY.checked;
+    if (domCache.settingInvertY) {
+      settings.invertY = domCache.settingInvertY.checked;
+      Storage.set('flyby_invert_y', settings.invertY.toString());
+      updateTouchControlsUI();
+    }
     if (domCache.settingTouchControls) {
       settings.touchControls = domCache.settingTouchControls.value;
       Storage.set('flyby_touch_controls', settings.touchControls);
       applyTouchControlsVisibility();
     }
-    if (domCache.settingInstruments) settings.showInstruments = domCache.settingInstruments.checked;
-    if (domCache.settingScanlines) settings.scanlines = domCache.settingScanlines.checked;
+    if (domCache.settingInstruments) {
+      settings.showInstruments = domCache.settingInstruments.checked;
+      Storage.set('flyby_instruments', settings.showInstruments.toString());
+    }
+    if (domCache.settingScanlines) {
+      settings.scanlines = domCache.settingScanlines.checked;
+      Storage.set('flyby_scanlines', settings.scanlines.toString());
+    }
     if (domCache.settingEngineSound) {
       settings.engineSound = domCache.settingEngineSound.checked;
+      Storage.set('flyby_engine_sound', settings.engineSound.toString());
       if (masterAudioGain && audioCtx) {
         masterAudioGain.gain.setTargetAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime, 0.04);
       }
     }
     if (domCache.settingWind) {
       settings.wind = domCache.settingWind.checked;
+      Storage.set('flyby_wind', settings.wind.toString());
       if (!settings.wind) {
         wind.speed = 0;
         wind.targetSpeed = 0;
@@ -4300,6 +4412,15 @@
       state.paused = false;
       updatePauseBtnIcon();
     }
+  }
+
+  // Real-time Settings Event Listeners
+  if (domCache.settingInvertY) {
+    domCache.settingInvertY.addEventListener('change', () => {
+      settings.invertY = domCache.settingInvertY.checked;
+      Storage.set('flyby_invert_y', settings.invertY.toString());
+      updateTouchControlsUI();
+    });
   }
 
   const settingsBtn = document.getElementById('settings-btn');
@@ -4339,16 +4460,16 @@
   if (domCache.touchBtnUp) {
     bindTouchButton(
       domCache.touchBtnUp,
-      () => { touchState.climb = true; },
-      () => { touchState.climb = false; }
+      () => { touchState.btnUp = true; },
+      () => { touchState.btnUp = false; }
     );
   }
 
   if (domCache.touchBtnDown) {
     bindTouchButton(
       domCache.touchBtnDown,
-      () => { touchState.dive = true; },
-      () => { touchState.dive = false; }
+      () => { touchState.btnDown = true; },
+      () => { touchState.btnDown = false; }
     );
   }
 
@@ -4375,6 +4496,21 @@
   window.addEventListener('orientationchange', checkOrientation);
 
   // Initial setup
+  if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+  if (domCache.settingTouchControls) domCache.settingTouchControls.value = settings.touchControls || 'auto';
+  if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
+  if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
+  if (domCache.settingEngineSound) domCache.settingEngineSound.checked = settings.engineSound;
+  if (domCache.settingWind) domCache.settingWind.checked = settings.wind;
+
+  if (domCache.instrumentPanel) {
+    domCache.instrumentPanel.style.display = settings.showInstruments ? 'flex' : 'none';
+  }
+  if (domCache.crtOverlay) {
+    domCache.crtOverlay.style.display = settings.scanlines ? 'block' : 'none';
+  }
+
+  updateTouchControlsUI();
   applyTouchControlsVisibility();
   initWorldCourse(1);
   updateHUD();
