@@ -22,8 +22,8 @@ body {
 
 #game-wrapper {
   position: relative;
-  width: 960px;
-  height: 540px;
+  width: min(98vw, calc(98vh * (16 / 9)));
+  height: min(98vh, calc(98vw * (9 / 16)));
   max-width: 100vw;
   max-height: 100vh;
   aspect-ratio: 16 / 9;
