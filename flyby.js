@@ -4435,6 +4435,50 @@
       updateTouchControlsUI();
     });
   }
+  if (domCache.settingScanlines) {
+    domCache.settingScanlines.addEventListener('change', () => {
+      settings.scanlines = domCache.settingScanlines.checked;
+      Storage.set('flyby_scanlines', settings.scanlines.toString());
+      if (domCache.crtOverlay) {
+        domCache.crtOverlay.style.display = settings.scanlines ? 'block' : 'none';
+      }
+    });
+  }
+  if (domCache.settingInstruments) {
+    domCache.settingInstruments.addEventListener('change', () => {
+      settings.showInstruments = domCache.settingInstruments.checked;
+      Storage.set('flyby_instruments', settings.showInstruments.toString());
+      if (domCache.instrumentPanel) {
+        domCache.instrumentPanel.style.display = settings.showInstruments ? 'flex' : 'none';
+      }
+    });
+  }
+  if (domCache.settingTouchControls) {
+    domCache.settingTouchControls.addEventListener('change', () => {
+      settings.touchControls = domCache.settingTouchControls.value;
+      Storage.set('flyby_touch_controls', settings.touchControls);
+      applyTouchControlsVisibility();
+    });
+  }
+  if (domCache.settingEngineSound) {
+    domCache.settingEngineSound.addEventListener('change', () => {
+      settings.engineSound = domCache.settingEngineSound.checked;
+      Storage.set('flyby_engine_sound', settings.engineSound.toString());
+      if (masterAudioGain && audioCtx) {
+        masterAudioGain.gain.setTargetAtTime(settings.engineSound ? 1.0 : 0.0, audioCtx.currentTime, 0.04);
+      }
+    });
+  }
+  if (domCache.settingWind) {
+    domCache.settingWind.addEventListener('change', () => {
+      settings.wind = domCache.settingWind.checked;
+      Storage.set('flyby_wind', settings.wind.toString());
+      if (!settings.wind) {
+        wind.speed = 0;
+        wind.targetSpeed = 0;
+      }
+    });
+  }
 
   const settingsBtn = document.getElementById('settings-btn');
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
