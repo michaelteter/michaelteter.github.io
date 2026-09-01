@@ -844,10 +844,11 @@
     if (e.code === 'KeyM') {
       toggleMute();
     }
-    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F' || ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden'))) {
-      if (state.gameOver || !state.running) {
-        restartGame();
-      }
+    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+      toggleFullscreen();
+    }
+    if ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
+      restartGame();
     }
   });
 
@@ -3539,6 +3540,7 @@
     settingEngineSound: document.getElementById('setting-engine-sound'),
     settingWind: document.getElementById('setting-wind'),
     // Action buttons & touch overlays
+    fullscreenBtn: document.getElementById('fullscreen-btn'),
     pauseBtn: document.getElementById('pause-btn'),
     touchControls: document.getElementById('touch-controls'),
     touchBtnThrottle: document.getElementById('touch-btn-throttle'),
@@ -4489,6 +4491,66 @@
   const closeSettingsBtn = document.getElementById('close-settings-btn');
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
 
+  // --- FULLSCREEN MANAGEMENT ---
+  function isFullscreen() {
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  }
+
+  function updateFullscreenBtnIcon() {
+    if (domCache.fullscreenBtn) {
+      domCache.fullscreenBtn.textContent = isFullscreen() ? '✕' : '⛶';
+      domCache.fullscreenBtn.title = isFullscreen() ? 'Exit Fullscreen (F)' : 'Toggle Fullscreen (F)';
+    }
+  }
+
+  function toggleFullscreen() {
+    try {
+      if (!isFullscreen()) {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+          el.requestFullscreen().catch(() => {});
+        } else if (el.webkitRequestFullscreen) {
+          el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+          el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+          el.msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+    } catch {}
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    updateFullscreenBtnIcon();
+    resizeGame();
+  });
+  document.addEventListener('webkitfullscreenchange', () => {
+    updateFullscreenBtnIcon();
+    resizeGame();
+  });
+
+  if (domCache.fullscreenBtn) {
+    domCache.fullscreenBtn.addEventListener('click', () => {
+      initAudio();
+      toggleFullscreen();
+    });
+  }
+
   if (domCache.pauseBtn) {
     domCache.pauseBtn.addEventListener('click', () => {
       initAudio();
@@ -4502,6 +4564,9 @@
   const startBtn = document.getElementById('start-btn');
   if (startBtn) {
     startBtn.addEventListener('click', () => {
+      if (isMobileDevice && !isFullscreen()) {
+        toggleFullscreen();
+      }
       restartGame();
     });
   }

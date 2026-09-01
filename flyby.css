@@ -474,9 +474,23 @@ body {
 }
 
 .icon-btn {
-  padding: 4px 8px;
-  font-size: 14px;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 16px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .icon-btn {
+    min-width: 42px;
+    height: 36px;
+    font-size: 17px;
+  }
 }
 
 /* Fullscreen Overlay Modals (Title, GameOver, Settings) */
