@@ -486,31 +486,60 @@ body {
   align-items: center;
   z-index: 30;
   transition: opacity 0.25s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .screen-card {
   background: #141c28;
   border: 3px solid #4a5c78;
   border-radius: 8px;
-  padding: 24px 32px;
+  padding: 20px 28px;
   max-width: 580px;
-  width: 90%;
+  width: 92%;
+  max-height: calc(100% - 10px);
+  margin: auto;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #4a5c78 #0d141e;
+}
+
+.screen-card::-webkit-scrollbar,
+.overlay-screen::-webkit-scrollbar,
+.settings-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.screen-card::-webkit-scrollbar-thumb,
+.overlay-screen::-webkit-scrollbar-thumb,
+.settings-list::-webkit-scrollbar-thumb {
+  background: #4a5c78;
+  border-radius: 3px;
+}
+
+.screen-card::-webkit-scrollbar-track,
+.overlay-screen::-webkit-scrollbar-track,
+.settings-list::-webkit-scrollbar-track {
+  background: #0d141e;
 }
 
 .pixel-title {
-  font-size: 26px;
+  font-size: 24px;
   color: #ffdf40;
   text-shadow: 2px 2px 0 #b37400, 4px 4px 0 #000000;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   letter-spacing: 2px;
 }
 
 .pixel-subtitle {
   font-size: 11px;
   color: #79a6d2;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   letter-spacing: 1px;
 }
 
@@ -522,7 +551,7 @@ body {
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .mission-text {
@@ -534,16 +563,16 @@ body {
 .briefing-list {
   text-align: left;
   list-style: none;
-  font-size: 8.5px;
-  line-height: 2;
+  font-size: 8px;
+  line-height: 1.6;
   background: #0d141e;
-  padding: 16px 20px;
+  padding: 14px 18px;
   border: 1px solid #2b394f;
   border-radius: 4px;
 }
 
 .briefing-list li {
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 
 .briefing-list li:last-child {
@@ -557,22 +586,23 @@ body {
   color: #ffeb3b;
   padding: 2px 5px;
   border-radius: 2px;
-  font-size: 8px;
+  font-size: 7.5px;
 }
 
 .btn-row {
   display: flex;
   justify-content: center;
-  gap: 14px;
-  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
 }
 
 .credits-text {
-  font-size: 7.5px;
+  font-size: 7px;
   color: #8c9bb0;
-  margin-top: 16px;
+  margin-top: 12px;
   letter-spacing: 0.5px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .credits-text a {
@@ -606,6 +636,8 @@ body {
   border-radius: 4px;
   margin-bottom: 16px;
   font-size: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #4a5c78 #0d141e;
 }
 
 .hud-actions {
@@ -874,21 +906,72 @@ body {
     height: 66px;
   }
 
+  .overlay-screen {
+    padding: 8px;
+  }
+
   .screen-card {
-    padding: 16px 20px;
+    padding: 12px 16px;
+    max-height: calc(100% - 6px);
   }
 
   .pixel-title {
-    font-size: 20px;
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .pixel-subtitle {
+    font-size: 10px;
+    margin-bottom: 8px;
+  }
+
+  .card-body {
+    gap: 8px;
   }
 
   .briefing-list {
     font-size: 7px;
-    padding: 10px 12px;
+    line-height: 1.45;
+    padding: 8px 10px;
+  }
+
+  .briefing-list li {
+    margin-bottom: 6px;
+  }
+
+  .key-badge {
+    padding: 1px 4px;
+    font-size: 6.5px;
   }
 
   .btn-row {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .retro-btn {
+    padding: 6px 12px;
+    font-size: 8px;
+  }
+
+  .credits-text {
+    margin-top: 6px;
+    font-size: 6.5px;
+  }
+
+  .settings-list {
+    padding: 10px 12px;
+    gap: 8px;
+    font-size: 7px;
+    margin-bottom: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .setting-item {
     gap: 8px;
   }
 
@@ -901,6 +984,87 @@ body {
     font-size: 7px;
     padding: 4px 10px;
     letter-spacing: 0.25px;
+  }
+}
+
+/* Extra Small / Landscape Mobile Viewports */
+@media (max-height: 380px), (max-width: 480px) {
+  .overlay-screen {
+    padding: 4px;
+  }
+
+  .screen-card {
+    padding: 8px 12px;
+    border-width: 2px;
+  }
+
+  .pixel-title {
+    font-size: 13px;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+
+  .pixel-subtitle {
+    font-size: 8.5px;
+    margin-bottom: 4px;
+  }
+
+  .card-body {
+    gap: 5px;
+  }
+
+  .briefing-list {
+    font-size: 6px;
+    line-height: 1.35;
+    padding: 6px 8px;
+  }
+
+  .briefing-list li {
+    margin-bottom: 4px;
+  }
+
+  .key-badge {
+    padding: 1px 3px;
+    font-size: 5.5px;
+  }
+
+  .btn-row {
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .retro-btn {
+    padding: 5px 10px;
+    font-size: 7px;
+  }
+
+  .credits-text {
+    margin-top: 3px;
+    font-size: 5.5px;
+    line-height: 1.3;
+  }
+
+  .settings-list {
+    padding: 6px 8px;
+    gap: 6px;
+    font-size: 6px;
+    margin-bottom: 6px;
+    max-height: 125px;
+    overflow-y: auto;
+  }
+
+  .setting-item {
+    gap: 6px;
+  }
+
+  .setting-item input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+  }
+
+  .retro-select {
+    font-size: 6px;
+    padding: 2px 4px;
   }
 }
 
