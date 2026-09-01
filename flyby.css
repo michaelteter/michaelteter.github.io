@@ -59,7 +59,8 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
-  z-index: 10;
+  z-index: 25;
+  pointer-events: auto;
   font-size: 10px;
   letter-spacing: 1px;
 }
@@ -275,24 +276,24 @@ body {
   box-shadow: 0 0 10px rgba(56, 239, 125, 0.4), 0 4px 14px rgba(0, 0, 0, 0.8);
 }
 
-/* Cockpit Instrument Dashboard Overlay (Left Side Bar) */
+/* Cockpit Instrument Dashboard Overlay (Left Side Bar - Desktop/Tablet Default) */
 #instrument-panel {
   position: absolute;
   top: 50%;
-  left: max(0px, env(safe-area-inset-left));
+  left: 0;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: rgba(10, 15, 24, 0.92);
-  padding: 8px 5px;
+  padding: 8px 6px 8px max(6px, calc(env(safe-area-inset-left) + 4px));
   border-radius: 0 8px 8px 0;
   border: 1.5px solid #2f3f56;
   border-left: none;
   box-shadow: 3px 0 14px rgba(0, 0, 0, 0.8), inset -1px 0 3px rgba(255, 255, 255, 0.06);
   z-index: 10;
   pointer-events: none;
-  width: 44px;
+  width: auto;
   box-sizing: border-box;
 }
 
@@ -476,20 +477,24 @@ body {
 .icon-btn {
   min-width: 36px;
   height: 32px;
-  padding: 0 6px;
-  font-size: 16px;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: bold;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   touch-action: manipulation;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (pointer: coarse) {
   .icon-btn {
-    min-width: 42px;
-    height: 36px;
-    font-size: 17px;
+    min-width: 44px;
+    height: 38px;
+    font-size: 24px;
   }
 }
 
@@ -906,7 +911,7 @@ body {
 }
 
 /* Mobile Responsive Tweaks */
-@media (max-width: 800px), (max-height: 520px) {
+@media (max-width: 899px), (max-height: 520px) {
   #hud {
     padding: 0 max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
     height: 42px;
@@ -924,6 +929,69 @@ body {
   .fuel-bar-wrapper {
     width: 60px;
     height: 8px;
+  }
+
+  .hud-actions {
+    gap: 5px;
+  }
+
+  .icon-btn {
+    min-width: 38px;
+    height: 34px;
+    font-size: 22px;
+  }
+
+  /* Cockpit Instrument Panel - Horizontal row layout for mobile devices */
+  #instrument-panel {
+    top: max(42px, env(safe-area-inset-top));
+    left: 0;
+    transform: none;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+    width: auto;
+    padding: 3px 8px 4px max(6px, calc(env(safe-area-inset-left) + 4px));
+    border-radius: 0 0 8px 0;
+    border-top: none;
+    border-left: none;
+    border-right: 1.5px solid #2f3f56;
+    border-bottom: 1.5px solid #2f3f56;
+  }
+
+  .gauge {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .gauge-label {
+    font-size: 5px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 1px;
+  }
+
+  .gauge-wind-box {
+    width: 28px;
+    height: 20px;
+  }
+
+  #wind-gauge-canvas {
+    width: 28px;
+    height: 20px;
+  }
+
+  .gauge-bar-track {
+    width: 16px;
+    height: 34px;
+  }
+
+  .gauge-val {
+    font-size: 5px;
+    letter-spacing: -0.5px;
+    margin-top: 1px;
   }
 
   .touch-cluster-left {
@@ -1072,6 +1140,41 @@ body {
     max-height: 100%;
     padding: 4px 6px;
     border: none;
+  }
+
+  #instrument-panel {
+    top: max(38px, env(safe-area-inset-top));
+    gap: 4px;
+    padding: 2px 6px 3px max(4px, calc(env(safe-area-inset-left) + 2px));
+  }
+
+  .gauge-label {
+    font-size: 4.5px;
+  }
+
+  .gauge-wind-box {
+    width: 24px;
+    height: 16px;
+  }
+
+  #wind-gauge-canvas {
+    width: 24px;
+    height: 16px;
+  }
+
+  .gauge-bar-track {
+    width: 14px;
+    height: 28px;
+  }
+
+  .gauge-val {
+    font-size: 4.5px;
+  }
+
+  .icon-btn {
+    min-width: 34px;
+    height: 30px;
+    font-size: 19px;
   }
 
   .pixel-title {

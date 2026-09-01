@@ -29,6 +29,14 @@
   };
 
   // --- DETECT DEVICE TYPE ---
+  const isIOS = (() => {
+    try {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    } catch {
+      return false;
+    }
+  })();
+
   const isMobileDevice = (() => {
     try {
       return (
@@ -4492,10 +4500,29 @@
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
 
   // --- FULLSCREEN MANAGEMENT ---
+  function isFullscreenSupported() {
+    const el = document.documentElement || document.body;
+    return !!(
+      document.fullscreenEnabled ||
+      document.webkitFullscreenEnabled ||
+      document.mozFullScreenEnabled ||
+      document.msFullscreenEnabled ||
+      (el && (el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen))
+    );
+  }
+
+  function isStandaloneMode() {
+    return !!(
+      window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    );
+  }
+
   function isFullscreen() {
     return !!(
       document.fullscreenElement ||
       document.webkitFullscreenElement ||
+      document.webkitCurrentFullScreenElement ||
       document.mozFullScreenElement ||
       document.msFullscreenElement
     );
@@ -4509,43 +4536,85 @@
   }
 
   function toggleFullscreen() {
+    if (!isFullscreenSupported()) {
+      if (isStandaloneMode()) {
+        showStatusBanner('ALREADY IN FULLSCREEN APP MODE', 2.5, 'info');
+      } else if (isIOS) {
+        showStatusBanner('iOS: TAP SHARE ⎋ → "ADD TO HOME SCREEN" FOR FULLSCREEN', 3.5, 'info');
+      } else {
+        showStatusBanner('FULLSCREEN NOT SUPPORTED BY THIS BROWSER', 2.5, 'warning');
+      }
+      return;
+    }
+
     try {
       if (!isFullscreen()) {
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-          el.requestFullscreen().catch(() => {});
-        } else if (el.webkitRequestFullscreen) {
-          el.webkitRequestFullscreen();
-        } else if (el.mozRequestFullScreen) {
-          el.mozRequestFullScreen();
-        } else if (el.msRequestFullscreen) {
-          el.msRequestFullscreen();
+        const el = document.documentElement || document.body || document.getElementById('game-wrapper');
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (req) {
+          const res = req.call(el, { navigationUI: 'hide' }).catch ? req.call(el, { navigationUI: 'hide' }) : req.call(el);
+          if (res && typeof res.then === 'function') {
+            res.then(() => {
+              updateFullscreenBtnIcon();
+              showStatusBanner('FULLSCREEN ENABLED', 1.5, 'info');
+              try {
+                if (screen.orientation && screen.orientation.lock) {
+                  screen.orientation.lock('landscape').catch(() => {});
+                }
+              } catch (_) {}
+            }).catch(() => {
+              if (el.requestFullscreen) {
+                el.requestFullscreen().then(() => {
+                  updateFullscreenBtnIcon();
+                  showStatusBanner('FULLSCREEN ENABLED', 1.5, 'info');
+                }).catch(() => {
+                  showStatusBanner('FULLSCREEN BLOCKED BY BROWSER', 2.0, 'warning');
+                });
+              } else {
+                showStatusBanner('FULLSCREEN BLOCKED BY BROWSER', 2.0, 'warning');
+              }
+            });
+          } else {
+            updateFullscreenBtnIcon();
+            showStatusBanner('FULLSCREEN ENABLED', 1.5, 'info');
+          }
         }
       } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-        } else if (document.webkitExitFullscreen) {
-          document.webkitExitFullscreen();
-        } else if (document.mozCancelFullScreen) {
-          document.mozCancelFullScreen();
-        } else if (document.msExitFullscreen) {
-          document.msExitFullscreen();
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exit) {
+          const res = exit.call(document);
+          if (res && typeof res.then === 'function') {
+            res.then(() => {
+              updateFullscreenBtnIcon();
+              showStatusBanner('FULLSCREEN EXITED', 1.5, 'info');
+              try {
+                if (screen.orientation && screen.orientation.unlock) {
+                  screen.orientation.unlock();
+                }
+              } catch (_) {}
+            }).catch(() => {});
+          } else {
+            updateFullscreenBtnIcon();
+            showStatusBanner('FULLSCREEN EXITED', 1.5, 'info');
+          }
         }
       }
-    } catch {}
+    } catch (_) {
+      showStatusBanner('FULLSCREEN NOT AVAILABLE', 2.0, 'warning');
+    }
   }
 
-  document.addEventListener('fullscreenchange', () => {
-    updateFullscreenBtnIcon();
-    resizeGame();
-  });
-  document.addEventListener('webkitfullscreenchange', () => {
-    updateFullscreenBtnIcon();
-    resizeGame();
+  const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+  fullscreenEvents.forEach((evt) => {
+    document.addEventListener(evt, () => {
+      updateFullscreenBtnIcon();
+      resizeGame();
+    });
   });
 
   if (domCache.fullscreenBtn) {
-    domCache.fullscreenBtn.addEventListener('click', () => {
+    domCache.fullscreenBtn.addEventListener('click', (e) => {
+      e.preventDefault();
       initAudio();
       toggleFullscreen();
     });
@@ -4564,7 +4633,7 @@
   const startBtn = document.getElementById('start-btn');
   if (startBtn) {
     startBtn.addEventListener('click', () => {
-      if (isMobileDevice && !isFullscreen()) {
+      if (isMobileDevice && isFullscreenSupported() && !isFullscreen()) {
         toggleFullscreen();
       }
       restartGame();
