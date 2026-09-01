@@ -492,6 +492,43 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Start / Title Screen Fullscreen Panel */
+#title-screen {
+  background: rgba(10, 16, 26, 0.72);
+  backdrop-filter: blur(2px);
+  padding: 0;
+}
+
+#title-screen .screen-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 24px;
+}
+
+#title-screen .card-body {
+  max-width: 680px;
+  width: 100%;
+  align-items: center;
+}
+
+#title-screen .briefing-list {
+  background: rgba(13, 20, 30, 0.65);
+  border: 1.5px solid rgba(74, 92, 120, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 600px;
+}
+
 .screen-card {
   background: #141c28;
   border: 3px solid #4a5c78;
@@ -917,6 +954,13 @@ body {
     max-height: calc(100% - 6px);
   }
 
+  #title-screen .screen-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 8px 12px;
+  }
+
   .pixel-title {
     font-size: 15px;
     margin-bottom: 5px;
@@ -1002,6 +1046,14 @@ body {
     width: 98%;
     max-width: 860px;
     border-width: 2px;
+  }
+
+  #title-screen .screen-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 4px 6px;
+    border: none;
   }
 
   .pixel-title {
