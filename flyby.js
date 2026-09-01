@@ -4700,6 +4700,14 @@
   window.addEventListener('resize', resizeGame);
   window.addEventListener('orientationchange', resizeGame);
 
+  // Prevent context menus, long-press selection popups, and text selection highlights
+  window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+  window.addEventListener('selectstart', (e) => {
+    e.preventDefault();
+  });
+
   // Initial setup
   resizeGame();
   if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
