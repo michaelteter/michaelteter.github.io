@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#0f1118">
   <title>Fly By: Balloon Pop & Stunt Flight</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310141c'/%3E%3Crect x='6' y='14' width='20' height='4' fill='%232b7a78'/%3E%3Crect x='12' y='8' width='8' height='3' fill='%233aafa9'/%3E%3Crect x='14' y='11' width='4' height='3' fill='%23def2f1'/%3E%3Ccircle cx='24' cy='10' r='4' fill='%23ff3366'/%3E%3Cpath d='M24 14 L23 18' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E" type="image/svg+xml">
-  <link rel="stylesheet" href="flyby.css?v=20260901_101832">
+  <link rel="stylesheet" href="flyby.css?v=20260901_142414">
 </head>
 <body>
   <div id="game-wrapper">
@@ -46,6 +46,10 @@
           <span class="plane-icon">✈</span>
           <span class="plane-icon">✈</span>
         </div>
+      </div>
+      <div class="hud-box powerup-box hidden" id="powerup-hud">
+        <span id="powerup-hud-label" class="hud-label">POWERUP</span>
+        <span id="powerup-hud-val" class="hud-value powerup-val">--</span>
       </div>
       <div class="hud-box">
         <span class="hud-label">FUEL</span>
@@ -133,6 +137,10 @@
         </button>
       </div>
       <div class="touch-cluster-right">
+        <button id="touch-btn-fire" class="touch-btn fire-btn hidden" aria-label="Fire Gun">
+          <span class="touch-icon">🎯</span>
+          <span class="touch-label">FIRE</span>
+        </button>
         <button id="touch-btn-up" class="touch-btn pitch-btn" aria-label="Climb / Pitch Up">
           <span class="touch-icon">▲</span>
           <span class="touch-label">CLIMB</span>
@@ -152,6 +160,7 @@
           <ul class="briefing-list">
             <li><span class="key-badge">▲</span>/<span class="key-badge">▼</span> or <span class="key-badge">W</span>/<span class="key-badge">S</span> : Pitch (Climb/Dive)</li>
             <li><span class="key-badge">SPACE</span> or <span class="key-badge">⚡</span> : Throttle / Brakes / Takeoff</li>
+            <li><span class="key-badge">F</span> / <span class="key-badge">X</span> or <span class="key-badge">🎯</span> : Fire Machine Gun Power-Up</li>
             <li><span class="key-badge">P</span>/<span class="key-badge">⏸</span> : Pause &nbsp;|&nbsp; <span class="key-badge">M</span> : Mute &nbsp;|&nbsp; <span class="key-badge">ESC</span> : Settings</li>
           </ul>
           <div class="btn-row">
@@ -228,6 +237,6 @@
     <div id="crt-overlay" class="crt-filter"></div>
   </div>
 
-  <script src="flyby.js?v=20260901_101832"></script>
+  <script src="flyby.js?v=20260901_142414"></script>
 </body>
 </html>

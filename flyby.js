@@ -805,6 +805,98 @@
         osc1.stop(now + 0.29);
         osc2.stop(now + 0.29);
         noise.stop(now + 0.30);
+      } else if (type === 'powerup_speed') {
+        // High-energy ascending arpeggio chime
+        const freqs = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+        freqs.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.28, now + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.05 + 0.25);
+          osc.connect(gain);
+          gain.connect(destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.26);
+        });
+      } else if (type === 'powerup_gun') {
+        // Heavy metallic cocking click + power surge chord
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        const gain2 = audioCtx.createGain();
+
+        // Mechanical click
+        osc1.type = 'square';
+        osc1.frequency.setValueAtTime(320, now);
+        osc1.frequency.setValueAtTime(640, now + 0.06);
+        osc1.frequency.setValueAtTime(180, now + 0.12);
+        gain1.gain.setValueAtTime(0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc1.connect(gain1);
+        gain1.connect(destination);
+        osc1.start(now);
+        osc1.stop(now + 0.23);
+
+        // Power-up surge
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(220, now + 0.1);
+        osc2.frequency.exponentialRampToValueAtTime(880, now + 0.35);
+        gain2.gain.setValueAtTime(0.25, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc2.connect(gain2);
+        gain2.connect(destination);
+        osc2.start(now + 0.1);
+        osc2.stop(now + 0.42);
+      } else if (type === 'machine_gun') {
+        // Crisp punchy vintage biplane Vickers/Spandau machine gun burst
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 0.1);
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.06);
+        filter.Q.setValueAtTime(2.0, now);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+
+        // Square wave tone punch for mechanical barrel clack
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.05);
+        oscGain.gain.setValueAtTime(0.35, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+
+        osc.connect(oscGain);
+        oscGain.connect(destination);
+
+        noise.start(now);
+        osc.start(now);
+        noise.stop(now + 0.07);
+        osc.stop(now + 0.07);
+      } else if (type === 'bullet_ricochet') {
+        // Metallic ricochet ping
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2200, now);
+        osc.frequency.exponentialRampToValueAtTime(650, now + 0.12);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + 0.13);
       }
     } catch (e) {
       // Audio not permitted yet or failed
@@ -818,19 +910,28 @@
     left: false,
     right: false,
     space: false,
-    boost: false
+    boost: false,
+    fire: false
   };
 
   const touchState = {
     btnUp: false,
     btnDown: false,
-    throttle: false
+    throttle: false,
+    btnFire: false
   };
 
   function updatePauseBtnIcon() {
     if (domCache.pauseBtn) {
       domCache.pauseBtn.textContent = state.paused ? '▶' : '⏸';
     }
+  }
+
+  function isFireKey(e) {
+    const k = (e.key || '').toLowerCase();
+    return e.code === 'KeyF' || e.code === 'KeyX' || e.code === 'KeyZ' || e.code === 'KeyJ' ||
+           e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'ControlLeft' || e.code === 'ControlRight' ||
+           k === 'f' || k === 'x' || k === 'z' || k === 'j';
   }
 
   window.addEventListener('keydown', (e) => {
@@ -840,6 +941,9 @@
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
     if (e.code === 'Space') { keys.space = true; keys.boost = true; e.preventDefault(); }
+    if (isFireKey(e)) {
+      keys.fire = true;
+    }
     if (e.code === 'KeyP') {
       if (state.running && !state.gameOver) {
         state.paused = !state.paused;
@@ -852,7 +956,8 @@
     if (e.code === 'KeyM') {
       toggleMute();
     }
-    if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+    if (e.code === 'KeyF' && !state.running) {
+      // Allow F to toggle fullscreen on title screen if desired
       toggleFullscreen();
     }
     if ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
@@ -866,6 +971,9 @@
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
     if (e.code === 'Space') { keys.space = false; keys.boost = false; }
+    if (isFireKey(e)) {
+      keys.fire = false;
+    }
   });
 
   window.addEventListener('pointerdown', () => {
@@ -1613,7 +1721,13 @@
           return true;
         }
       } else if (this.type === 'church') {
-        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
+        // Two rectangular hitboxes:
+        // 1. Steeple rect (tall tower & spire on left)
+        if (px >= this.x && px <= this.x + 28 && py >= this.y && py <= GROUND_Y) {
+          return true;
+        }
+        // 2. Chapel building + roof rect (lower half on right)
+        if (px > this.x + 28 && px <= this.x + this.width && py >= this.y + 42 && py <= GROUND_Y) {
           return true;
         }
       }
@@ -2201,6 +2315,296 @@
     }
   }
 
+  // --- POWER-UP ENTITY (SPEED BOOST & MACHINE GUN) ---
+  class PowerUp {
+    constructor(x, y, type = 'speed') {
+      this.x = x;
+      this.y = y;
+      this.baseY = y;
+      this.type = type; // 'speed', 'gun'
+      this.id = `${Math.round(x)}_${Math.round(y)}_${type}`;
+      this.radius = 16;
+      this.bobOffset = Math.random() * Math.PI * 2;
+      this.bobSpeed = 2.5 + Math.random() * 0.5;
+      this.pulseTimer = Math.random() * Math.PI * 2;
+      this.collected = false;
+    }
+
+    update(dt) {
+      if (this.collected) return;
+      const diffScale = getLevelSpeedScale();
+      this.bobOffset += (this.bobSpeed * diffScale) * dt;
+      this.pulseTimer += (4.0 * diffScale) * dt;
+      // Bouncing in place
+      this.y = this.baseY + Math.sin(this.bobOffset) * 8;
+    }
+
+    collect(plane) {
+      if (this.collected) return;
+      this.collected = true;
+      collectedPowerUpKeys.add(this.id);
+
+      createConfettiBurst(this.x, this.y, 28, true);
+
+      if (this.type === 'speed') {
+        plane.activateSpeedBoost(8.0);
+        playSound('powerup_speed');
+        addFloatingText(this.x, this.y - 15, '⚡ SPEED BOOST +33%!', '#00e5ff', 11);
+        showStatusBanner('⚡ SPEED BOOST ACTIVATED! (+33% SPEED) ⚡', 2.8, 'bonus');
+      } else if (this.type === 'gun') {
+        plane.activateGun(10.0, 80);
+        playSound('powerup_gun');
+        addFloatingText(this.x, this.y - 15, '💥 MACHINE GUN BARRAGE!', '#ff4500', 11);
+        showStatusBanner('💥 MACHINE GUN STREAM ACTIVATED! 💥', 2.8, 'bonus');
+      }
+
+      updateHUD();
+    }
+
+    draw(ctx, camX) {
+      if (this.collected) return;
+      const renderX = this.x - camX;
+      const pulse = Math.sin(this.pulseTimer);
+
+      ctx.save();
+      ctx.translate(renderX, this.y);
+
+      // 0. Soft ground shadow / halo glow
+      const glowColor = this.type === 'speed' ? 'rgba(0, 229, 255,' : 'rgba(255, 69, 0,';
+      const auraRadius = this.radius + 4 + pulse * 3;
+
+      ctx.strokeStyle = `${glowColor}${0.35 + pulse * 0.2})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, auraRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 1. Badge Base (Shield / Medal)
+      ctx.fillStyle = this.type === 'speed' ? '#0d2838' : '#380d0d';
+      ctx.strokeStyle = this.type === 'speed' ? '#00e5ff' : '#ff4500';
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Inner golden / accent rim
+      ctx.strokeStyle = this.type === 'speed' ? '#ffd700' : '#ffa500';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius - 3, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 2. Icon Graphic
+      if (this.type === 'speed') {
+        // Lightning bolt ⚡
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.moveTo(1, -9);
+        ctx.lineTo(-6, 0);
+        ctx.lineTo(-1, 0);
+        ctx.lineTo(-3, 9);
+        ctx.lineTo(6, -1);
+        ctx.lineTo(1, -1);
+        ctx.closePath();
+        ctx.fill();
+
+        // Speed chevrons
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-10, -3);
+        ctx.lineTo(-7, 0);
+        ctx.lineTo(-10, 3);
+        ctx.moveTo(7, -3);
+        ctx.lineTo(10, 0);
+        ctx.lineTo(7, 3);
+        ctx.stroke();
+      } else {
+        // Machine Gun / Crosshair & 3 Golden Bullets
+        ctx.fillStyle = '#ffd700';
+        // Center bullet
+        ctx.fillRect(-2, -6, 4, 12);
+        ctx.fillRect(-1.5, -8, 3, 2);
+        // Left bullet
+        ctx.fillRect(-7, -4, 3, 9);
+        ctx.fillRect(-6.5, -5.5, 2, 1.5);
+        // Right bullet
+        ctx.fillRect(4, -4, 3, 9);
+        ctx.fillRect(4.5, -5.5, 2, 1.5);
+
+        // Crosshair ring ticks
+        ctx.strokeStyle = '#ff4500';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -this.radius + 1);
+        ctx.lineTo(0, -this.radius + 4);
+        ctx.moveTo(0, this.radius - 1);
+        ctx.lineTo(0, this.radius - 4);
+        ctx.moveTo(-this.radius + 1, 0);
+        ctx.lineTo(-this.radius + 4, 0);
+        ctx.moveTo(this.radius - 1, 0);
+        ctx.lineTo(this.radius - 4, 0);
+        ctx.stroke();
+      }
+
+      // 3. Floating Mini Label Banner
+      ctx.fillStyle = this.type === 'speed' ? '#00e5ff' : '#ff4500';
+      ctx.font = '6px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.type === 'speed' ? 'SPEED' : 'GUN', 0, this.radius + 6);
+
+      ctx.restore();
+    }
+  }
+
+  // --- BULLET PROJECTILE ENTITY ---
+  class Bullet {
+    constructor(x, y, vx, vy, theta) {
+      this.x = x;
+      this.y = y;
+      this.vx = vx;
+      this.vy = vy;
+      this.theta = theta;
+      this.life = 0.95; // ~800px range
+      this.maxLife = 0.95;
+      this.isDead = false;
+      this.length = 16;
+    }
+
+    update(dt) {
+      if (this.isDead) return;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.life -= dt;
+
+      if (this.life <= 0 || this.y >= GROUND_Y) {
+        this.isDead = true;
+        if (this.y >= GROUND_Y) {
+          createSmokePuff(this.x, GROUND_Y - 2, 0, -5, 2.0, 'rgba(200,190,160,');
+        }
+        return;
+      }
+
+      // 1. Collide with Balloons
+      for (const b of balloons) {
+        if (!b.popped) {
+          if (Math.hypot(this.x - b.x, this.y - b.y) < b.radius + 6) {
+            b.pop();
+            this.isDead = true;
+            createConfettiBurst(this.x, this.y, 10);
+            return;
+          }
+        }
+      }
+
+      // 2. Collide with Airliners
+      for (const al of airliners) {
+        if (!al.isDead && !al.isCrashing) {
+          const dx = Math.abs(this.x - al.x);
+          const dy = Math.abs(this.y - al.y);
+          if (dx < al.width / 2 && dy < al.height / 2 + 6) {
+            al.triggerCrash(this.x, this.y);
+            this.isDead = true;
+            addScore(500);
+            addFloatingText(this.x, this.y - 16, '+500 AIRLINER SHOT DOWN!', '#ff4500', 11);
+            showStatusBanner('🎯 AIRLINER SHOT DOWN! +500 PTS 🎯', 2.2, 'bonus');
+            playSound('big_crash');
+            createExplosion(this.x, this.y, 25);
+            state.shake = Math.min(state.shake + 8, 14);
+            return;
+          }
+        }
+      }
+
+      // 3. Collide with Stunt Biplanes
+      for (const sp of stuntPlanes) {
+        if (!sp.isDead) {
+          if (Math.hypot(this.x - sp.x, this.y - sp.y) < 22) {
+            sp.explode();
+            this.isDead = true;
+            addScore(300);
+            addFloatingText(this.x, this.y - 16, '+300 BIPLANE SHOT DOWN!', '#ffaa00', 11);
+            showStatusBanner('🎯 BIPLANE SHOT DOWN! +300 PTS 🎯', 2.2, 'bonus');
+            playSound('crash');
+            state.shake = Math.min(state.shake + 6, 12);
+            return;
+          }
+        }
+      }
+
+      // 4. Collide with Bird Flocks
+      for (const bf of birdFlocks) {
+        if (!bf.isDead) {
+          for (let i = bf.birds.length - 1; i >= 0; i--) {
+            const bird = bf.birds[i];
+            const bx = bf.x + bird.relX;
+            const by = bf.y + bird.relY;
+            if (Math.hypot(this.x - bx, this.y - by) < 16) {
+              bf.birds.splice(i, 1);
+              createFeatherBurst(bx, by, 20);
+              playSound('bird_strike');
+              addScore(100);
+              addFloatingText(bx, by - 12, '+100 BIRD HIT!', '#55ff77', 10);
+              this.isDead = true;
+              if (bf.birds.length === 0) {
+                bf.isDead = true;
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      // 5. Collide with Country Structures
+      for (const s of structures) {
+        if (s.checkCollision(this)) {
+          this.isDead = true;
+          playSound('bullet_ricochet');
+          for (let i = 0; i < 4; i++) {
+            createFirePuff(this.x, this.y, (Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60, 2.0);
+          }
+          return;
+        }
+      }
+    }
+
+    draw(ctx, camX) {
+      if (this.isDead) return;
+      const renderX = this.x - camX;
+      const tailX = renderX - Math.cos(this.theta) * this.length;
+      const tailY = this.y + Math.sin(this.theta) * this.length;
+
+      ctx.save();
+
+      // Outer tracer glow
+      ctx.strokeStyle = 'rgba(255, 120, 0, 0.5)';
+      ctx.lineWidth = 4.0;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(renderX, this.y);
+      ctx.stroke();
+
+      // Bright core tracer
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(renderX, this.y);
+      ctx.stroke();
+
+      // White-hot tip
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(renderX, this.y, 2.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
   // --- PLAYER PLANE & FLIGHT DYNAMICS ---
   class PlayerPlane {
     constructor(x, y) {
@@ -2209,6 +2613,13 @@
 
       // Flight Vector & Orientation (0 = right, PI = left)
       this.theta = 0;
+      this.speedBoostTimer = 0;
+      this.isSpeedBoosted = false;
+      this.gunTimer = 0;
+      this.gunAmmo = 0;
+      this.fireCooldown = 0;
+      this.fireFlashTimer = 0;
+
       this.initAeroStats();
       this.airspeed = this.cruiseSpeed;
       this.vx = this.cruiseSpeed;
@@ -2259,11 +2670,12 @@
 
     initAeroStats() {
       const diffScale = getLevelSpeedScale();
-      // Aerodynamics & Energy Speeds (Boosted +20% base, scaled +5% per level)
-      this.cruiseSpeed = 168 * diffScale;   // Base unboosted level flight speed (+20% from 140) * diffScale
-      this.maxLevelSpeed = 234 * diffScale; // Max level flight speed achievable under boost * diffScale
-      this.maxDiveSpeed = 396 * diffScale;  // Terminal dive velocity achievable in power dive * diffScale
-      this.maxSpeed = 396 * diffScale;      // Hard speed ceiling * diffScale
+      const boostMult = this.isSpeedBoosted ? 1.33 : 1.0;
+      // Aerodynamics & Energy Speeds (Boosted +20% base, scaled +5% per level, +33% during powerup)
+      this.cruiseSpeed = 168 * diffScale * boostMult;   // Base unboosted level flight speed (+20% from 140) * diffScale
+      this.maxLevelSpeed = 234 * diffScale * boostMult; // Max level flight speed achievable under boost * diffScale
+      this.maxDiveSpeed = 396 * diffScale * boostMult;  // Terminal dive velocity achievable in power dive * diffScale
+      this.maxSpeed = 396 * diffScale * boostMult;      // Hard speed ceiling * diffScale
       this.stallSpeed = 52 * diffScale;
       this.recoverSpeed = 82 * diffScale;
       this.minSpeed = 20 * diffScale;
@@ -2279,6 +2691,47 @@
         this.vx *= ratio;
         this.vy *= ratio;
       }
+    }
+
+    activateSpeedBoost(duration = 8.0) {
+      this.speedBoostTimer = Math.max(this.speedBoostTimer, duration);
+      this.isSpeedBoosted = true;
+      // Instant +33% increase in current velocity and max speed
+      this.airspeed *= 1.33;
+      this.vx *= 1.33;
+      this.vy *= 1.33;
+      this.initAeroStats();
+    }
+
+    activateGun(duration = 12.0, ammo = 45) {
+      this.gunTimer = Math.max(this.gunTimer, duration);
+      this.gunAmmo = Math.max(this.gunAmmo, ammo);
+    }
+
+    shoot() {
+      if (this.isDead || (this.gunTimer <= 0 && this.gunAmmo <= 0)) return;
+      if (this.fireCooldown > 0) return;
+
+      this.fireCooldown = 0.11; // ~9 rounds per second continuous tracer stream
+      if (this.gunAmmo > 0) {
+        this.gunAmmo--;
+      }
+      this.fireFlashTimer = 0.06;
+
+      const noseX = Math.cos(this.theta);
+      const noseY = -Math.sin(this.theta);
+      const muzzleX = this.x + noseX * 22;
+      const muzzleY = this.y + noseY * 22;
+
+      const bulletSpeed = 900;
+      const bVx = noseX * bulletSpeed + this.vx * 0.4;
+      const bVy = noseY * bulletSpeed + this.vy * 0.4;
+
+      bullets.push(new Bullet(muzzleX, muzzleY, bVx, bVy, this.theta));
+      playSound('machine_gun');
+
+      // Muzzle flash particle & smoke
+      createSmokePuff(muzzleX, muzzleY, this.vx * 0.1, this.vy * 0.1, 2.0, 'rgba(255,220,100,');
     }
 
     get flightAngle() {
@@ -2603,6 +3056,34 @@
       this.invertedTimer = 0;
       this.rollTimer = 0;
 
+      // Speed Boost Timer & State
+      if (this.speedBoostTimer > 0) {
+        this.speedBoostTimer -= dt;
+        if (!this.isSpeedBoosted) {
+          this.isSpeedBoosted = true;
+          this.initAeroStats();
+        }
+      } else if (this.isSpeedBoosted) {
+        this.isSpeedBoosted = false;
+        this.initAeroStats();
+      }
+
+      // Gun Timer, Cooldown & Continuous Auto-Stream Firing
+      if (this.fireCooldown > 0) this.fireCooldown -= dt;
+      if (this.fireFlashTimer > 0) this.fireFlashTimer -= dt;
+      if (this.gunTimer > 0) {
+        this.gunTimer -= dt;
+        if (this.gunTimer <= 0) {
+          this.gunAmmo = 0;
+        }
+      }
+
+      // Automatically fire stream of bullets while gun is active, and also on manual trigger
+      const isGunActive = (this.gunTimer > 0 || this.gunAmmo > 0) && !this.isDead;
+      if (isGunActive || (input.fire && !this.isDead)) {
+        this.shoot();
+      }
+
       // 3. Airborne Engine Throttle Toggle (Space bar toggles Max Throttle / Idle)
       if (spaceJustPressed) {
         this.isIdle = !this.isIdle;
@@ -2633,6 +3114,14 @@
       const pitchSin = Math.sin(this.theta);
       const noseX = Math.cos(this.theta);
       const noseY = -pitchSin;
+
+      // Supersonic flame exhaust trail from engine / tail when speed boosted
+      if (this.isSpeedBoosted && !this.onGround && Math.random() < 0.75) {
+        const tailX = this.x - noseX * 18;
+        const tailY = this.y - noseY * 18;
+        createFirePuff(tailX, tailY, -this.vx * 0.2, -this.vy * 0.2, 3.2);
+        createSmokePuff(tailX, tailY, -this.vx * 0.15, -this.vy * 0.15, 2.5, 'rgba(0,229,255,');
+      }
 
       if (!this.stalled) {
         // Angle of Attack (AoA): angle between aircraft nose and true relative air velocity vector
@@ -2794,6 +3283,28 @@
       const wingColor = '#3aafa9';
       const accentColor = '#def2f1';
 
+      // Supersonic Speed Boost Jet Flame (drawn behind tail)
+      if (this.isSpeedBoosted && !this.isDead) {
+        ctx.save();
+        ctx.fillStyle = '#00e5ff';
+        const flameLen = 12 + Math.random() * 8;
+        ctx.beginPath();
+        ctx.moveTo(-18, -3);
+        ctx.lineTo(-18 - flameLen, 0);
+        ctx.lineTo(-18, 3);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(-18, -1.5);
+        ctx.lineTo(-18 - flameLen * 0.5, 0);
+        ctx.lineTo(-18, 1.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
       // 1. Fuselage
       ctx.fillStyle = primaryColor;
       ctx.fillRect(-14, -4, 28, 8);
@@ -2820,6 +3331,16 @@
       ctx.fillStyle = '#2b3a4a';
       ctx.fillRect(2, -7, 2, 12);
       ctx.fillRect(-6, -7, 2, 12);
+
+      // Machine Gun Mounts (Twin Vickers Barrels) if gun active
+      if ((this.gunTimer > 0 || this.gunAmmo > 0) && !this.isDead) {
+        ctx.fillStyle = '#111111';
+        ctx.fillRect(4, -8, 10, 2); // Top right barrel
+        ctx.fillRect(4, -5, 10, 2); // Top left barrel
+        ctx.fillStyle = '#ff4500';
+        ctx.fillRect(12, -8, 2, 2); // Flash hider tip
+        ctx.fillRect(12, -5, 2, 2);
+      }
 
       // 4. Tail & Rudder (if not severed)
       if (!this.tailLost) {
@@ -2848,6 +3369,20 @@
       ctx.fillStyle = 'rgba(240, 240, 240, 0.8)';
       const propHeight = Math.sin(this.propAngle) * 14;
       ctx.fillRect(-1, -propHeight / 2, 2, propHeight);
+
+      // Muzzle Flash Starburst
+      if (this.fireFlashTimer > 0) {
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(6, -6, 5 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.arc(6, 0, 4 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(6, -6, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.restore();
     }
   }
@@ -2858,12 +3393,16 @@
   let airfields = [];
   let structures = [];
   let balloons = [];
+  let powerups = [];
+  let bullets = [];
   let airliners = [];
   let stuntPlanes = [];
   let birdFlocks = [];
   let generatedChunks = new Set();
   let poppedBalloonKeys = new Set();
+  let collectedPowerUpKeys = new Set();
   let worldSeed = Math.floor(Math.random() * 1000000) + 1;
+  let powerupSpawnTimer = 6.0;
 
   class Airfield {
     constructor(startX, length = 380) {
@@ -2998,6 +3537,35 @@
         }
       }
     }
+
+    // 4. Random Bouncing Power-Ups (Speed Boost & Machine Gun)
+    const puProb = (k === 0) ? 1.0 : (Math.abs(k) % 2 === 1 ? 0.70 : 0.50);
+    if (rand() < puProb) {
+      let puX;
+      let puY;
+      if (k === 0) {
+        // Initial spawn chunk: placed at climb-out altitude right after runway
+        puX = chunkStart + 560;
+        puY = 160;
+      } else {
+        puX = chunkStart + 160 + rand() * 680;
+        puY = 110 + rand() * 170; // In core visible flight path (110 - 280)
+      }
+
+      // Ensure powerup is positioned safely above any structure
+      for (const s of structures) {
+        if (puX >= s.x - 30 && puX <= s.x + s.width + 30) {
+          puY = Math.min(puY, GROUND_Y - s.height - 40);
+          break;
+        }
+      }
+
+      const puType = rand() < 0.5 ? 'speed' : 'gun';
+      const pu = new PowerUp(puX, puY, puType);
+      if (!collectedPowerUpKeys.has(pu.id)) {
+        powerups.push(pu);
+      }
+    }
   }
 
   function ensureChunksGenerated(centerX) {
@@ -3011,6 +3579,9 @@
     // Cull entities that are too far away (> 4500px) to keep performance snappy
     if (balloons.length > 300) {
       balloons = balloons.filter(b => Math.abs(b.x - centerX) < 4500);
+    }
+    if (powerups.length > 50) {
+      powerups = powerups.filter(pu => Math.abs(pu.x - centerX) < 4500);
     }
     if (structures.length > 80) {
       structures = structures.filter(s => Math.abs(s.x - centerX) < 4500);
@@ -3077,16 +3648,54 @@
       const spawnY = 120 + Math.random() * 180;
       birdFlocks.push(new BirdFlock(spawnX, spawnY, 5));
     }
+
+    // Dynamic timed Power-Up Spawning ahead of player
+    for (let i = powerups.length - 1; i >= 0; i--) {
+      const pu = powerups[i];
+      pu.update(dt);
+      if (pu.collected || Math.abs(pu.x - player.x) > 3000) {
+        powerups.splice(i, 1);
+      }
+    }
+
+    if (powerupSpawnTimer > 0) {
+      powerupSpawnTimer -= dt;
+    }
+
+    if (powerupSpawnTimer <= 0 && powerups.length < 2) {
+      powerupSpawnTimer = 8.0 + Math.random() * 6.0; // Next dynamic spawn in 8-14s
+      const dir = player.vx >= 0 ? 1 : -1;
+      const puX = player.x + dir * (700 + Math.random() * 400);
+      const puY = 120 + Math.random() * 170; // In core visible flight path (120 - 290)
+      const puType = Math.random() < 0.5 ? 'speed' : 'gun';
+      const pu = new PowerUp(puX, puY, puType);
+      if (!collectedPowerUpKeys.has(pu.id)) {
+        powerups.push(pu);
+      }
+    }
+
+    // Update active bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.update(dt);
+      if (b.isDead || Math.abs(b.x - player.x) > 1500) {
+        bullets.splice(i, 1);
+      }
+    }
   }
 
   function initWorldCourse(wave = 1) {
     state.wave = wave;
     worldSeed = Math.floor(Math.random() * 1000000) + 1;
+    powerupSpawnTimer = 6.0;
     generatedChunks.clear();
     poppedBalloonKeys.clear();
+    collectedPowerUpKeys.clear();
     airfields = [];
     structures = [];
     balloons = [];
+    powerups = [];
+    bullets = [];
     airliners = [];
     stuntPlanes = [];
     birdFlocks = [];
@@ -3186,6 +3795,15 @@
       }
     }
 
+    // 1.5. Player vs Power-Ups (Collect!)
+    for (const pu of powerups) {
+      if (!pu.collected) {
+        if (Math.hypot(player.x - pu.x, player.y - pu.y) < player.width * 0.7 + pu.radius) {
+          pu.collect(player);
+        }
+      }
+    }
+
     // 2. Player vs Country Structures (Barns, Silos, Houses, Windmills, Water Towers, Churches)
     for (const s of structures) {
       if (s.checkCollision(player)) {
@@ -3204,13 +3822,16 @@
         showStatusBanner(`COLLIDED WITH ${structName}!`, 2.0, 'danger');
         return;
       } else if (!player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        let inNearY = (player.y >= s.y - 28 && player.y <= s.y + 12);
+        if (s.type === 'church' && player.x > s.x + 28) {
+          inNearY = (player.y >= s.y + 10 && player.y <= s.y + 48);
+        }
         const inNearX = (player.x >= s.x - 25 && player.x <= s.x + s.width + 25);
-        const inNearY = (player.y >= s.y - 28 && player.y <= s.y + 12);
         if (!s.nearMissAwarded && !s.nearMissPending && inNearX && inNearY) {
           s.nearMissPending = true;
         } else if (s.nearMissPending && !s.nearMissAwarded) {
           const clearedX = (player.x < s.x - 55 || player.x > s.x + s.width + 55);
-          const clearedY = (player.y < s.y - 50 || player.y > s.y + 35);
+          const clearedY = (player.y < s.y - 50 || player.y > s.y + 35 || (s.type === 'church' && player.x > s.x + 28 && (player.y < s.y - 10 || player.y > s.y + 65)));
           if (clearedX || clearedY) {
             s.nearMissAwarded = true;
             s.nearMissPending = false;
@@ -3518,6 +4139,9 @@
     fuelBar: document.getElementById('fuel-bar'),
     stallWarning: document.getElementById('stall-warning'),
     statusBanner: document.getElementById('status-banner'),
+    powerupHud: document.getElementById('powerup-hud'),
+    powerupHudLabel: document.getElementById('powerup-hud-label'),
+    powerupHudVal: document.getElementById('powerup-hud-val'),
     // Gauges
     barSpd: document.getElementById('bar-spd'),
     valSpd: document.getElementById('val-spd'),
@@ -3554,6 +4178,7 @@
     touchBtnThrottle: document.getElementById('touch-btn-throttle'),
     touchBtnUp: document.getElementById('touch-btn-up'),
     touchBtnDown: document.getElementById('touch-btn-down'),
+    touchBtnFire: document.getElementById('touch-btn-fire'),
     orientationHint: document.getElementById('orientation-hint')
   };
 
@@ -3878,6 +4503,48 @@
         else domCache.stallWarning.classList.add('hidden');
         hudDirty.stalled = isStalled;
       }
+
+      // Dynamic Power-Up HUD Indicator
+      if (domCache.powerupHud) {
+        let puActive = false;
+        let puLabel = 'POWERUP';
+        let puVal = '';
+        let puType = '';
+
+        if (player.speedBoostTimer > 0) {
+          puActive = true;
+          puLabel = 'BOOST';
+          puVal = `⚡ ${player.speedBoostTimer.toFixed(1)}s`;
+          puType = 'speed';
+        } else if (player.gunTimer > 0 || player.gunAmmo > 0) {
+          puActive = true;
+          puLabel = 'GUN';
+          puVal = `🎯 ${player.gunAmmo}R (${player.gunTimer.toFixed(1)}s)`;
+          puType = 'gun';
+        }
+
+        if (puActive) {
+          domCache.powerupHud.classList.remove('hidden');
+          domCache.powerupHud.className = `hud-box powerup-box ${puType}`;
+          if (domCache.powerupHudLabel) domCache.powerupHudLabel.textContent = puLabel;
+          if (domCache.powerupHudVal) {
+            domCache.powerupHudVal.textContent = puVal;
+            domCache.powerupHudVal.className = `hud-value powerup-val ${puType}`;
+          }
+        } else {
+          domCache.powerupHud.classList.add('hidden');
+        }
+      }
+
+      // Dynamic Mobile Touch FIRE Button Visibility
+      if (domCache.touchBtnFire) {
+        const hasGun = (player.gunTimer > 0 || player.gunAmmo > 0) && !player.isDead;
+        if (hasGun) {
+          domCache.touchBtnFire.classList.remove('hidden');
+        } else {
+          domCache.touchBtnFire.classList.add('hidden');
+        }
+      }
     }
   }
 
@@ -3980,7 +4647,8 @@
         pitchUp,
         pitchDown,
         space: keys.space || keys.boost || touchState.throttle,
-        boost: keys.boost || touchState.throttle
+        boost: keys.boost || touchState.throttle,
+        fire: keys.fire || touchState.btnFire
       });
     } else if (state.lives > 0 && !player.handledDeath) {
       player.handledDeath = true;
@@ -4126,6 +4794,13 @@
       }
     }
 
+    // 3.5. Draw Power-Ups (Bouncing Badges)
+    for (const pu of powerups) {
+      if (!pu.collected && pu.x - state.cameraX >= -80 && pu.x - state.cameraX <= gameWidth + 80) {
+        pu.draw(ctx, state.cameraX);
+      }
+    }
+
     // 4. Draw Airliners
     for (const al of airliners) {
       al.draw(ctx, state.cameraX);
@@ -4139,6 +4814,11 @@
     // 6. Draw Bird Flocks
     for (const bf of birdFlocks) {
       bf.draw(ctx, state.cameraX);
+    }
+
+    // 6.5. Draw Bullets (Tracers)
+    for (const b of bullets) {
+      b.draw(ctx, state.cameraX);
     }
 
     // 7. Draw Player Plane
@@ -4669,6 +5349,14 @@
       domCache.touchBtnThrottle,
       () => { touchState.throttle = true; },
       () => { touchState.throttle = false; }
+    );
+  }
+
+  if (domCache.touchBtnFire) {
+    bindTouchButton(
+      domCache.touchBtnFire,
+      () => { touchState.btnFire = true; },
+      () => { touchState.btnFire = false; }
     );
   }
 
