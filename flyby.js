@@ -929,9 +929,9 @@
 
   function isFireKey(e) {
     const k = (e.key || '').toLowerCase();
-    return e.code === 'KeyF' || e.code === 'KeyX' || e.code === 'KeyZ' || e.code === 'KeyJ' ||
+    return e.code === 'KeyX' || e.code === 'KeyZ' || e.code === 'KeyJ' ||
            e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'ControlLeft' || e.code === 'ControlRight' ||
-           k === 'f' || k === 'x' || k === 'z' || k === 'j';
+           k === 'x' || k === 'z' || k === 'j';
   }
 
   window.addEventListener('keydown', (e) => {
@@ -956,8 +956,7 @@
     if (e.code === 'KeyM') {
       toggleMute();
     }
-    if (e.code === 'KeyF' && !state.running) {
-      // Allow F to toggle fullscreen on title screen if desired
+    if (e.code === 'KeyF') {
       toggleFullscreen();
     }
     if ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
