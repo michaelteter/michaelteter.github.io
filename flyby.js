@@ -10,7 +10,7 @@
   // --- CANVAS & CONTEXT SETUP ---
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  const GAME_WIDTH = 960;
+  let gameWidth = 960;
   const GAME_HEIGHT = 540;
   const GROUND_Y = 480;
   const RUNWAY_START = 120;
@@ -3321,11 +3321,11 @@
     skyGrad.addColorStop(0.85, '#99d98c'); // Golden-lime horizon
     skyGrad.addColorStop(1, '#d9ed92');   // Bright sun haze
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.fillRect(0, 0, gameWidth, GAME_HEIGHT);
 
     // 2. Warm Sun (Seamless gentle parallax)
-    const sunCycle = GAME_WIDTH + 140;
-    const sunRenderX = ((GAME_WIDTH * 0.82 - (camX * 0.04) % sunCycle) + sunCycle) % sunCycle - 70;
+    const sunCycle = gameWidth + 140;
+    const sunRenderX = ((gameWidth * 0.82 - (camX * 0.04) % sunCycle) + sunCycle) % sunCycle - 70;
     ctx.fillStyle = '#fff4cc';
     ctx.beginPath();
     ctx.arc(sunRenderX, 65, 32, 0, Math.PI * 2);
@@ -3336,12 +3336,12 @@
     ctx.beginPath();
     ctx.moveTo(0, GROUND_Y);
     const mStep = 35;
-    for (let x = -mStep; x <= GAME_WIDTH + mStep; x += mStep) {
+    for (let x = -mStep; x <= gameWidth + mStep; x += mStep) {
       const worldX = x + camX * 0.08;
       const my = GROUND_Y - 95 - Math.sin(worldX * 0.003) * 45 - Math.cos(worldX * 0.009) * 25;
       ctx.lineTo(x, my);
     }
-    ctx.lineTo(GAME_WIDTH, GROUND_Y);
+    ctx.lineTo(gameWidth, GROUND_Y);
     ctx.fill();
 
     // 4. Rolling Country Hills (Continuous Parallax 0.25x)
@@ -3349,20 +3349,20 @@
     ctx.beginPath();
     ctx.moveTo(0, GROUND_Y);
     const hStep = 30;
-    for (let x = -hStep; x <= GAME_WIDTH + hStep; x += hStep) {
+    for (let x = -hStep; x <= gameWidth + hStep; x += hStep) {
       const worldX = x + camX * 0.25;
       const hy = GROUND_Y - 45 - Math.sin(worldX * 0.006) * 22;
       ctx.lineTo(x, hy);
     }
-    ctx.lineTo(GAME_WIDTH, GROUND_Y);
+    ctx.lineTo(gameWidth, GROUND_Y);
     ctx.fill();
 
     // 5. Fluffy Pixel Clouds (Continuous streaming)
     const diffScale = getLevelSpeedScale();
     for (const cloud of clouds) {
       cloud.x += (cloud.speed * diffScale) * 0.016;
-      while (cloud.x < camX - 300) cloud.x += GAME_WIDTH + 600;
-      while (cloud.x > camX + GAME_WIDTH + 300) cloud.x -= GAME_WIDTH + 600;
+      while (cloud.x < camX - 300) cloud.x += gameWidth + 600;
+      while (cloud.x > camX + gameWidth + 300) cloud.x -= gameWidth + 600;
 
       const renderX = cloud.x - camX * 0.5;
       drawPixelCloud(ctx, renderX, cloud.y, cloud.scale);
@@ -3370,16 +3370,16 @@
 
     // 6. Ground & Farmland
     ctx.fillStyle = '#52b788'; // Lush grass field
-    ctx.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+    ctx.fillRect(0, GROUND_Y, gameWidth, GAME_HEIGHT - GROUND_Y);
 
     ctx.fillStyle = '#2d6a4f'; // Soil underneath
-    ctx.fillRect(0, GROUND_Y + 14, GAME_WIDTH, GAME_HEIGHT - GROUND_Y - 14);
+    ctx.fillRect(0, GROUND_Y + 14, gameWidth, GAME_HEIGHT - GROUND_Y - 14);
 
     // Continuous Country fence posts (skips active airfields)
     ctx.strokeStyle = '#8d6e63';
     ctx.lineWidth = 1.5;
     const startFence = Math.floor((camX - 75) / 75) * 75;
-    const endFence = camX + GAME_WIDTH + 75;
+    const endFence = camX + gameWidth + 75;
     for (let fx = startFence; fx <= endFence; fx += 75) {
       if (isPointOnAnyRunway(fx, 10)) continue; // Don't build fences across runways!
       const rfx = fx - camX;
@@ -3396,7 +3396,7 @@
       const rwRenderStart = af.startX - camX;
       const rwRenderEnd = af.endX - camX;
 
-      if (rwRenderEnd < -100 || rwRenderStart > GAME_WIDTH + 100) continue;
+      if (rwRenderEnd < -100 || rwRenderStart > gameWidth + 100) continue;
 
       // Runway Tarmac
       ctx.fillStyle = '#495057';
@@ -3979,7 +3979,7 @@
 
     // 3. Dynamic World & Camera Tracking
     ensureChunksGenerated(player.x);
-    state.cameraX = player.x - GAME_WIDTH * 0.33;
+    state.cameraX = player.x - gameWidth * 0.33;
 
     // 4. Screen Shake Decay
     if (state.shake > 0) {
@@ -4104,14 +4104,14 @@
 
     // 2. Draw Country Structures (Barns, Silos, Windmills, Water Towers, Churches)
     for (const s of structures) {
-      if (s.x - state.cameraX >= -200 && s.x - state.cameraX <= GAME_WIDTH + 200) {
+      if (s.x - state.cameraX >= -200 && s.x - state.cameraX <= gameWidth + 200) {
         s.draw(ctx, state.cameraX);
       }
     }
 
     // 3. Draw Balloons
     for (const b of balloons) {
-      if (!b.popped && b.x - state.cameraX >= -80 && b.x - state.cameraX <= GAME_WIDTH + 80) {
+      if (!b.popped && b.x - state.cameraX >= -80 && b.x - state.cameraX <= gameWidth + 80) {
         b.draw(ctx, state.cameraX);
       }
     }
@@ -4282,18 +4282,18 @@
     if (state.running && !state.gameOver && state.paused && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
       ctx.save();
       ctx.fillStyle = 'rgba(8, 12, 18, 0.65)';
-      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      ctx.fillRect(0, 0, gameWidth, GAME_HEIGHT);
 
       ctx.fillStyle = '#ffdf40';
       ctx.font = '20px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       ctx.shadowColor = '#000000';
       ctx.shadowBlur = 6;
-      ctx.fillText('PAUSED', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10);
+      ctx.fillText('PAUSED', gameWidth / 2, GAME_HEIGHT / 2 - 10);
 
       ctx.fillStyle = '#79a6d2';
       ctx.font = '9px "Press Start 2P", monospace';
-      ctx.fillText('PRESS P / ⏸ TO RESUME | ESC FOR SETTINGS', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25);
+      ctx.fillText('PRESS P / ⏸ TO RESUME | ESC FOR SETTINGS', gameWidth / 2, GAME_HEIGHT / 2 + 25);
       ctx.restore();
     }
   }
@@ -4549,10 +4549,25 @@
       domCache.orientationHint.classList.add('hidden');
     }
   }
-  window.addEventListener('resize', checkOrientation);
-  window.addEventListener('orientationchange', checkOrientation);
+
+  // Dynamic Game Canvas Resizing
+  function resizeGame() {
+    const containerWidth = window.innerWidth || document.documentElement.clientWidth || 960;
+    const containerHeight = window.innerHeight || document.documentElement.clientHeight || 540;
+    const aspect = containerWidth / Math.max(1, containerHeight);
+    gameWidth = Math.max(720, Math.round(GAME_HEIGHT * aspect));
+    if (canvas.width !== gameWidth || canvas.height !== GAME_HEIGHT) {
+      canvas.width = gameWidth;
+      canvas.height = GAME_HEIGHT;
+    }
+    ctx.imageSmoothingEnabled = false;
+    checkOrientation();
+  }
+  window.addEventListener('resize', resizeGame);
+  window.addEventListener('orientationchange', resizeGame);
 
   // Initial setup
+  resizeGame();
   if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
   if (domCache.settingTouchControls) domCache.settingTouchControls.value = settings.touchControls || 'auto';
   if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
