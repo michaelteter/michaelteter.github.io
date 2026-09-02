@@ -1904,9 +1904,15 @@
       this.flames = [];
 
       if (type === 'barn') {
-        this.width = 110;
-        this.height = 70;
+        this.width = 140;
+        this.height = 85;
         this.y = GROUND_Y - this.height;
+        this.gapTop = 428;
+        this.gapBottom = 470;
+        this.gapHeight = this.gapBottom - this.gapTop;
+        this.barnStormPending = false;
+        this.barnStormAwarded = false;
+        this.entryDir = 0;
       } else if (type === 'house') {
         this.width = 85;
         this.height = 55;
@@ -1996,9 +2002,24 @@
       const py = plane.y;
 
       if (this.type === 'barn') {
-        // Barn bounding box + roof slope
-        if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
-          return true;
+        const halfW = (plane.width || 34) * 0.40;
+        const halfH = (plane.height || 18) * 0.38;
+        const pLeft = px - halfW;
+        const pRight = px + halfW;
+        const pTop = py - halfH;
+        const pBottom = py + halfH;
+
+        // Check horizontal overlap across the barn
+        if (pRight >= this.x && pLeft <= this.x + this.width) {
+          // 1. Top Hitbox: Gambrel roof & upper hayloft
+          if (pTop <= this.gapTop && pBottom >= this.y) {
+            return true;
+          }
+          // 2. Bottom Hitbox: Foundation & ground threshold
+          if (pBottom >= this.gapBottom && pTop <= GROUND_Y) {
+            return true;
+          }
+          // Inside the vertical fly-through corridor (this.gapTop to this.gapBottom): clear flight!
         }
       } else if (this.type === 'house') {
         if (px >= this.x && px <= this.x + this.width && py >= this.y && py <= GROUND_Y) {
@@ -2064,54 +2085,109 @@
       const rx = this.x - camX;
 
       if (this.type === 'barn') {
-        // Red Barn Body
-        ctx.fillStyle = '#a62b2b';
-        ctx.fillRect(rx, this.y + 25, 78, 45);
+        // --- BARN INTERIOR BREEZEWAY (Rendered behind player) ---
+        // 1. Darkened rustic timber interior back wall
+        ctx.fillStyle = '#26120c';
+        ctx.fillRect(rx + 4, this.gapTop - 4, this.width - 8, this.gapHeight + 4);
 
-        // White Barn Trim & Crosses
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(rx + 22, this.y + 35, 34, 35); // Main doors
+        // Vertical interior plank boards
+        ctx.strokeStyle = '#1b0c08';
+        ctx.lineWidth = 1.5;
+        for (let bx = rx + 16; bx < rx + this.width - 12; bx += 14) {
+          ctx.beginPath();
+          ctx.moveTo(bx, this.gapTop - 4);
+          ctx.lineTo(bx, this.gapBottom);
+          ctx.stroke();
+        }
+
+        // Interior roof rafters / cross trusses visible in the breezeway ceiling
+        ctx.strokeStyle = '#180a07';
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
-        ctx.moveTo(rx + 22, this.y + 35);
-        ctx.lineTo(rx + 56, this.y + 70);
-        ctx.moveTo(rx + 56, this.y + 35);
-        ctx.lineTo(rx + 22, this.y + 70);
+        for (let bx = rx + 10; bx < rx + this.width - 20; bx += 24) {
+          ctx.moveTo(bx, this.gapTop);
+          ctx.lineTo(bx + 12, this.gapTop - 6);
+          ctx.lineTo(bx + 24, this.gapTop);
+        }
         ctx.stroke();
 
-        // Gambrel Barn Roof (sloped classic roof)
-        ctx.fillStyle = '#6b1c1c';
+        // Straw-strewn earthen floor inside the barn
+        ctx.fillStyle = '#3a2618';
+        ctx.fillRect(rx + 4, this.gapBottom - 3, this.width - 8, 3);
+        ctx.fillStyle = '#b8860b';
+        // Flecks of gold straw on the floor
+        for (let sX = rx + 12; sX < rx + this.width - 12; sX += 16) {
+          ctx.fillRect(sX, this.gapBottom - 2, 4, 1.5);
+        }
+
+        // Interior depth shading: center tunnel shadow, light spilling in from open doors
+        const grad = ctx.createLinearGradient(rx, 0, rx + this.width, 0);
+        grad.addColorStop(0, 'rgba(255, 230, 180, 0.15)');
+        grad.addColorStop(0.2, 'rgba(0, 0, 0, 0.35)');
+        grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.55)');
+        grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.35)');
+        grad.addColorStop(1, 'rgba(255, 230, 180, 0.15)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(rx + 4, this.gapTop, this.width - 8, this.gapHeight);
+
+        // --- OBVIOUSLY OPEN DOORS ON BOTH ENDS ---
+        ctx.save();
+        // Left Open Barn Door (swung wide open outward to the west)
+        ctx.fillStyle = '#781c1c';
+        ctx.strokeStyle = '#4a0f0f';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(rx - 4, this.y + 25);
-        ctx.lineTo(rx + 16, this.y + 6);
-        ctx.lineTo(rx + 39, this.y);
-        ctx.lineTo(rx + 62, this.y + 6);
-        ctx.lineTo(rx + 82, this.y + 25);
+        ctx.moveTo(rx + 2, this.gapTop);
+        ctx.lineTo(rx - 14, this.gapTop + 3);
+        ctx.lineTo(rx - 14, this.gapBottom + 2);
+        ctx.lineTo(rx + 2, this.gapBottom);
         ctx.closePath();
         ctx.fill();
+        ctx.stroke();
+
+        // White X-cross brace on open left door
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(rx - 12, this.gapTop + 5);
+        ctx.lineTo(rx, this.gapBottom - 2);
+        ctx.moveTo(rx, this.gapTop + 2);
+        ctx.lineTo(rx - 12, this.gapBottom);
         ctx.stroke();
 
-        // Silo attached to barn
-        const siloX = rx + 82;
-        ctx.fillStyle = '#a0aab2';
-        ctx.fillRect(siloX, this.y + 8, 26, 62);
-        // Silo Dome
-        ctx.fillStyle = '#7a858d';
+        // Black heavy iron hinges
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(rx - 2, this.gapTop + 4, 6, 3);
+        ctx.fillRect(rx - 2, this.gapBottom - 7, 6, 3);
+
+        // Right Open Barn Door (swung wide open outward to the east)
+        ctx.fillStyle = '#781c1c';
+        ctx.strokeStyle = '#4a0f0f';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(siloX + 13, this.y + 8, 13, Math.PI, 0);
+        ctx.moveTo(rx + this.width - 2, this.gapTop);
+        ctx.lineTo(rx + this.width + 14, this.gapTop + 3);
+        ctx.lineTo(rx + this.width + 14, this.gapBottom + 2);
+        ctx.lineTo(rx + this.width - 2, this.gapBottom);
+        ctx.closePath();
         ctx.fill();
-
-        // Weather vane
-        ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(rx + 39, this.y);
-        ctx.lineTo(rx + 39, this.y - 10);
         ctx.stroke();
-        ctx.fillStyle = '#d4af37';
-        ctx.fillRect(rx + 34, this.y - 12, 10, 4);
+
+        // White X-cross brace on open right door
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(rx + this.width, this.gapTop + 2);
+        ctx.lineTo(rx + this.width + 12, this.gapBottom);
+        ctx.moveTo(rx + this.width + 12, this.gapTop + 5);
+        ctx.lineTo(rx + this.width, this.gapBottom - 2);
+        ctx.stroke();
+
+        // Black heavy iron hinges
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(rx + this.width - 4, this.gapTop + 4, 6, 3);
+        ctx.fillRect(rx + this.width - 4, this.gapBottom - 7, 6, 3);
+        ctx.restore();
 
       } else if (this.type === 'house') {
         // Country Farmhouse
@@ -2294,8 +2370,8 @@
         ctx.fillRect(rx + 11, this.y + 50, 10, 14);
       }
 
-      // Draw 2-3 large dancing flames overlaid on top of building with bottom starting at ground level
-      if (this.flames && this.flames.length > 0) {
+      // Draw 2-3 large dancing flames overlaid on top of building with bottom starting at ground level (non-barn buildings)
+      if (this.type !== 'barn' && this.flames && this.flames.length > 0) {
         const nowSec = Date.now() * 0.0038;
         for (const f of this.flames) {
           const rx = f.x - camX;
@@ -2306,6 +2382,216 @@
             alpha = f.life / 0.6;
           }
           drawLargeDancingFlame(ctx, rx, GROUND_Y, f.width, f.height, nowSec + f.phase, Math.max(0, Math.min(1.0, alpha)));
+        }
+      }
+    }
+
+    // Foreground pass (rendered on top of player biplane and other hazards)
+    drawForeground(ctx, camX) {
+      if (this.type !== 'barn') return;
+      const rx = this.x - camX;
+
+      ctx.save();
+
+      // 1. Stone Foundation along the base (GROUND_Y - 10 to GROUND_Y)
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(rx + 2, this.gapBottom, this.width - 4, GROUND_Y - this.gapBottom);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(rx + 2, GROUND_Y - 2, this.width - 4, 2);
+      // Mortar block joints
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let bx = rx + 14; bx < rx + this.width; bx += 20) {
+        ctx.moveTo(bx, this.gapBottom);
+        ctx.lineTo(bx, GROUND_Y);
+      }
+      ctx.stroke();
+
+      // 2. Front Wall Facade (obscures the player biplane as it flies inside)
+      // Spans between the left open door (rx + 26) and right open door (rx + this.width - 26)
+      const fwLeft = rx + 26;
+      const fwRight = rx + this.width - 26;
+      const fwWidth = fwRight - fwLeft;
+
+      // Solid red front wall
+      ctx.fillStyle = '#a62b2b';
+      ctx.fillRect(fwLeft, this.gapTop, fwWidth, this.gapHeight);
+
+      // Vertical board plank lines
+      ctx.strokeStyle = '#851e1e';
+      ctx.lineWidth = 1.5;
+      for (let px = fwLeft + 10; px < fwRight; px += 11) {
+        ctx.beginPath();
+        ctx.moveTo(px, this.gapTop);
+        ctx.lineTo(px, this.gapBottom);
+        ctx.stroke();
+      }
+
+      // White X-braces across the front wall
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.0;
+      const midFw = fwLeft + fwWidth / 2;
+      // Left X-brace panel
+      ctx.strokeRect(fwLeft + 4, this.gapTop + 4, midFw - fwLeft - 8, this.gapHeight - 8);
+      ctx.beginPath();
+      ctx.moveTo(fwLeft + 4, this.gapTop + 4);
+      ctx.lineTo(midFw - 4, this.gapBottom - 4);
+      ctx.moveTo(midFw - 4, this.gapTop + 4);
+      ctx.lineTo(fwLeft + 4, this.gapBottom - 4);
+      // Right X-brace panel
+      ctx.moveTo(midFw + 4, this.gapTop + 4);
+      ctx.lineTo(fwRight - 4, this.gapBottom - 4);
+      ctx.moveTo(fwRight - 4, this.gapTop + 4);
+      ctx.lineTo(midFw + 4, this.gapBottom - 4);
+      ctx.stroke();
+      ctx.strokeRect(midFw + 4, this.gapTop + 4, fwRight - midFw - 8, this.gapHeight - 8);
+
+      // White Timber Jamb Posts framing the open doorways
+      ctx.fillStyle = '#ffffff';
+      // Left doorway jamb post
+      ctx.fillRect(fwLeft - 2, this.gapTop - 2, 4, this.gapHeight + 4);
+      // Right doorway jamb post
+      ctx.fillRect(fwRight - 2, this.gapTop - 2, 4, this.gapHeight + 4);
+      // Far outer jamb posts at the ends of the barn
+      ctx.fillRect(rx, this.gapTop - 2, 3, this.gapHeight + 4);
+      ctx.fillRect(rx + this.width - 3, this.gapTop - 2, 3, this.gapHeight + 4);
+
+      // Heavy Doorway Header / Lintel Beam across the doorways and front wall
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(rx, this.gapTop - 4, this.width, 5);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rx, this.gapTop - 4, this.width, 5);
+
+      // 3. Upper Hayloft Wall (from this.y + 24 to this.gapTop)
+      ctx.fillStyle = '#9e2626';
+      ctx.fillRect(rx + 2, this.y + 24, this.width - 4, this.gapTop - (this.y + 24));
+
+      // Upper wall plank lines
+      ctx.strokeStyle = '#7c1c1c';
+      ctx.lineWidth = 1.5;
+      for (let px = rx + 14; px < rx + this.width - 4; px += 14) {
+        ctx.beginPath();
+        ctx.moveTo(px, this.y + 24);
+        ctx.lineTo(px, this.gapTop - 4);
+        ctx.stroke();
+      }
+
+      // Hayloft Door / Window in upper wall center
+      const hwX = rx + this.width / 2 - 13;
+      const hwY = this.y + 28;
+      ctx.fillStyle = '#1e0c08';
+      ctx.fillRect(hwX, hwY, 26, 22); // Dark interior
+      // Warm amber lantern glow
+      ctx.fillStyle = 'rgba(255, 204, 0, 0.4)';
+      ctx.fillRect(hwX + 4, hwY + 3, 18, 16);
+      // Hay spilling out of the loft window
+      ctx.fillStyle = '#eab308';
+      ctx.beginPath();
+      ctx.moveTo(hwX + 3, hwY + 22);
+      ctx.lineTo(hwX + 7, hwY + 27);
+      ctx.lineTo(hwX + 13, hwY + 23);
+      ctx.lineTo(hwX + 19, hwY + 28);
+      ctx.lineTo(hwX + 23, hwY + 22);
+      ctx.closePath();
+      ctx.fill();
+      // White window frame & center mullion
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hwX, hwY, 26, 22);
+      ctx.beginPath();
+      ctx.moveTo(hwX + 13, hwY);
+      ctx.lineTo(hwX + 13, hwY + 22);
+      ctx.stroke();
+
+      // 4. Classic Gambrel Roof (double-sloped gambrel roof profile)
+      const roofMid = rx + this.width / 2;
+      ctx.fillStyle = '#6b1c1c';
+      ctx.beginPath();
+      ctx.moveTo(rx - 6, this.y + 24);
+      ctx.lineTo(rx + 28, this.y + 7);
+      ctx.lineTo(roofMid, this.y);
+      ctx.lineTo(rx + this.width - 28, this.y + 7);
+      ctx.lineTo(rx + this.width + 6, this.y + 24);
+      ctx.closePath();
+      ctx.fill();
+
+      // Roof shading (right slope slightly darker)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(roofMid, this.y);
+      ctx.lineTo(rx + this.width - 28, this.y + 7);
+      ctx.lineTo(rx + this.width + 6, this.y + 24);
+      ctx.lineTo(roofMid, this.y + 24);
+      ctx.closePath();
+      ctx.fill();
+
+      // White fascia and roof trim
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(rx - 7, this.y + 24);
+      ctx.lineTo(rx + 28, this.y + 7);
+      ctx.lineTo(roofMid, this.y);
+      ctx.lineTo(rx + this.width - 28, this.y + 7);
+      ctx.lineTo(rx + this.width + 7, this.y + 24);
+      ctx.stroke();
+
+      // 5. Rooftop Cupola & Golden Weather Vane
+      const cupolaX = roofMid - 9;
+      const cupolaY = this.y - 12;
+      // White cupola box
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(cupolaX, cupolaY, 18, 12);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cupolaX, cupolaY, 18, 12);
+      // Cupola louvers
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(cupolaX + 3, cupolaY + 3, 12, 2);
+      ctx.fillRect(cupolaX + 3, cupolaY + 7, 12, 2);
+      // Cupola roof
+      ctx.fillStyle = '#6b1c1c';
+      ctx.beginPath();
+      ctx.moveTo(cupolaX - 2, cupolaY);
+      ctx.lineTo(roofMid, cupolaY - 8);
+      ctx.lineTo(cupolaX + 20, cupolaY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      // Weather Vane Spire & Rooster
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(roofMid, cupolaY - 8);
+      ctx.lineTo(roofMid, cupolaY - 20);
+      ctx.moveTo(roofMid - 5, cupolaY - 14);
+      ctx.lineTo(roofMid + 5, cupolaY - 14);
+      ctx.stroke();
+      // Golden Rooster
+      ctx.fillStyle = '#eab308';
+      ctx.beginPath();
+      ctx.arc(roofMid, cupolaY - 21, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(roofMid - 4, cupolaY - 23, 7, 3);
+
+      ctx.restore();
+
+      // 6. Draw 2-3 large dancing flames overlaid on top of front wall & roof if ignited
+      if (this.flames && this.flames.length > 0) {
+        const nowSec = Date.now() * 0.0038;
+        for (const f of this.flames) {
+          const fx = f.x - camX;
+          let alpha = 1.0;
+          if (f.life > f.maxLife - 0.25) {
+            alpha = (f.maxLife - f.life) / 0.25;
+          } else if (f.life < 0.6) {
+            alpha = f.life / 0.6;
+          }
+          drawLargeDancingFlame(ctx, fx, GROUND_Y, f.width, f.height, nowSec + f.phase, Math.max(0, Math.min(1.0, alpha)));
         }
       }
     }
@@ -3993,7 +4279,7 @@
       let diveY = GROUND_Y - struct.height - 18;
       if (stype === 'windmill') diveY = GROUND_Y - 125;
       else if (stype === 'silo_set') diveY = GROUND_Y - 105;
-      else if (stype === 'barn') diveY = GROUND_Y - 82;
+      else if (stype === 'barn') diveY = GROUND_Y - 105;
       else if (stype === 'church') diveY = GROUND_Y - 128;
       else if (stype === 'water_tower') diveY = GROUND_Y - 110;
 
@@ -4001,6 +4287,16 @@
       const diveBalloon = new Balloon(sx + struct.width / 2, diveY, diveType);
       if (!poppedBalloonKeys.has(diveBalloon.id)) {
         balloons.push(diveBalloon);
+      }
+
+      // For barns, tempt players to fly through by placing a star or rainbow balloon inside the breezeway tunnel!
+      if (stype === 'barn' && rand() < 0.65) {
+        const tunnelY = (struct.gapTop + struct.gapBottom) / 2;
+        const tunnelType = rand() < 0.55 ? 'gold' : 'rainbow';
+        const tunnelBalloon = new Balloon(sx + struct.width / 2, tunnelY, tunnelType);
+        if (!poppedBalloonKeys.has(tunnelBalloon.id)) {
+          balloons.push(tunnelBalloon);
+        }
       }
     }
 
@@ -4269,6 +4565,24 @@
     state.shake = Math.min(state.shake + 3.5, 7);
   }
 
+  function triggerBarnStormer(s) {
+    const pVx = player ? player.vx : 0;
+    const relSpeed = Math.abs(pVx);
+    const speedMult = Math.max(1.0, relSpeed / 150);
+    const points = Math.round(400 * speedMult);
+
+    addScore(points);
+    state.nearMisses = (state.nearMisses || 0) + 1;
+    const midX = s.x + s.width / 2;
+    const speedNotice = speedMult > 1.05 ? ` (${speedMult.toFixed(1)}X SPD)` : '';
+
+    addFloatingText(midX, s.y - 12, `+${points} BARNSTORMER!${speedNotice}`, '#ffd700', 13);
+    showStatusBanner(`★ DARING BARNSTORMER! FLEW THROUGH THE BARN! +${points}${speedNotice} ★`, 2.4, 'bonus');
+    playSound('near_miss');
+    createNearMissBurst(player.x, player.y);
+    state.shake = Math.min(state.shake + 4, 8);
+  }
+
   // --- COLLISION DETECTION & TWO-PHASE NEAR MISS SYSTEM ---
   function checkCollisions() {
     if (player.isDead) return;
@@ -4296,7 +4610,7 @@
       }
     }
 
-    // 1.5. Player vs Power-Ups (Collect!)
+    // 1.5. Power-Ups Collection
     for (const pu of powerups) {
       if (!pu.collected) {
         if (Math.hypot(player.x - pu.x, player.y - pu.y) < player.width * 0.7 + pu.radius) {
@@ -4310,6 +4624,7 @@
       if (s.checkCollision(player)) {
         s.nearMissPending = false;
         s.nearMissAwarded = true;
+        if (s.barnStormPending) s.barnStormPending = false;
         s.ignite();
         player.crash();
         const names = {
@@ -4324,6 +4639,29 @@
         showStatusBanner(`COLLIDED WITH ${structName}!`, 2.0, 'danger');
         return;
       } else if (!player.isDead && !player.onGround && !player.isWobblingCrash && (!player.invulnerableTimer || player.invulnerableTimer <= 0)) {
+        // Barn Fly-Through Stunt Tracking (Barnstormer)
+        if (s.type === 'barn') {
+          const inGapY = (player.y >= s.gapTop && player.y <= s.gapBottom);
+          const inBarnX = (player.x >= s.x && player.x <= s.x + s.width);
+
+          if (inBarnX && inGapY) {
+            if (!s.barnStormPending && !s.barnStormAwarded) {
+              s.barnStormPending = true;
+              s.entryDir = player.vx >= 0 ? 1 : -1;
+              createSmokePuff(player.x, player.y + 8, -player.vx * 0.1, -4, 2.5, 'rgba(180,160,130,');
+            }
+          } else if (s.barnStormPending && !s.barnStormAwarded) {
+            const clearedEast = (s.entryDir === 1 && player.x > s.x + s.width + 4);
+            const clearedWest = (s.entryDir === -1 && player.x < s.x - 4);
+            if (clearedEast || clearedWest) {
+              s.barnStormAwarded = true;
+              s.barnStormPending = false;
+              triggerBarnStormer(s);
+            } else if (!inGapY && inBarnX) {
+              s.barnStormPending = false;
+            }
+          }
+        }
         let inNearY = (player.y >= s.y - 28 && player.y <= s.y + 12);
         if (s.type === 'church' && player.x > s.x + 28) {
           inNearY = (player.y >= s.y + 10 && player.y <= s.y + 48);
@@ -5398,6 +5736,13 @@
 
     // 7. Draw Player Plane
     player.draw(ctx, state.cameraX);
+
+    // 7.5. Draw Country Structures Foreground (Front Walls & Obscuration)
+    for (const s of structures) {
+      if (s.drawForeground && s.x - state.cameraX >= -200 && s.x - state.cameraX <= gameWidth + 200) {
+        s.drawForeground(ctx, state.cameraX);
+      }
+    }
 
     // 8. Draw Particles (Smoke, Fire, Feathers, Debris & Confetti)
     for (const p of particles) {
