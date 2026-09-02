@@ -693,6 +693,33 @@ body {
   font-size: 7.5px;
 }
 
+.start-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+  color: #f4eedb;
+  font-size: inherit;
+  touch-action: manipulation;
+  transition: color 0.15s ease;
+}
+
+.start-toggle:hover {
+  color: #ffdf40;
+}
+
+.start-toggle input[type="checkbox"] {
+  accent-color: #38ef7d;
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+  touch-action: manipulation;
+}
+
 .btn-row {
   display: flex;
   justify-content: center;
@@ -1157,6 +1184,15 @@ body {
     font-size: 0.95em;
   }
 
+  .start-toggle {
+    gap: 4px;
+  }
+
+  .start-toggle input[type="checkbox"] {
+    width: 11px;
+    height: 11px;
+  }
+
   .btn-row {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1286,6 +1322,15 @@ body {
   .key-badge {
     padding: 0 2px;
     font-size: 0.9em;
+  }
+
+  .start-toggle {
+    gap: 3px;
+  }
+
+  .start-toggle input[type="checkbox"] {
+    width: 10px;
+    height: 10px;
   }
 
   .btn-row {

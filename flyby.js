@@ -56,9 +56,13 @@
   // If the user previously saved a preference, respect the saved preference.
   const initialInvertY = storedInvertY !== null ? storedInvertY === 'true' : !isMobileDevice;
 
+  const storedPowerups = Storage.get('flyby_powerups');
+  const initialPowerups = storedPowerups !== null ? storedPowerups === 'true' : true;
+
   // --- SETTINGS & CONFIG ---
   const settings = {
     invertY: initialInvertY,
+    powerups: initialPowerups,
     touchControls: Storage.get('flyby_touch_controls') || 'auto', // 'auto', 'always', 'off'
     showInstruments: Storage.get('flyby_instruments') !== null ? Storage.get('flyby_instruments') === 'true' : true, // Cockpit side bar gauges
     scanlines: Storage.get('flyby_scanlines') !== null ? Storage.get('flyby_scanlines') === 'true' : true,       // CRT filter
@@ -146,6 +150,149 @@
       }
     }
   };
+
+  // --- ATMOSPHERIC WIND GUSTS (Swirling Country Leaves) ---
+  const windLeaves = [];
+  let leafGustTimer = 2.0; // Countdown until next gust of leaves
+  const LEAF_COLORS = ['#e76f51', '#f4a261', '#e9c46a', '#70a040', '#9c6644', '#d4a373'];
+
+  function triggerLeafGust() {
+    if (!settings.wind) return;
+    const currentWind = wind.speed;
+    const windMag = Math.abs(currentWind);
+    if (windMag < 2.5) return; // Calm / negligible breeze
+
+    const diffScale = getLevelSpeedScale();
+    const maxWind = Math.max(25, 33.6 * diffScale);
+    const windRatio = Math.min(1.0, windMag / maxWind);
+
+    // Direction wind is blowing toward (+1 = East/Right, -1 = West/Left)
+    const dir = currentWind >= 0 ? 1 : -1;
+
+    // Cluster count: 4 to 9 leaves in a natural gust formation
+    const leafCount = Math.round(4 + windRatio * 5);
+
+    // Spawn origin just offscreen on the windward side
+    const originX = dir > 0 ? (state.cameraX - 25) : (state.cameraX + gameWidth + 25);
+    const originY = 50 + Math.random() * (GROUND_Y - 170);
+
+    for (let i = 0; i < leafCount; i++) {
+      const staggerX = (Math.random() - 0.5) * 60 - dir * (i * 12);
+      const staggerY = (Math.random() - 0.5) * 45;
+      const speedScale = 1.05 + Math.random() * 0.45;
+
+      windLeaves.push({
+        x: originX + staggerX,
+        y: originY + staggerY,
+        vx: currentWind * speedScale + dir * (10 + Math.random() * 15),
+        vy: 8 + Math.random() * 14,
+        length: 3.5 + Math.random() * 1.8,
+        width: 2.0 + Math.random() * 1.0,
+        color: LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)],
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * (4 + windRatio * 6),
+        flutter: Math.random() * Math.PI * 2,
+        flutterSpeed: 3.5 + Math.random() * 4.0,
+        flutterAmp: 14 + Math.random() * 10,
+        life: 1.0,
+        onGround: false
+      });
+    }
+  }
+
+  function resetWindLeaves() {
+    windLeaves.length = 0;
+    leafGustTimer = 2.0 + Math.random() * 2.0;
+  }
+
+  function updateWindLeaves(dt) {
+    if (!settings.wind) {
+      windLeaves.length = 0;
+      return;
+    }
+
+    const currentWind = wind.speed;
+    const windMag = Math.abs(currentWind);
+    const maxWind = Math.max(25, 33.6 * getLevelSpeedScale());
+    const windRatio = Math.min(1.0, windMag / maxWind);
+
+    // Gust frequency scales with wind: high wind = frequent gusts (every 2.5-4.5s), low wind = rare (8-12s)
+    leafGustTimer -= dt;
+    if (leafGustTimer <= 0) {
+      if (windMag >= 3.0) {
+        triggerLeafGust();
+        leafGustTimer = 2.2 + (1.0 - windRatio) * 4.8 + Math.random() * 2.0;
+      } else {
+        leafGustTimer = 7.0 + Math.random() * 5.0;
+      }
+    }
+
+    // Update active leaves with O(1) swap-and-pop
+    for (let i = windLeaves.length - 1; i >= 0; i--) {
+      const leaf = windLeaves[i];
+
+      if (leaf.onGround) {
+        leaf.vx *= 0.85;
+        leaf.x += leaf.vx * dt;
+        leaf.life -= dt * 1.5;
+      } else {
+        leaf.flutter += leaf.flutterSpeed * dt;
+        leaf.rotation += leaf.rotSpeed * dt;
+        leaf.x += (leaf.vx + Math.sin(leaf.flutter) * leaf.flutterAmp) * dt;
+        leaf.y += (leaf.vy + Math.cos(leaf.flutter) * 6) * dt;
+
+        // Ground contact
+        if (leaf.y >= GROUND_Y - 3) {
+          leaf.y = GROUND_Y - 3;
+          leaf.onGround = true;
+          leaf.rotSpeed = 0;
+        }
+
+        // Fade if far off camera
+        const rx = leaf.x - state.cameraX;
+        if (rx < -120 || rx > gameWidth + 120) {
+          leaf.life -= dt * 2.5;
+        }
+      }
+
+      if (leaf.life <= 0) {
+        windLeaves[i] = windLeaves[windLeaves.length - 1];
+        windLeaves.pop();
+      }
+    }
+  }
+
+  function drawWindLeaves(ctx, camX) {
+    if (!settings.wind || windLeaves.length === 0) return;
+
+    for (let i = 0; i < windLeaves.length; i++) {
+      const leaf = windLeaves[i];
+      const rx = leaf.x - camX;
+      if (rx < -25 || rx > gameWidth + 25) continue;
+
+      ctx.save();
+      ctx.translate(Math.round(rx), Math.round(leaf.y));
+      ctx.rotate(leaf.rotation + Math.sin(leaf.flutter) * 0.35);
+      ctx.globalAlpha = Math.max(0, Math.min(1.0, leaf.life));
+      ctx.fillStyle = leaf.color;
+
+      // Clean retro pointed leaf shape
+      ctx.beginPath();
+      ctx.ellipse(0, 0, leaf.length, leaf.width, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Delicate leaf stem / vein detail
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(-leaf.length, 0);
+      ctx.lineTo(leaf.length * 0.6, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1.0;
+  }
 
   // --- RETRO SOUND SYNTHESIZER (Web Audio API) ---
   let audioCtx = null;
@@ -669,6 +816,26 @@
         gain.connect(destination);
         noise.start(now);
         noise.stop(now + 0.42);
+      } else if (type === 'fire_ignite') {
+        // Sudden whooshing flame eruption burst
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = sharedWhiteNoiseBuffer || createWhiteNoiseBuffer(audioCtx, 0.6);
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(450, now);
+        filter.frequency.linearRampToValueAtTime(750, now + 0.1);
+        filter.frequency.exponentialRampToValueAtTime(150, now + 0.55);
+        filter.Q.setValueAtTime(1.8, now);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        noise.start(now);
+        noise.stop(now + 0.56);
       } else if (type === 'boost') {
         // Whoosh boost sound
         const osc = audioCtx.createOscillator();
@@ -959,8 +1126,15 @@
     if (e.code === 'KeyF') {
       toggleFullscreen();
     }
-    if ((e.code === 'Space' || e.code === 'Enter') && !state.running && !state.gameOver && domCache.settingsModal && domCache.settingsModal.classList.contains('hidden')) {
-      restartGame();
+    const settingsClosed = !domCache.settingsModal || domCache.settingsModal.classList.contains('hidden');
+    if ((e.code === 'Space' || e.code === 'Enter') && settingsClosed) {
+      if (!state.running && !state.gameOver) {
+        e.preventDefault();
+        restartGame();
+      } else if (state.gameOver && (e.code === 'Enter' || !e.repeat)) {
+        e.preventDefault();
+        restartGame();
+      }
     }
   });
 
@@ -1078,12 +1252,13 @@
   }
 
   function createSmokePuff(x, y, vx = 0, vy = 0, size = 3, color = 'rgba(230,230,230,') {
+    const validSize = Math.max(0.5, size);
     particles.push({
       x,
       y,
       vx: vx * 0.2 + (Math.random() - 0.5) * 10,
       vy: vy * 0.2 - Math.random() * 15 - 5,
-      size,
+      size: validSize,
       life: 1.0,
       decay: Math.random() * 1.4 + 0.9,
       color,
@@ -1093,12 +1268,13 @@
   }
 
   function createFirePuff(x, y, vx = 0, vy = 0, size = 4) {
+    const validSize = Math.max(0.5, size);
     particles.push({
       x,
       y,
       vx: vx * 0.2 + (Math.random() - 0.5) * 20,
       vy: vy * 0.2 - Math.random() * 25 - 5,
-      size,
+      size: validSize,
       life: 1.0,
       decay: Math.random() * 1.8 + 1.2,
       color: Math.random() < 0.5 ? '#ff4500' : '#ffaa00',
@@ -1642,6 +1818,82 @@
     }
   }
 
+  // --- LARGE DANCING FLAME RENDERING ---
+  function drawLargeDancingFlame(ctx, renderX, baseY, width, height, t, alpha) {
+    if (alpha <= 0) return;
+    const currentWind = settings.wind ? wind.speed : 0;
+    const windTilt = currentWind * 0.22;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Layer 1: Outer dancing flame (Rich Red-Orange)
+    const tipX = renderX + Math.sin(t * 1.8) * (width * 0.24) + windTilt;
+    const tipY = baseY - height * (0.84 + 0.10 * Math.sin(t * 2.2));
+
+    ctx.fillStyle = '#ff3d00';
+    ctx.beginPath();
+    ctx.moveTo(renderX - width * 0.45, baseY);
+    ctx.bezierCurveTo(
+      renderX - width * (0.52 + 0.08 * Math.sin(t * 1.4)), baseY - height * 0.38,
+      renderX - width * 0.14 + windTilt * 0.5, tipY + height * 0.25,
+      tipX, tipY
+    );
+    ctx.bezierCurveTo(
+      renderX + width * 0.14 + windTilt * 0.5, tipY + height * 0.25,
+      renderX + width * (0.52 + 0.08 * Math.cos(t * 1.5)), baseY - height * 0.38,
+      renderX + width * 0.45, baseY
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    // Layer 2: Middle dancing flame (Vibrant Gold / Orange)
+    const mWidth = width * 0.65;
+    const mHeight = height * 0.72;
+    const mTipX = renderX + Math.sin(t * 2.0 + 0.5) * (mWidth * 0.22) + windTilt * 0.8;
+    const mTipY = baseY - mHeight * (0.84 + 0.10 * Math.cos(t * 2.5));
+
+    ctx.fillStyle = '#ff9100';
+    ctx.beginPath();
+    ctx.moveTo(renderX - mWidth * 0.45, baseY);
+    ctx.bezierCurveTo(
+      renderX - mWidth * (0.52 + 0.08 * Math.sin(t * 1.6 + 0.3)), baseY - mHeight * 0.38,
+      renderX - mWidth * 0.14 + windTilt * 0.4, mTipY + mHeight * 0.25,
+      mTipX, mTipY
+    );
+    ctx.bezierCurveTo(
+      renderX + mWidth * 0.14 + windTilt * 0.4, mTipY + mHeight * 0.25,
+      renderX + mWidth * (0.52 + 0.08 * Math.cos(t * 1.7 + 0.3)), baseY - mHeight * 0.38,
+      renderX + mWidth * 0.45, baseY
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    // Layer 3: Inner core (Bright Yellow-White)
+    const cWidth = width * 0.35;
+    const cHeight = height * 0.45;
+    const cTipX = renderX + Math.sin(t * 2.3 + 1.0) * (cWidth * 0.18) + windTilt * 0.5;
+    const cTipY = baseY - cHeight * (0.86 + 0.08 * Math.sin(t * 2.8));
+
+    ctx.fillStyle = '#fff59d';
+    ctx.beginPath();
+    ctx.moveTo(renderX - cWidth * 0.45, baseY);
+    ctx.bezierCurveTo(
+      renderX - cWidth * 0.48, baseY - cHeight * 0.38,
+      renderX - cWidth * 0.1 + windTilt * 0.3, cTipY + cHeight * 0.25,
+      cTipX, cTipY
+    );
+    ctx.bezierCurveTo(
+      renderX + cWidth * 0.1 + windTilt * 0.3, cTipY + cHeight * 0.25,
+      renderX + cWidth * 0.48, baseY - cHeight * 0.38,
+      renderX + cWidth * 0.45, baseY
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   // --- COUNTRYSIDE STRUCTURES & BARNYARD ---
   class CountryStructure {
     constructor(x, type = 'barn') {
@@ -1649,6 +1901,7 @@
       this.type = type; // 'barn', 'house', 'windmill', 'silo_set', 'water_tower', 'church'
       this.nearMissAwarded = false;
       this.nearMissPending = false;
+      this.flames = [];
 
       if (type === 'barn') {
         this.width = 110;
@@ -1678,10 +1931,61 @@
       }
     }
 
+    ignite(mult = 1.0) {
+      playSound('fire_ignite');
+      // Create 2-3 large dancing flames randomly offset across the building, starting at ground level
+      const count = Math.random() < 0.5 ? 2 : 3;
+      this.flames = [];
+      for (let i = 0; i < count; i++) {
+        const offsetRatio = (i + 0.3 + Math.random() * 0.4) / count;
+        const fx = this.x + Math.max(12, Math.min(this.width - 12, offsetRatio * this.width));
+        const dur = (2.0 + Math.random() * 1.0) * mult; // 2 to 3 seconds
+        const fWidth = 32 + Math.random() * 10;
+        const fHeight = Math.max(48, this.height * (0.72 + Math.random() * 0.20));
+        this.flames.push({
+          x: fx,
+          width: fWidth,
+          height: fHeight,
+          life: dur,
+          maxLife: dur,
+          phase: Math.random() * 10,
+          smokeTimer: Math.random() * 0.1
+        });
+      }
+    }
+
     update(dt) {
       if (this.type === 'windmill') {
         const diffScale = getLevelSpeedScale();
         this.bladeAngle += (1.4 * diffScale) * dt; // Spinning windmill sails
+      }
+
+      if (this.flames.length > 0) {
+        const currentWind = settings.wind ? wind.speed : 0;
+        for (let i = this.flames.length - 1; i >= 0; i--) {
+          const f = this.flames[i];
+          f.life -= dt;
+          f.smokeTimer += dt;
+
+          // Each flame has a bit of smoke effect going up
+          if (f.smokeTimer >= 0.20) {
+            f.smokeTimer = 0;
+            const smokeX = f.x + (settings.wind ? (wind.speed * 0.15) : 0);
+            const smokeY = GROUND_Y - f.height * 0.85;
+            createSmokePuff(
+              smokeX + (Math.random() - 0.5) * 6,
+              smokeY,
+              currentWind * 0.25,
+              -Math.random() * 25 - 15,
+              3.5 + Math.random() * 2.0,
+              'rgba(90,90,90,'
+            );
+          }
+
+          if (f.life <= 0) {
+            this.flames.splice(i, 1);
+          }
+        }
       }
     }
 
@@ -1731,6 +2035,29 @@
         }
       }
       return false;
+    }
+
+    // Check collision with large aircraft (such as crashing airliners)
+    checkAirlinerCollision(al) {
+      if (al.isDead) return false;
+      const alLeft = al.x - 38;
+      const alRight = al.x + 38;
+      const alTop = al.y - 12;
+      const alBottom = al.y + 12;
+
+      // Horizontal overlap
+      const hOverlap = alRight >= this.x && alLeft <= this.x + this.width;
+      if (!hOverlap) return false;
+
+      if (this.type === 'church') {
+        // Steeple tower
+        const steepleOverlap = (alRight >= this.x && alLeft <= this.x + 28 && alBottom >= this.y && alTop <= GROUND_Y);
+        // Chapel nave
+        const chapelOverlap = (alRight > this.x + 28 && alLeft <= this.x + this.width && alBottom >= this.y + 42 && alTop <= GROUND_Y);
+        return steepleOverlap || chapelOverlap;
+      }
+
+      return alBottom >= this.y && alTop <= GROUND_Y;
     }
 
     draw(ctx, camX) {
@@ -1966,6 +2293,21 @@
         ctx.fillRect(rx + 68, this.y + 68, 12, 18);
         ctx.fillRect(rx + 11, this.y + 50, 10, 14);
       }
+
+      // Draw 2-3 large dancing flames overlaid on top of building with bottom starting at ground level
+      if (this.flames && this.flames.length > 0) {
+        const nowSec = Date.now() * 0.0038;
+        for (const f of this.flames) {
+          const rx = f.x - camX;
+          let alpha = 1.0;
+          if (f.life > f.maxLife - 0.25) {
+            alpha = (f.maxLife - f.life) / 0.25;
+          } else if (f.life < 0.6) {
+            alpha = f.life / 0.6;
+          }
+          drawLargeDancingFlame(ctx, rx, GROUND_Y, f.width, f.height, nowSec + f.phase, Math.max(0, Math.min(1.0, alpha)));
+        }
+      }
     }
   }
 
@@ -2037,6 +2379,44 @@
           }
         }
 
+        // Structure Collision Detonation (Set building ablaze!)
+        for (const s of structures) {
+          if (s.checkAirlinerCollision(this)) {
+            this.isDead = true;
+            s.ignite(1.25);
+            createHugeExplosion(this.x, this.y, 85);
+            createAirlinerDebris(this.x, this.y, this.vx * 0.5, -45, 20);
+            state.shake = Math.min(state.shake + 16, 24);
+            const names = {
+              barn: 'BARN',
+              house: 'HOUSE',
+              windmill: 'WINDMILL',
+              silo_set: 'SILO',
+              water_tower: 'WATER TOWER',
+              church: 'CHURCH'
+            };
+            const structName = names[s.type] || 'BUILDING';
+            showStatusBanner(`AIRLINER CRASHED INTO ${structName}!`, 2.5, 'danger');
+            return;
+          }
+        }
+
+        // Airfield Hangar Collision
+        for (const af of airfields) {
+          if (af.hangarX !== undefined) {
+            const hx = af.hangarX;
+            if (this.x >= hx - 20 && this.x <= hx + 62 && this.y >= GROUND_Y - 36) {
+              this.isDead = true;
+              if (af.igniteHangar) af.igniteHangar();
+              createHugeExplosion(this.x, this.y, 85);
+              createAirlinerDebris(this.x, this.y, this.vx * 0.5, -45, 20);
+              state.shake = Math.min(state.shake + 16, 24);
+              showStatusBanner('AIRLINER CRASHED INTO HANGAR!', 2.5, 'danger');
+              return;
+            }
+          }
+        }
+
         // Ground Impact Detonation
         if (this.y >= GROUND_Y - 10) {
           this.isDead = true;
@@ -2048,6 +2428,28 @@
       }
 
       this.x += this.vx * dt;
+
+      // Check collision with Country Structures while flying
+      for (const s of structures) {
+        if (s.checkAirlinerCollision(this)) {
+          this.isDead = true;
+          s.ignite(1.25);
+          createHugeExplosion(this.x, this.y, 85);
+          createAirlinerDebris(this.x, this.y, this.vx * 0.5, -45, 20);
+          state.shake = Math.min(state.shake + 16, 24);
+          const names = {
+            barn: 'BARN',
+            house: 'HOUSE',
+            windmill: 'WINDMILL',
+            silo_set: 'SILO',
+            water_tower: 'WATER TOWER',
+            church: 'CHURCH'
+          };
+          const structName = names[s.type] || 'BUILDING';
+          showStatusBanner(`AIRLINER CRASHED INTO ${structName}!`, 2.5, 'danger');
+          return;
+        }
+      }
 
       // Jet Contrails
       this.contrailTimer += dt;
@@ -2203,6 +2605,32 @@
 
       this.x += this.vx * dt;
       this.y += this.vy * dt;
+
+      // Check collision with Country Structures
+      for (const s of structures) {
+        if (s.checkCollision(this)) {
+          this.explode();
+          s.ignite();
+          state.shake = Math.min(state.shake + 12, 18);
+          playSound('crash');
+          const names = {
+            barn: 'BARN',
+            house: 'HOUSE',
+            windmill: 'WINDMILL',
+            silo_set: 'SILO',
+            water_tower: 'WATER TOWER',
+            church: 'CHURCH'
+          };
+          const structName = names[s.type] || 'BUILDING';
+          showStatusBanner(`BIPLANE CRASHED INTO ${structName}!`, 2.2, 'danger');
+          return;
+        }
+      }
+
+      if (this.y >= GROUND_Y - 8) {
+        this.explode();
+        return;
+      }
 
       // Trailing Acrobatic Smoke Ribbons
       this.smokeTimer += dt;
@@ -3410,6 +3838,51 @@
       this.endX = startX + length;
       this.hangarX = startX - 50;
       this.windsockX = startX - 29; // Positioned on top of hangar (hangarX + 21)
+      this.flames = [];
+    }
+
+    igniteHangar(mult = 1.0) {
+      playSound('fire_ignite');
+      this.flames = [];
+      for (let i = 0; i < 2; i++) {
+        const fx = this.hangarX + 12 + i * 18;
+        const dur = (2.0 + Math.random() * 1.0) * mult;
+        this.flames.push({
+          x: fx,
+          width: 30 + Math.random() * 8,
+          height: 44 + Math.random() * 10,
+          life: dur,
+          maxLife: dur,
+          phase: Math.random() * 10,
+          smokeTimer: Math.random() * 0.1
+        });
+      }
+    }
+
+    update(dt) {
+      if (this.flames.length > 0) {
+        const currentWind = settings.wind ? wind.speed : 0;
+        for (let i = this.flames.length - 1; i >= 0; i--) {
+          const f = this.flames[i];
+          f.life -= dt;
+          f.smokeTimer += dt;
+          if (f.smokeTimer >= 0.20) {
+            f.smokeTimer = 0;
+            const smokeX = f.x + (settings.wind ? (wind.speed * 0.15) : 0);
+            createSmokePuff(
+              smokeX,
+              GROUND_Y - f.height * 0.85,
+              currentWind * 0.25,
+              -Math.random() * 25 - 15,
+              3.5 + Math.random() * 2.0,
+              'rgba(90,90,90,'
+            );
+          }
+          if (f.life <= 0) {
+            this.flames.splice(i, 1);
+          }
+        }
+      }
     }
   }
 
@@ -3538,31 +4011,33 @@
     }
 
     // 4. Random Bouncing Power-Ups (Speed Boost & Machine Gun)
-    const puProb = (k === 0) ? 1.0 : (Math.abs(k) % 2 === 1 ? 0.70 : 0.50);
-    if (rand() < puProb) {
-      let puX;
-      let puY;
-      if (k === 0) {
-        // Initial spawn chunk: placed at climb-out altitude right after runway
-        puX = chunkStart + 560;
-        puY = 160;
-      } else {
-        puX = chunkStart + 160 + rand() * 680;
-        puY = 110 + rand() * 170; // In core visible flight path (110 - 280)
-      }
-
-      // Ensure powerup is positioned safely above any structure
-      for (const s of structures) {
-        if (puX >= s.x - 30 && puX <= s.x + s.width + 30) {
-          puY = Math.min(puY, GROUND_Y - s.height - 40);
-          break;
+    if (settings.powerups) {
+      const puProb = (k === 0) ? 1.0 : (Math.abs(k) % 2 === 1 ? 0.70 : 0.50);
+      if (rand() < puProb) {
+        let puX;
+        let puY;
+        if (k === 0) {
+          // Initial spawn chunk: placed at climb-out altitude right after runway
+          puX = chunkStart + 560;
+          puY = 160;
+        } else {
+          puX = chunkStart + 160 + rand() * 680;
+          puY = 110 + rand() * 170; // In core visible flight path (110 - 280)
         }
-      }
 
-      const puType = rand() < 0.5 ? 'speed' : 'gun';
-      const pu = new PowerUp(puX, puY, puType);
-      if (!collectedPowerUpKeys.has(pu.id)) {
-        powerups.push(pu);
+        // Ensure powerup is positioned safely above any structure
+        for (const s of structures) {
+          if (puX >= s.x - 30 && puX <= s.x + s.width + 30) {
+            puY = Math.min(puY, GROUND_Y - s.height - 40);
+            break;
+          }
+        }
+
+        const puType = rand() < 0.5 ? 'speed' : 'gun';
+        const pu = new PowerUp(puX, puY, puType);
+        if (!collectedPowerUpKeys.has(pu.id)) {
+          powerups.push(pu);
+        }
       }
     }
   }
@@ -3657,19 +4132,21 @@
       }
     }
 
-    if (powerupSpawnTimer > 0) {
-      powerupSpawnTimer -= dt;
-    }
+    if (settings.powerups) {
+      if (powerupSpawnTimer > 0) {
+        powerupSpawnTimer -= dt;
+      }
 
-    if (powerupSpawnTimer <= 0 && powerups.length < 2) {
-      powerupSpawnTimer = 8.0 + Math.random() * 6.0; // Next dynamic spawn in 8-14s
-      const dir = player.vx >= 0 ? 1 : -1;
-      const puX = player.x + dir * (700 + Math.random() * 400);
-      const puY = 120 + Math.random() * 170; // In core visible flight path (120 - 290)
-      const puType = Math.random() < 0.5 ? 'speed' : 'gun';
-      const pu = new PowerUp(puX, puY, puType);
-      if (!collectedPowerUpKeys.has(pu.id)) {
-        powerups.push(pu);
+      if (powerupSpawnTimer <= 0 && powerups.length < 2) {
+        powerupSpawnTimer = 8.0 + Math.random() * 6.0; // Next dynamic spawn in 8-14s
+        const dir = player.vx >= 0 ? 1 : -1;
+        const puX = player.x + dir * (700 + Math.random() * 400);
+        const puY = 120 + Math.random() * 170; // In core visible flight path (120 - 290)
+        const puType = Math.random() < 0.5 ? 'speed' : 'gun';
+        const pu = new PowerUp(puX, puY, puType);
+        if (!collectedPowerUpKeys.has(pu.id)) {
+          powerups.push(pu);
+        }
       }
     }
 
@@ -3705,6 +4182,7 @@
 
     wind.reset();
     player = new PlayerPlane(80, 220);
+    resetWindLeaves();
     ensureChunksGenerated(player.x);
     const speedBonusPct = Math.round((getLevelSpeedScale(wave) - 1) * 100);
     const speedNotice = wave > 1 ? ` (SPEED +${speedBonusPct}%)` : '';
@@ -3808,6 +4286,7 @@
       if (s.checkCollision(player)) {
         s.nearMissPending = false;
         s.nearMissAwarded = true;
+        s.ignite();
         player.crash();
         const names = {
           barn: 'BARN',
@@ -3848,6 +4327,20 @@
         }
       } else {
         s.nearMissPending = false;
+      }
+    }
+
+    // Player vs Airfield Hangar (only when plane is crashing or stalled)
+    if (!player.isDead && (player.isWobblingCrash || player.engineFailed || player.fuel <= 0)) {
+      for (const af of airfields) {
+        if (af.hangarX !== undefined) {
+          if (player.x >= af.hangarX - 4 && player.x <= af.hangarX + 46 && player.y >= GROUND_Y - 32) {
+            if (af.igniteHangar) af.igniteHangar();
+            player.crash();
+            showStatusBanner('COLLIDED WITH HANGAR!', 2.0, 'danger');
+            return;
+          }
+        }
       }
     }
 
@@ -4039,12 +4532,28 @@
 
       // Airfield Hangar
       const hangarX = af.hangarX - camX;
+
       ctx.fillStyle = '#6c757d';
       ctx.fillRect(hangarX, GROUND_Y - 28, 42, 28);
       ctx.fillStyle = '#212529';
       ctx.fillRect(hangarX + 6, GROUND_Y - 20, 30, 20);
       ctx.fillStyle = '#9e2a2b';
       ctx.fillRect(hangarX - 2, GROUND_Y - 32, 46, 5);
+
+      // Draw large dancing flames on top of hangar starting at GROUND_Y
+      if (af.flames && af.flames.length > 0) {
+        const nowSec = Date.now() * 0.0038;
+        for (const f of af.flames) {
+          const rx = f.x - camX;
+          let alpha = 1.0;
+          if (f.life > f.maxLife - 0.25) {
+            alpha = (f.maxLife - f.life) / 0.25;
+          } else if (f.life < 0.6) {
+            alpha = f.life / 0.6;
+          }
+          drawLargeDancingFlame(ctx, rx, GROUND_Y, f.width, f.height, nowSec + f.phase, Math.max(0, Math.min(1.0, alpha)));
+        }
+      }
 
       // Windsock on top of Hangar Roof (Not a collision hazard)
       const mastX = hangarX + 21;
@@ -4165,6 +4674,9 @@
     finalCombo: document.getElementById('final-combo'),
     // Settings inputs
     settingInvertY: document.getElementById('setting-invert-y'),
+    settingPowerups: document.getElementById('setting-powerups'),
+    startInvertY: document.getElementById('start-invert-y'),
+    startPowerups: document.getElementById('start-powerups'),
     settingTouchControls: document.getElementById('setting-touch-controls'),
     settingInstruments: document.getElementById('setting-instruments'),
     settingScanlines: document.getElementById('setting-scanlines'),
@@ -4548,6 +5060,9 @@
   }
 
   // --- GAME OVER & RESPAWN ---
+  let gameOverTimeout = null;
+  let respawnTimeout = null;
+
   function handlePlayerDeath() {
     state.lives--;
     state.combo = 1;
@@ -4568,11 +5083,19 @@
           ? `x${maxMult} (+${maxBonusPct}%) [${state.maxCombo} Streak]`
           : 'x1.00';
       }
-      setTimeout(() => {
-        if (domCache.gameoverScreen) domCache.gameoverScreen.classList.remove('hidden');
+      if (gameOverTimeout) clearTimeout(gameOverTimeout);
+      gameOverTimeout = setTimeout(() => {
+        if (state.gameOver && domCache.gameoverScreen) {
+          domCache.gameoverScreen.classList.remove('hidden');
+          const restartBtn = document.getElementById('restart-btn');
+          if (restartBtn) {
+            try { restartBtn.focus(); } catch (_) {}
+          }
+        }
       }, 1200);
     } else {
-      setTimeout(() => {
+      if (respawnTimeout) clearTimeout(respawnTimeout);
+      respawnTimeout = setTimeout(() => {
         if (!state.gameOver) {
           player = new PlayerPlane(player.x, 220);
           showStatusBanner('NEW BIPLANE AIRBORNE!', 2.0, 'info');
@@ -4583,6 +5106,25 @@
 
   function restartGame() {
     initAudio();
+    if (gameOverTimeout) {
+      clearTimeout(gameOverTimeout);
+      gameOverTimeout = null;
+    }
+    if (respawnTimeout) {
+      clearTimeout(respawnTimeout);
+      respawnTimeout = null;
+    }
+    if (document.activeElement && document.activeElement.blur) {
+      try { document.activeElement.blur(); } catch (_) {}
+    }
+    keys.space = false;
+    keys.boost = false;
+    keys.up = false;
+    keys.down = false;
+    keys.left = false;
+    keys.right = false;
+    keys.fire = false;
+
     state.score = 0;
     state.wave = 1;
     state.lives = 3;
@@ -4628,6 +5170,9 @@
   function update(dt) {
     // 0. Dynamic Atmospheric Wind Simulation
     wind.update(dt);
+
+    // 0.5. Atmospheric Wind Gusts Update (Swirling Leaves)
+    updateWindLeaves(dt);
 
     // 1. Player Input
     let pitchUp = false;
@@ -4677,9 +5222,12 @@
       b.update(dt);
     }
 
-    // 7. Countryside Structures Update
+    // 7. Countryside Structures & Airfields Update
     for (const s of structures) {
       s.update(dt);
+    }
+    for (const af of airfields) {
+      if (af.update) af.update(dt);
     }
 
     // 8. Dynamic Hazards Update
@@ -4786,6 +5334,9 @@
       }
     }
 
+    // 2.5. Draw Atmospheric Wind Gust Leaves
+    drawWindLeaves(ctx, state.cameraX);
+
     // 3. Draw Balloons
     for (const b of balloons) {
       if (!b.popped && b.x - state.cameraX >= -80 && b.x - state.cameraX <= gameWidth + 80) {
@@ -4828,17 +5379,23 @@
       const rx = p.x - state.cameraX;
 
       if (p.isSmoke) {
-        ctx.fillStyle = `${p.color}${p.life * 0.75})`;
-        ctx.beginPath();
-        ctx.arc(rx, p.y, p.size * (2.2 - p.life), 0, Math.PI * 2);
-        ctx.fill();
+        const radius = Math.max(0, p.size * (2.2 - p.life));
+        if (radius > 0) {
+          ctx.fillStyle = `${p.color}${Math.max(0, p.life * 0.75)})`;
+          ctx.beginPath();
+          ctx.arc(rx, p.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else if (p.isFire) {
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, p.life);
-        ctx.beginPath();
-        ctx.arc(rx, p.y, p.size * (1.5 - p.life * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
+        const radius = Math.max(0, p.size * (1.5 - p.life * 0.5));
+        if (radius > 0) {
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.max(0, Math.min(1.0, p.life));
+          ctx.beginPath();
+          ctx.arc(rx, p.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        }
       } else if (p.isFeather) {
         ctx.save();
         ctx.translate(rx, p.y);
@@ -5054,11 +5611,27 @@
     }
   }
 
+  function applyPowerupsSetting() {
+    if (!settings.powerups) {
+      powerups.length = 0;
+      if (player) {
+        player.speedBoostTimer = 0;
+        player.gunTimer = 0;
+        player.gunAmmo = 0;
+      }
+      if (domCache.powerupHud) domCache.powerupHud.classList.add('hidden');
+      if (domCache.touchBtnFire) domCache.touchBtnFire.classList.add('hidden');
+    }
+  }
+
   function openSettings() {
     initAudio();
     state.paused = true;
     updatePauseBtnIcon();
     if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+    if (domCache.startInvertY) domCache.startInvertY.checked = settings.invertY;
+    if (domCache.settingPowerups) domCache.settingPowerups.checked = settings.powerups;
+    if (domCache.startPowerups) domCache.startPowerups.checked = settings.powerups;
     if (domCache.settingTouchControls) domCache.settingTouchControls.value = settings.touchControls || 'auto';
     if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
     if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
@@ -5071,7 +5644,14 @@
     if (domCache.settingInvertY) {
       settings.invertY = domCache.settingInvertY.checked;
       Storage.set('flyby_invert_y', settings.invertY.toString());
+      if (domCache.startInvertY) domCache.startInvertY.checked = settings.invertY;
       updateTouchControlsUI();
+    }
+    if (domCache.settingPowerups) {
+      settings.powerups = domCache.settingPowerups.checked;
+      Storage.set('flyby_powerups', settings.powerups.toString());
+      if (domCache.startPowerups) domCache.startPowerups.checked = settings.powerups;
+      applyPowerupsSetting();
     }
     if (domCache.settingTouchControls) {
       settings.touchControls = domCache.settingTouchControls.value;
@@ -5121,7 +5701,32 @@
     domCache.settingInvertY.addEventListener('change', () => {
       settings.invertY = domCache.settingInvertY.checked;
       Storage.set('flyby_invert_y', settings.invertY.toString());
+      if (domCache.startInvertY) domCache.startInvertY.checked = settings.invertY;
       updateTouchControlsUI();
+    });
+  }
+  if (domCache.startInvertY) {
+    domCache.startInvertY.addEventListener('change', () => {
+      settings.invertY = domCache.startInvertY.checked;
+      Storage.set('flyby_invert_y', settings.invertY.toString());
+      if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+      updateTouchControlsUI();
+    });
+  }
+  if (domCache.settingPowerups) {
+    domCache.settingPowerups.addEventListener('change', () => {
+      settings.powerups = domCache.settingPowerups.checked;
+      Storage.set('flyby_powerups', settings.powerups.toString());
+      if (domCache.startPowerups) domCache.startPowerups.checked = settings.powerups;
+      applyPowerupsSetting();
+    });
+  }
+  if (domCache.startPowerups) {
+    domCache.startPowerups.addEventListener('change', () => {
+      settings.powerups = domCache.startPowerups.checked;
+      Storage.set('flyby_powerups', settings.powerups.toString());
+      if (domCache.settingPowerups) domCache.settingPowerups.checked = settings.powerups;
+      applyPowerupsSetting();
     });
   }
   if (domCache.settingScanlines) {
@@ -5398,6 +6003,9 @@
   // Initial setup
   resizeGame();
   if (domCache.settingInvertY) domCache.settingInvertY.checked = settings.invertY;
+  if (domCache.startInvertY) domCache.startInvertY.checked = settings.invertY;
+  if (domCache.settingPowerups) domCache.settingPowerups.checked = settings.powerups;
+  if (domCache.startPowerups) domCache.startPowerups.checked = settings.powerups;
   if (domCache.settingTouchControls) domCache.settingTouchControls.value = settings.touchControls || 'auto';
   if (domCache.settingInstruments) domCache.settingInstruments.checked = settings.showInstruments;
   if (domCache.settingScanlines) domCache.settingScanlines.checked = settings.scanlines;
