@@ -3123,11 +3123,35 @@
     activateSpeedBoost(duration = 8.0) {
       this.speedBoostTimer = Math.max(this.speedBoostTimer, duration);
       this.isSpeedBoosted = true;
-      // Instant +33% increase in current velocity and max speed
-      this.airspeed *= 1.33;
-      this.vx *= 1.33;
-      this.vy *= 1.33;
       this.initAeroStats();
+
+      // If current speed is less than normal max cruise speed, boost as if already at max level cruise speed
+      const diffScale = getLevelSpeedScale();
+      const normalCruiseSpeed = 168 * diffScale;
+      const baseSpeed = Math.max(this.airspeed, normalCruiseSpeed);
+      const newAirspeed = Math.min(baseSpeed * 1.33, this.maxSpeed);
+
+      if (this.airspeed > 0.001) {
+        const ratio = newAirspeed / this.airspeed;
+        this.vx *= ratio;
+        this.vy *= ratio;
+      } else {
+        const noseX = Math.cos(this.theta);
+        const noseY = -Math.sin(this.theta);
+        this.vx = noseX * newAirspeed;
+        this.vy = noseY * newAirspeed;
+      }
+      this.airspeed = newAirspeed;
+
+      this.isIdle = false; // Engage active throttle
+      if (this.stalled) {
+        this.stalled = false;
+      }
+      if (this.onGround) {
+        this.throttleUp = true;
+        this.isStopped = false;
+        this.isBraking = false;
+      }
     }
 
     activateGun(duration = 12.0, ammo = 45) {
@@ -5317,10 +5341,11 @@
   function render() {
     ctx.save();
 
-    // Apply Screen Shake
+    // Apply Screen Shake (scaled down 20% for visual clarity during heavy action)
     if (state.shake > 0) {
-      const rx = (Math.random() - 0.5) * state.shake;
-      const ry = (Math.random() - 0.5) * state.shake;
+      const shakeMag = state.shake * 0.8;
+      const rx = (Math.random() - 0.5) * shakeMag;
+      const ry = (Math.random() - 0.5) * shakeMag;
       ctx.translate(rx, ry);
     }
 
