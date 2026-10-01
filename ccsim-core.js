@@ -887,6 +887,7 @@
     getCurrencyWord,
     formatMonths,
     calculateFreedomDate,
+    getFreedomDate: calculateFreedomDate,
 
     // Context & Reducers
     createInitialContext,

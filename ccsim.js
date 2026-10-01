@@ -320,7 +320,7 @@
   // Story Outcome & Contrast Mirror Calculation
   // =========================================================================
   function renderStoryOutcome(laptopPrice, cur) {
-    const { formatMoney, formatMonths, getFreedomDate, calculateSimulation, getStorySimulationParams } = window.CCSim;
+    const { formatMoney, formatMonths, calculateFreedomDate, calculateSimulation, getStorySimulationParams } = window.CCSim;
 
     let outcomeMeta = {};
 
@@ -412,7 +412,7 @@
     }
     if (el.storyOutcomeMarkup) el.storyOutcomeMarkup.textContent = markupNote;
     if (el.storyOutcomeDuration) el.storyOutcomeDuration.textContent = formatMonths(sim.durationMonths);
-    if (el.storyOutcomeFreedomDate) el.storyOutcomeFreedomDate.textContent = `Free in ${getFreedomDate(sim.durationMonths)}`;
+    if (el.storyOutcomeFreedomDate) el.storyOutcomeFreedomDate.textContent = `Free in ${calculateFreedomDate(sim.durationMonths)}`;
     if (el.storyOutcomeVerdict) el.storyOutcomeVerdict.innerHTML = outcomeMeta.buildVerdict(sim);
 
     // Dynamic reference for The Contrast Mirror (The Wise Move vs. The Dangerous Trap)
