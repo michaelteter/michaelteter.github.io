@@ -4,468 +4,616 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Credit Card Reality Simulator | The True Cost of Debt</title>
-  <link rel="stylesheet" href="ccsim.css?v=20261001_110544">
+  <link rel="stylesheet" href="ccsim.css?v=20261001_125209">
 </head>
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="badge-tag">Personal Finance Lab</div>
+      <div class="header-badge-row">
+        <span class="badge-tag">Personal Finance Lab</span>
+        <div class="currency-toggle" id="currencyToggle">
+          <button type="button" class="cur-btn active" data-cur="THB">🇹🇭 THB (฿)</button>
+          <button type="button" class="cur-btn" data-cur="USD">🇺🇸 USD ($)</button>
+        </div>
+      </div>
       <h1>Credit Card Reality Simulator</h1>
       <p class="subtitle">
-        Understand the true cost of credit cards, interest accumulation, and the hidden "minimum payment trap."
+        See the real price tag of credit cards, why the "minimum payment" is a trap, and how smart habits protect your future money.
       </p>
       
-      <!-- Thailand Context Banner -->
-      <div class="top-bar">
-        <div class="thai-info-badge" title="Bank of Thailand (BOT) credit card interest ceiling is 16% APR">
-          🇹🇭 <span>Thailand BOT Card Cap: <strong>16% APR</strong> | Min Payment: <strong>8%–10%</strong></span>
-        </div>
+      <!-- Thailand Legal Cap Badge -->
+      <div class="thai-info-badge" title="Bank of Thailand (BOT) credit card interest ceiling is 16% APR">
+        🇹🇭 <span>Thailand BOT Card Rate Cap: <strong>16% APR</strong> | Minimum Payment: <strong>8%–10%</strong> (min ฿500)</span>
       </div>
     </header>
 
-    <!-- Main Grid -->
-    <main class="sim-grid">
-      <!-- Left Column: Inputs & Controls -->
-      <section class="card input-section" aria-labelledby="controls-heading">
-        <h2 id="controls-heading" class="section-title">Purchase & Card Settings</h2>
+    <!-- Mobile/Tablet Sticky Reality Summary Bar -->
+    <aside class="sticky-reality-bar" id="stickyRealityBar" aria-label="Quick Summary">
+      <div class="sticky-bar-content">
+        <div class="sticky-stat">
+          <span class="sticky-label">Original</span>
+          <span class="sticky-val" id="stickyOriginalPrice">฿52,500</span>
+        </div>
+        <div class="sticky-arrow">➔</div>
+        <div class="sticky-stat highlight">
+          <span class="sticky-label">Total Cost</span>
+          <span class="sticky-val danger-text" id="stickyTotalPaid">฿66,220</span>
+          <span class="sticky-sub danger-text" id="stickyTotalInterest">+฿13,720 extra</span>
+        </div>
+        <div class="sticky-stat">
+          <span class="sticky-label">Debt-Free</span>
+          <span class="sticky-val" id="stickyFreedomDate">Nov 2029</span>
+          <span class="sticky-sub" id="stickyDuration">3 yrs 2 mos</span>
+        </div>
+      </div>
+    </aside>
 
-        <!-- Purchase Amount -->
-        <div class="form-group">
-          <div class="label-row">
-            <label for="purchaseAmount">Purchase Amount</label>
-            <span class="value-display" id="purchaseAmountDisplay">฿52,500</span>
+    <!-- Main Guided Content -->
+    <main class="sim-main">
+      
+      <!-- ============================================ -->
+      <!-- STEP 1: What Are You Buying?                 -->
+      <!-- ============================================ -->
+      <section class="step-card" id="step1Section" aria-labelledby="step1Heading">
+        <div class="step-header">
+          <span class="step-number">Step 1</span>
+          <div class="step-header-text">
+            <h2 id="step1Heading">What Are You Buying?</h2>
+            <p>Pick an everyday purchase or enter a custom amount.</p>
           </div>
-          <div class="input-with-symbol">
-            <span class="currency-prefix" id="currencyPrefix">฿</span>
-            <input type="number" id="purchaseAmount" min="500" max="2000000" step="500" value="52500" class="num-input">
-          </div>
-          <!-- Presets -->
+        </div>
+
+        <div class="step-body">
+          <!-- Preset Chips -->
           <div class="preset-chips" aria-label="Quick purchase presets">
-            <button type="button" class="chip active" data-preset-thb="52500" data-preset-usd="1500">💻 School Laptop</button>
-            <button type="button" class="chip" data-preset-thb="35000" data-preset-usd="1000">📱 Flagship Phone</button>
-            <button type="button" class="chip" data-preset-thb="17500" data-preset-usd="500">🎮 Game Console</button>
-            <button type="button" class="chip" data-preset-thb="5250" data-preset-usd="150">🎟️ Concert Ticket</button>
+            <button type="button" class="chip active" data-preset-thb="52500" data-preset-usd="1500" data-item-name="School Laptop">
+              <span class="chip-icon">💻</span>
+              <span class="chip-label">School Laptop</span>
+              <span class="chip-price">฿52,500</span>
+            </button>
+            <button type="button" class="chip" data-preset-thb="35000" data-preset-usd="1000" data-item-name="Flagship Phone">
+              <span class="chip-icon">📱</span>
+              <span class="chip-label">Flagship Phone</span>
+              <span class="chip-price">฿35,000</span>
+            </button>
+            <button type="button" class="chip" data-preset-thb="17500" data-preset-usd="500" data-item-name="Game Console">
+              <span class="chip-icon">🎮</span>
+              <span class="chip-label">Game Console</span>
+              <span class="chip-price">฿17,500</span>
+            </button>
+            <button type="button" class="chip" data-preset-thb="5250" data-preset-usd="150" data-item-name="Concert Ticket">
+              <span class="chip-icon">🎟️</span>
+              <span class="chip-label">Concert Ticket</span>
+              <span class="chip-price">฿5,250</span>
+            </button>
+          </div>
+
+          <!-- Purchase Amount Input -->
+          <div class="amount-input-row">
+            <label for="purchaseAmount" class="input-label">Purchase Price:</label>
+            <div class="input-with-symbol">
+              <span class="currency-prefix" id="currencyPrefix">฿</span>
+              <input type="number" id="purchaseAmount" min="500" max="2000000" step="500" value="52500" class="num-input">
+            </div>
+            <span class="purchase-amount-badge" id="purchaseAmountDisplay">฿52,500</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- STEP 2: Choose Your Payment Habit            -->
+      <!-- ============================================ -->
+      <section class="step-card" id="step2Section" aria-labelledby="step2Heading">
+        <div class="step-header">
+          <span class="step-number">Step 2</span>
+          <div class="step-header-text">
+            <h2 id="step2Heading">How Will You Pay?</h2>
+            <p>Choose your repayment habit to see the real financial consequences.</p>
           </div>
         </div>
 
-        <!-- Annual Interest Rate (APR) -->
-        <div class="form-group">
-          <div class="label-row">
-            <label>Annual Interest Rate (APR)</label>
-            <span class="value-display highlight-rate" id="aprDisplay">16.0%</span>
-          </div>
-          
-          <!-- APR Preset Quick Buttons -->
-          <div class="rate-presets">
-            <button type="button" class="rate-btn" data-rate="0" title="Promotional 0% installment plan (common in Thai department stores)">0% (Promo Plan)</button>
-            <button type="button" class="rate-btn active" data-rate="16" title="Bank of Thailand official credit card interest ceiling">16% (Thai Credit Card)</button>
-            <button type="button" class="rate-btn" data-rate="20" title="Standard international credit card APR">20% (Avg Credit Card)</button>
-            <button type="button" class="rate-btn" data-rate="25" title="Bank of Thailand ceiling for revolving cash advance cards">25% (Cash Card / Loan)</button>
-            <button type="button" class="rate-btn" data-rate="28" title="Department store card or penalty rate">28% (Store Card)</button>
-          </div>
-        </div>
-
-        <!-- Repayment Strategy -->
-        <div class="form-group strategy-group">
-          <label class="group-label">Repayment Strategy</label>
-          <div class="strategy-selector">
-            <label class="radio-card">
+        <div class="step-body">
+          <div class="habit-cards-grid" role="radiogroup" aria-label="Payment Habit Options">
+            <!-- Habit 1: Minimum Trap -->
+            <label class="habit-card trap-card active">
               <input type="radio" name="payStrategy" value="minimum" checked>
-              <div class="radio-content">
-                <strong>Minimum Payment Only</strong>
-                <small>Pay only what the bank asks each month</small>
+              <div class="habit-card-inner">
+                <div class="habit-card-header">
+                  <span class="habit-badge danger-badge">The Trap 🪤</span>
+                  <span class="habit-icon">🔴</span>
+                </div>
+                <h3 class="habit-title">Minimum Payment Only</h3>
+                <p class="habit-desc">Pay only what the bank requires each month (8%–10% of balance, min ฿500).</p>
+                <div class="habit-highlight danger-text">
+                  <span>Slowest payoff • Maximum interest</span>
+                </div>
               </div>
             </label>
 
-            <label class="radio-card">
+            <!-- Habit 2: Fixed Monthly Amount -->
+            <label class="habit-card smart-card">
               <input type="radio" name="payStrategy" value="fixed">
-              <div class="radio-content">
-                <strong>Fixed Monthly Amount</strong>
-                <small>Pay a constant set amount every month</small>
+              <div class="habit-card-inner">
+                <div class="habit-card-header">
+                  <span class="habit-badge blue-badge">Disciplined Plan ⚡</span>
+                  <span class="habit-icon">🟡</span>
+                </div>
+                <h3 class="habit-title">Fixed Monthly Amount</h3>
+                <p class="habit-desc">Pay a steady, unchanging amount every month until the balance hits ฿0.</p>
+                <div class="habit-highlight blue-text">
+                  <span>Fast payoff • Huge interest savings</span>
+                </div>
               </div>
             </label>
 
-            <label class="radio-card">
-              <input type="radio" name="payStrategy" value="duration">
-              <div class="radio-content">
-                <strong>Target Payoff Time</strong>
-                <small>Set a goal to pay off within N months</small>
-              </div>
-            </label>
-
-            <label class="radio-card highlight-promo-card">
-              <input type="radio" name="payStrategy" value="promo">
-              <div class="radio-content">
-                <strong>0% 10-Mo Promo (Mall Deal)</strong>
-                <small>10-mo 0% plan: on-time vs slip into debt</small>
-              </div>
-            </label>
-
-            <label class="radio-card">
+            <!-- Habit 3: Pay in Full -->
+            <label class="habit-card hero-card">
               <input type="radio" name="payStrategy" value="full">
-              <div class="radio-content">
-                <strong>Pay in Full (1 Month)</strong>
-                <small>The smart habit: Pay entire statement, 0 interest</small>
+              <div class="habit-card-inner">
+                <div class="habit-card-header">
+                  <span class="habit-badge green-badge">The Pro Move 🏆</span>
+                  <span class="habit-icon">🟢</span>
+                </div>
+                <h3 class="habit-title">Pay in Full (1 Month)</h3>
+                <p class="habit-desc">Pay the entire statement balance within the 45-day grace period.</p>
+                <div class="habit-highlight green-text">
+                  <span>฿0 interest • Free financing & rewards</span>
+                </div>
+              </div>
+            </label>
+
+            <!-- Habit 4: Mall 0% Promo Deal -->
+            <label class="habit-card promo-card">
+              <input type="radio" name="payStrategy" value="promo">
+              <div class="habit-card-inner">
+                <div class="habit-card-header">
+                  <span class="habit-badge amber-badge">Mall Promo 🇹🇭</span>
+                  <span class="habit-icon">⚡</span>
+                </div>
+                <h3 class="habit-title">0% 10-Month Mall Deal</h3>
+                <p class="habit-desc">Popular Thai store offer: Pay off 100% of the balance within 10 months for 0% interest. If any debt remains into Month 11, the 0% deal is canceled!</p>
+                <div class="habit-highlight amber-text">
+                  <span>Full debt must be 100% cleared in 10 mos for 0%!</span>
+                </div>
               </div>
             </label>
           </div>
 
-          <!-- Dynamic Sub-Controls Based on Strategy -->
-          <div id="strategyOptions" class="strategy-sub-options">
-            <!-- Minimum Payment Options -->
+          <!-- Dynamic Sub-Options for Chosen Habit -->
+          <div class="habit-sub-panel" id="habitSubPanel">
+            <!-- Minimum Sub-Options (Clear Regulatory Callout, No Slider) -->
             <div id="minPayOptions" class="sub-panel">
-              <div class="label-row">
-                <label for="minPayPercent">Bank Minimum Rate:</label>
-                <span class="value-display" id="minPayPercentDisplay">8.0%</span>
+              <div class="sub-panel-rule-box">
+                <div class="rule-box-header">
+                  <span class="rule-box-icon">🏦</span>
+                  <div>
+                    <strong>Bank Policy (Bank of Thailand Standard):</strong>
+                    <span class="rule-box-sub">Non-negotiable required minimum payment</span>
+                  </div>
+                  <span class="value-pill" id="minPayPercentDisplay">8.0%</span>
+                </div>
+                <p class="sub-panel-hint" id="minPayHint">
+                  The bank automatically calculates your minimum as <strong>8% of your balance (or minimum ฿500)</strong>. As your balance decreases, the required payment shrinks too, deliberately stretching your debt out for years so the bank collects maximum interest!
+                </p>
               </div>
-              <input type="range" id="minPayPercent" min="3" max="15" step="1" value="8" class="slider">
-              <div class="slider-marks">
-                <span>5% (Relief)</span>
-                <span>8% (Thai 2024)</span>
-                <span>10% (Thai 2025+)</span>
-              </div>
-              <p class="hint-text" id="minPayHint">
-                Thai banks require 8%–10% minimum (min ฿500). As your balance shrinks, your minimum payment shrinks, dragging the loan out for years!
-              </p>
             </div>
 
-            <!-- Fixed Payment Options -->
+            <!-- Fixed Sub-Options -->
             <div id="fixedPayOptions" class="sub-panel hidden">
-              <div class="label-row">
+              <div class="sub-panel-row">
                 <label for="fixedPayAmount">Monthly Payment Amount:</label>
-                <span class="value-display" id="fixedPayAmountDisplay">฿3,500</span>
+                <span class="value-pill highlight" id="fixedPayAmountDisplay">฿3,500/mo</span>
               </div>
               <input type="range" id="fixedPayAmount" min="500" max="20000" step="250" value="3500" class="slider">
               <div class="quick-fixed-btns">
                 <button type="button" class="pill-btn" data-fixed-thb="1500" data-fixed-usd="50">฿1,500/mo</button>
-                <button type="button" class="pill-btn" data-fixed-thb="3500" data-fixed-usd="100">฿3,500/mo</button>
+                <button type="button" class="pill-btn active" data-fixed-thb="3500" data-fixed-usd="100">฿3,500/mo</button>
                 <button type="button" class="pill-btn" data-fixed-thb="5000" data-fixed-usd="150">฿5,000/mo</button>
                 <button type="button" class="pill-btn" data-fixed-thb="10000" data-fixed-usd="250">฿10,000/mo</button>
               </div>
             </div>
 
-            <!-- Target Duration Options -->
-            <div id="durationPayOptions" class="sub-panel hidden">
-              <div class="label-row">
-                <label for="targetMonths">Target Payoff Duration:</label>
-                <span class="value-display" id="targetMonthsDisplay">12 Months</span>
-              </div>
-              <input type="range" id="targetMonths" min="3" max="48" step="1" value="12" class="slider">
-              <div class="slider-marks">
-                <span>3 mo</span>
-                <span>6 mo</span>
-                <span>12 mo (1 yr)</span>
-                <span>24 mo (2 yr)</span>
-                <span>36 mo</span>
+            <!-- Pay in Full Sub-Options -->
+            <div id="fullPayOptions" class="sub-panel hidden">
+              <div class="success-banner" id="fullPaySuccessBanner">
+                🌟 <strong>The Pro Strategy:</strong> Paying the statement balance in full before the due date gives you <strong>฿0 interest</strong>. You enjoy fraud protection and reward points completely free!
               </div>
             </div>
 
-            <!-- 0% 10-Month Promo Options -->
+            <!-- Promo Sub-Options (3 Scenarios) -->
             <div id="promoPayOptions" class="sub-panel hidden">
-              <div class="promo-mode-toggle-group">
-                <button type="button" class="promo-toggle-btn active" id="btnPromoModeOntime">
-                  ✅ Pay in 10 Months (0% Interest)
+              <div class="sub-panel-row">
+                <label>Choose a 0% Promo Repayment Scenario:</label>
+              </div>
+
+              <div class="promo-scenario-selector" role="radiogroup" aria-label="0% Promotion Options">
+                <button type="button" class="promo-scen-btn active" data-promo-scen="ideal" id="btnPromoIdeal">
+                  <div class="scen-btn-top">
+                    <span class="scen-icon">✅</span>
+                    <strong>1. Ideal (≤10 Mos)</strong>
+                  </div>
+                  <span class="scen-sub">Paid on time • ฿0 interest</span>
                 </button>
-                <button type="button" class="promo-toggle-btn" id="btnPromoModeSlip">
-                  ⚠️ The Slip: 12+ Months (16% Revert)
+
+                <button type="button" class="promo-scen-btn" data-promo-scen="slip11" id="btnPromoSlip11">
+                  <div class="scen-btn-top">
+                    <span class="scen-icon">⚠️</span>
+                    <strong>2. Slight Slip (11 Mos)</strong>
+                  </div>
+                  <span class="scen-sub">1 mo late • Retroactive penalty!</span>
+                </button>
+
+                <button type="button" class="promo-scen-btn" data-promo-scen="slipmin" id="btnPromoSlipMin">
+                  <div class="scen-btn-top">
+                    <span class="scen-icon">🚨</span>
+                    <strong>3. Slipped to Min (3+ Yrs)</strong>
+                  </div>
+                  <span class="scen-sub">The full trap • Massive total debt</span>
                 </button>
               </div>
 
-              <!-- On-Time Sub-View -->
-              <div id="promoOnTimeSubView" class="promo-sub-view">
-                <div class="success-banner" id="promoOnTimeBanner">
-                  🌟 <strong>Disciplined Plan:</strong> Pay <strong><span id="promoOnTimeAmountDisplay">฿5,250</span>/month</strong> for 10 months. You pay <strong>฿0 in interest</strong> and finish exactly on schedule!
+              <!-- Dynamic Scenario Banner -->
+              <div class="promo-scenario-banner" id="promoScenarioBanner">
+                <!-- Dynamically populated in ccsim.js?v=20261001_125209 -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- STEP 3: The 4 Core Financial Realities       -->
+      <!-- ============================================ -->
+      <section class="step-card reality-dashboard-card" id="step3Section" aria-labelledby="step3Heading">
+        <div class="step-header">
+          <span class="step-number">Step 3</span>
+          <div class="step-header-text">
+            <h2 id="step3Heading">The Financial Reality</h2>
+            <p>Here is what actually happens to your money with this payment habit.</p>
+          </div>
+        </div>
+
+        <div class="step-body">
+          <div class="realities-grid">
+            
+            <!-- REALITY 1: The True Price Tag & Impatience Markup -->
+            <div class="reality-box price-tag-box">
+              <div class="reality-box-header">
+                <span class="reality-num">1</span>
+                <h3>The True Price Tag</h3>
+                <span class="reality-tag danger-tag" id="markupPercentTag">+26.1% Extra</span>
+              </div>
+              
+              <div class="receipt-card">
+                <div class="receipt-row">
+                  <span>Sticker Price:</span>
+                  <strong id="resOriginalPrice">฿52,500</strong>
+                </div>
+                <div class="receipt-row interest-row">
+                  <span>Extra Interest Paid to Bank:</span>
+                  <strong class="danger-text" id="resTotalInterest">+฿13,720</strong>
+                </div>
+                <div class="receipt-divider"></div>
+                <div class="receipt-row total-row">
+                  <span>Total Real Cost:</span>
+                  <span class="receipt-total-val" id="resTotalPaid">฿66,220</span>
                 </div>
               </div>
 
-              <!-- Slipped Sub-View -->
-              <div id="promoSlipSubView" class="promo-sub-view hidden">
-                <div class="label-row">
-                  <label for="promoSlipTargetSelect">How Did the Debt Slip?</label>
+              <!-- Visual Cost Ratio Bar -->
+              <div class="stacked-bar-container">
+                <div class="stacked-bar-label-row">
+                  <span id="barPrincipalLabel">Principal: ฿52,500 (79%)</span>
+                  <span id="barInterestLabel">Interest: ฿13,720 (21%)</span>
                 </div>
-                <div class="quick-fixed-btns" id="promoSlipQuickBtns">
-                  <button type="button" class="pill-btn active" data-promo-slip="12">12 mo</button>
-                  <button type="button" class="pill-btn" data-promo-slip="14">14 mo</button>
-                  <button type="button" class="pill-btn" data-promo-slip="18">18 mo</button>
-                  <button type="button" class="pill-btn" data-promo-slip="24">24 mo</button>
-                  <button type="button" class="pill-btn" data-promo-slip="min">Min (8%)</button>
+                <div class="stacked-bar" role="progressbar" aria-label="Cost Breakdown">
+                  <div class="bar-principal" id="barPrincipal" style="width: 79%;"></div>
+                  <div class="bar-interest" id="barInterest" style="width: 21%;"></div>
                 </div>
-                <p class="hint-text" id="promoSlipStrategyHint" style="margin-top: 0.6rem;">
-                  Months 1–10: 0% promotional APR. At <strong>Month 11</strong>, the promotion expires! The bank charges standard <strong>16% APR</strong> on your remaining balance.
+              </div>
+
+              <!-- Opportunity Cost Punchline -->
+              <div class="opp-punchline-card" id="oppPunchlineCard">
+                <div class="opp-icon">💡</div>
+                <div class="opp-text">
+                  <strong>What That Interest Could Have Bought:</strong>
+                  <p id="oppSummaryText">Instead of giving ฿13,720 to the bank, you could have bought <strong>274 Thai Milk Teas</strong> or <strong>2 pairs of AirPods</strong>!</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- REALITY 2: Payoff Horizon & Paycheck Drain (Debt Stacking) -->
+            <div class="reality-box drain-box">
+              <div class="reality-box-header">
+                <span class="reality-num">2</span>
+                <h3>Payoff Horizon & Paycheck Drain</h3>
+                <span class="reality-tag time-tag" id="freedomDurationTag">38 Months</span>
+              </div>
+
+              <div class="freedom-badge-card">
+                <span class="freedom-label">You will be debt-free in:</span>
+                <div class="freedom-date-val" id="resFreedomDate">November 2029</div>
+                <div class="freedom-sub-text" id="resFreedomSub">
+                  That's <strong>3 years and 2 months</strong> of monthly debt payments!
+                </div>
+              </div>
+
+              <!-- Relatable Longevity Warning -->
+              <div class="product-age-warning" id="productAgeWarning">
+                ⚠️ <strong>Product Life Reality:</strong> By 2029, your <span class="warning-item-name">laptop</span> will likely be outdated, slow, or replaced—yet you will <em>still</em> be paying the bank for it every month!
+              </div>
+
+              <!-- Paycheck Slice Visual -->
+              <div class="paycheck-slice-wrapper">
+                <div class="paycheck-header-row">
+                  <span>Monthly Allowance / Starting Salary: <strong>฿20,000</strong></span>
+                  <span class="debt-slice-badge" id="paycheckDebtPercent">21% Eaten by Debt</span>
+                </div>
+                <div class="paycheck-bar">
+                  <div class="slice-debt" id="sliceDebtBar" style="width: 21%;">
+                    <span id="sliceDebtLabel">฿4,200 Debt</span>
+                  </div>
+                  <div class="slice-living" id="sliceLivingBar" style="width: 79%;">
+                    <span id="sliceLivingLabel">฿15,800 Left for Food & Life</span>
+                  </div>
+                </div>
+                <p class="debt-stack-tip">
+                  🚨 <strong>Debt Stacking Threat:</strong> If you finance a phone, laptop, and clothes at the same time, multiple minimum payments stack up to <strong>฿10,000+ per month</strong>, leaving you with barely enough to eat!
                 </p>
               </div>
             </div>
 
-            <!-- Pay in Full Message -->
-            <div id="fullPayOptions" class="sub-panel hidden">
-              <div class="success-banner" id="fullPaySuccessBanner">
-                🌟 <strong>The Pro Strategy:</strong> Paying the full balance within the 45-day grace period means <strong>0 interest</strong>. You enjoy card protections and rewards without giving a single baht of interest to the bank!
+            <!-- REALITY 3: The Anatomy of the Minimum Payment Trap -->
+            <div class="reality-box trap-breakdown-box">
+              <div class="reality-box-header">
+                <span class="reality-num">3</span>
+                <h3>The Minimum Payment Illusion</h3>
+                <span class="reality-tag alert-tag">The Treadmill</span>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- Right Column: Results & Educational Impact -->
-      <section class="card results-section" aria-labelledby="results-heading">
-        <h2 id="results-heading" class="section-title">The Financial Reality</h2>
+              <p class="trap-desc">
+                The bank makes the minimum payment look small and harmless. But look where your Month 1 payment actually goes:
+              </p>
 
-        <!-- Big Metric Cards -->
-        <div class="metric-cards-grid">
-          <div class="metric-card primary-cost">
-            <span class="metric-label">Total Cost to You</span>
-            <span class="metric-value" id="resTotalPaid">฿66,220</span>
-            <span class="metric-sub" id="resOriginalPrice">Original price: ฿52,500</span>
-          </div>
-
-          <div class="metric-card warning-cost">
-            <span class="metric-label">Extra Interest Donated to Bank</span>
-            <span class="metric-value danger-text" id="resTotalInterest">+฿13,720</span>
-            <span class="metric-sub" id="resInterestPercent">+26.1% above price</span>
-          </div>
-
-          <div class="metric-card time-cost">
-            <span class="metric-label">Time to Pay Off</span>
-            <span class="metric-value" id="resDuration">3 years 2 months</span>
-            <span class="metric-sub" id="resTimeSub">38 monthly billing cycles</span>
-          </div>
-
-          <div class="metric-card payment-cost">
-            <span class="metric-label">First Monthly Payment</span>
-            <span class="metric-value" id="resFirstPayment">฿4,200 / month</span>
-            <span class="metric-sub" id="resPaymentNote">Includes ฿700 interest in month 1</span>
-          </div>
-        </div>
-
-        <!-- Cost Breakdown Bar Visual -->
-        <div class="breakdown-wrapper">
-          <div class="breakdown-title-row">
-            <span>Where Your Money Goes:</span>
-            <span id="breakdownRatio">79% Laptop / 21% Bank Interest</span>
-          </div>
-          <div class="stacked-bar" role="progressbar" aria-label="Principal vs Interest breakdown">
-            <div class="bar-principal" id="barPrincipal" style="width: 79%;">
-              <span>Principal</span>
-            </div>
-            <div class="bar-interest" id="barInterest" style="width: 21%;">
-              <span>Interest</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Impact Callout / Reality Check Alert -->
-        <div class="alert-box" id="realityAlertBox">
-          <div class="alert-icon" id="alertIcon">⚠️</div>
-          <div class="alert-content">
-            <h4 id="alertTitle">The Minimum Payment Trap in Action</h4>
-            <p id="alertDescription">
-              Because you are only paying the minimum, the bank earns huge interest while your principal balance decreases very slowly.
-            </p>
-          </div>
-        </div>
-
-        <!-- Relatable Opportunity Cost for Thai High School Students -->
-        <div class="opportunity-card">
-          <div class="opportunity-header">
-            <span class="opp-icon">💡</span>
-            <h4>What That Interest Money Could Have Bought:</h4>
-          </div>
-          <p class="opp-intro">Instead of giving <strong id="oppInterestAmount">฿13,720</strong> to the bank, you could have enjoyed:</p>
-          <div class="opp-items-grid" id="oppItemsGrid">
-            <!-- Dynamically populated in ccsim.js?v=20261001_110544"promo-spotlight-card" id="promoSpotlightCard">
-          <div class="spotlight-header">
-            <div class="spotlight-title-group">
-              <span class="spotlight-badge">Reality Spotlight</span>
-              <h3>0% 10-Month Promo: On-Time Payoff vs. Slipping into 12+ Months</h3>
-            </div>
-            <span class="thai-tag">🇹🇭 ผ่อน 0% 10 เดือน vs หลุดหนี้เกิน 10 เดือน</span>
-          </div>
-          <p class="spotlight-desc">
-            Mall stores heavily promote "0% for 10 months" on phones, tablets, and laptops. See the massive difference between finishing on schedule versus letting payments slip past Month 10:
-          </p>
-
-          <!-- Side-by-side Dual Cards -->
-          <div class="spotlight-grid">
-            <!-- Card A: Disciplined 10 Months -->
-            <div class="spotlight-box ontime-box">
-              <div class="box-top">
-                <span class="box-badge green-badge">✅ Plan A: Disciplined (10 Mos)</span>
-                <span class="box-status">0% Promo Maintained</span>
-              </div>
-              <div class="box-metric">
-                <span class="box-metric-val" id="spotlightOntimeMonthly">฿5,250</span>
-                <span class="box-metric-label">per month for 10 months</span>
-              </div>
-              <ul class="box-list">
-                <li><strong>Total Interest:</strong> <span class="green-text">฿0 (Free financing!)</span></li>
-                <li><strong>Total Cost:</strong> <span id="spotlightOntimeTotal">฿52,500</span> (Exact price)</li>
-                <li><strong>Duration:</strong> Exactly 10 billing cycles</li>
-                <li><strong>Status:</strong> Debt-free on time with 0 baht lost!</li>
-              </ul>
-              <button type="button" class="btn-spotlight-action" id="btnSimulateOntime">
-                View 10-Mo Curve in Chart 📊
-              </button>
-            </div>
-
-            <!-- Card B: Slipped 12+ Months -->
-            <div class="spotlight-box slipped-box">
-              <div class="box-top">
-                <span class="box-badge red-badge">⚠️ Plan B: The Slip (12+ Mos)</span>
-                <span class="box-status">16% APR Kicks in at Month 11</span>
-              </div>
-              <div class="slip-scenario-pills" id="spotlightSlipPills">
-                <button type="button" class="slip-pill active" data-slip="12">12 Mos</button>
-                <button type="button" class="slip-pill" data-slip="14">14 Mos</button>
-                <button type="button" class="slip-pill" data-slip="18">18 Mos</button>
-                <button type="button" class="slip-pill" data-slip="24">24 Mos</button>
-                <button type="button" class="slip-pill" data-slip="min">Min (8%)</button>
-              </div>
-              <div class="box-metric">
-                <span class="box-metric-val danger-text" id="spotlightSlippedMonthly">฿4,389</span>
-                <span class="box-metric-label" id="spotlightSlippedPaymentLabel">per month (~12 months)</span>
-              </div>
-              <ul class="box-list">
-                <li><strong>Total Interest:</strong> <span class="danger-text" id="spotlightSlippedInterest">+฿173</span></li>
-                <li><strong>Total Cost:</strong> <span id="spotlightSlippedTotal">฿52,673</span></li>
-                <li><strong>Duration:</strong> <span id="spotlightSlippedDuration">12 months</span> (<span class="danger-text" id="spotlightSlippedExtraTime">+2 extra months</span>)</li>
-                <li id="spotlightSlippedNote"><strong>Month 11 Trap:</strong> 0% ends, 16% BOT APR compounds on remainder!</li>
-              </ul>
-              <button type="button" class="btn-spotlight-action secondary" id="btnSimulateSlipped">
-                View Slipped Curve in Chart 📊
-              </button>
-            </div>
-          </div>
-
-          <!-- Bottom Difference Banner -->
-          <div class="spotlight-diff-bar" id="spotlightDiffBar">
-            <span class="diff-icon">💡</span>
-            <div class="diff-content" id="spotlightDiffContent">
-              Slipping to 12 months adds <strong>+2 extra months of debt</strong> and <strong>+฿173 in bank interest</strong>!
-            </div>
-          </div>
-        </div>
-
-        <!-- Strategy Comparison Matrix -->
-        <div class="comparison-section">
-          <h3>Strategy Comparison</h3>
-          <div class="table-responsive">
-            <table class="comparison-table">
-              <thead>
-                <tr>
-                  <th>Strategy</th>
-                  <th>Monthly Payment</th>
-                  <th>Time to Freedom</th>
-                  <th>Total Interest</th>
-                  <th>Total Paid</th>
-                </tr>
-              </thead>
-              <tbody id="comparisonTableBody">
-                <!-- Populated dynamically -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Merged Amortization Schedule & Debt Payoff Chart -->
-        <div class="amortization-section" id="amortizationSection">
-          <div class="chart-header">
-            <div>
-              <h3>Month-by-Month Amortization & Payoff Trajectory</h3>
-              <p class="chart-subtitle">Stacked bars show remaining principal (blue) and debt interest (red) shrinking to zero as you pay off debt.</p>
-            </div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-swatch bar-swatch-principal"></span> Principal</span>
-              <span class="legend-item"><span class="legend-swatch bar-swatch-debt"></span> Debt Interest</span>
-            </div>
-          </div>
-
-          <!-- Dynamic SVG Chart Container with Hover Tooltip -->
-          <div class="chart-wrapper">
-            <div class="svg-container" id="chartContainer">
-              <svg id="balanceChart" viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="Month by month amortization stacked bars and payoff line"></svg>
-              <div id="chartTooltip" class="chart-tooltip hidden"></div>
-            </div>
-            <div class="chart-axis-labels">
-              <span>Month 1 (Start)</span>
-              <span id="chartMidMonth">Month 18</span>
-              <span id="chartEndMonth">Month 36 (Debt-Free 🎉)</span>
-            </div>
-          </div>
-
-          <!-- Interactive Touch Hint -->
-          <div class="touch-hint-bar">
-            <span>👆 <strong>Tap or drag across bars</strong> to inspect each month</span>
-          </div>
-
-          <!-- Selected Month Detail Box (iPad & Mobile Friendly) -->
-          <div class="month-detail-card" id="monthDetailCard" aria-live="polite">
-            <div class="detail-header">
-              <div class="detail-title-group">
-                <span class="detail-badge" id="detailBadge">Month 1</span>
-                <h4 id="detailTimeElapsed">1 month in</h4>
-              </div>
-              <span class="detail-progress-pill" id="detailProgressPill">Month 1 of 6</span>
-            </div>
-
-            <div class="detail-stats-grid">
-              <!-- Total Debt Left -->
-              <div class="detail-stat-item highlight-debt">
-                <span class="stat-label">Total Debt Remaining to Pay Off</span>
-                <span class="stat-value" id="detailTotalDebt">฿18,711</span>
-                <div class="stat-sub-pills">
-                  <span class="sub-pill blue" id="detailPrincipalLeft">฿14,000 Principal</span>
-                  <span class="sub-pill red" id="detailInterestLeft">+฿4,711 Debt Interest</span>
+              <div class="payment-split-card">
+                <div class="split-total-badge">
+                  <span>Month 1 Payment:</span>
+                  <strong id="splitTotalPayment">฿4,200</strong>
+                </div>
+                <div class="split-columns">
+                  <div class="split-col principal-col">
+                    <span class="split-col-label">Pays Off Item:</span>
+                    <strong class="split-col-val" id="splitPrincipalPaid">฿3,500</strong>
+                    <span class="split-col-sub">Reduces debt</span>
+                  </div>
+                  <div class="split-col-plus">+</div>
+                  <div class="split-col interest-col">
+                    <span class="split-col-label">Bank Interest Profit:</span>
+                    <strong class="split-col-val danger-text" id="splitInterestPaid">฿700</strong>
+                    <span class="split-col-sub danger-text">Burned money</span>
+                  </div>
                 </div>
               </div>
 
-              <!-- Payment this month -->
-              <div class="detail-stat-item">
-                <span class="stat-label">This Month's Payment</span>
-                <span class="stat-value" id="detailPayment">฿3,500</span>
-                <span class="stat-note" id="detailPaymentSplit">฿3,092 to laptop • ฿408 to bank</span>
-              </div>
-
-              <!-- Ending Balance -->
-              <div class="detail-stat-item">
-                <span class="stat-label">Ending Balance After Payment</span>
-                <span class="stat-value" id="detailEndingBalance">฿14,000</span>
-                <span class="stat-note" id="detailRemainingMonths">5 months remaining to payoff</span>
+              <div class="treadmill-note">
+                <strong>Why the treadmill never stops:</strong> As your balance shrinks, the required minimum drops too (down toward the ฿500 floor). You pay less principal each month, stretching the debt out for years while interest piles up!
               </div>
             </div>
+
+            <!-- REALITY 4: The Antidote (The Hero Move) -->
+            <div class="reality-box antidote-box">
+              <div class="reality-box-header">
+                <span class="reality-num">4</span>
+                <h3>The Antidote: How to Win</h3>
+                <span class="reality-tag hero-tag">The Smart Strategy</span>
+              </div>
+
+              <p class="antidote-desc">
+                You never have to get trapped. Compare your options and see the power of disciplined repayment:
+              </p>
+
+              <div class="antidote-comparison-grid">
+                <!-- Option A: Minimum -->
+                <div class="antidote-col trap">
+                  <div class="antidote-head">❌ Minimum Only</div>
+                  <div class="antidote-metric" id="antidoteMinTime">3 yrs 2 mos</div>
+                  <div class="antidote-sub" id="antidoteMinInterest">+฿13,720 interest</div>
+                  <span class="antidote-tag">The Bank Wins</span>
+                </div>
+
+                <!-- Option B: Fixed -->
+                <div class="antidote-col smart">
+                  <div class="antidote-head">⚡ Fixed ฿3,500/mo</div>
+                  <div class="antidote-metric" id="antidoteFixedTime">1 yr 5 mos</div>
+                  <div class="antidote-sub" id="antidoteFixedInterest">+฿5,800 interest</div>
+                  <span class="antidote-tag green">Save ฿7,900 & 21 mos!</span>
+                </div>
+
+                <!-- Option C: Full -->
+                <div class="antidote-col hero">
+                  <div class="antidote-head">🏆 Pay in Full</div>
+                  <div class="antidote-metric">1 Month</div>
+                  <div class="antidote-sub">฿0 Interest</div>
+                  <span class="antidote-tag gold">Total Freedom</span>
+                </div>
+              </div>
+
+              <div class="hero-rule-box">
+                💡 <strong>The Golden Rule:</strong> Always aim to pay your <strong>statement balance in full</strong>. If you must carry a balance, set a <strong>fixed payment</strong> well above the minimum!
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
+
+      <!-- ============================================ -->
+      <!-- STEP 4: Deep Dive & Teacher Tools            -->
+      <!-- ============================================ -->
+      <section class="step-card deep-dive-card">
+        <details class="deep-dive-accordion" id="deepDiveDetails">
+          <summary class="deep-dive-summary">
+            <div class="summary-left">
+              <span class="summary-icon">🔍</span>
+              <div>
+                <strong class="summary-title">Deep Dive & Teacher Tools</strong>
+                <span class="summary-subtitle">Month-by-month amortization chart, comparison matrix & custom APR settings</span>
+              </div>
+            </div>
+            <span class="summary-chevron">▼</span>
+          </summary>
+
+          <div class="deep-dive-content">
+            
+            <!-- Custom APR Controls -->
+            <div class="deep-dive-control-group">
+              <div class="deep-dive-label-row">
+                <label>Card Annual Interest Rate (APR):</label>
+                <span class="value-pill" id="aprDisplay">16.0%</span>
+              </div>
+              <div class="rate-presets">
+                <button type="button" class="rate-btn" data-rate="0" title="Promotional 0% installment plan">0% (Promo Plan)</button>
+                <button type="button" class="rate-btn active" data-rate="16" title="Bank of Thailand official credit card interest ceiling">16% (Thai Credit Card)</button>
+                <button type="button" class="rate-btn" data-rate="20" title="Standard international card APR">20% (Avg Card)</button>
+                <button type="button" class="rate-btn" data-rate="25" title="Bank of Thailand revolving cash advance card ceiling">25% (Cash Card / Loan)</button>
+                <button type="button" class="rate-btn" data-rate="28" title="Department store card or penalty rate">28% (Store Card)</button>
+              </div>
+            </div>
+
+            <!-- Month by Month Amortization Chart -->
+            <div class="amortization-container" id="amortizationSection">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Month-by-Month Amortization Trajectory</h3>
+                  <p class="chart-subtitle">Stacked bars show remaining principal (blue) and debt interest (red) shrinking as payments are made.</p>
+                </div>
+                <div class="chart-legend">
+                  <span class="legend-item"><span class="legend-swatch bar-swatch-principal"></span> Principal</span>
+                  <span class="legend-item"><span class="legend-swatch bar-swatch-debt"></span> Debt Interest</span>
+                </div>
+              </div>
+
+              <!-- SVG Chart -->
+              <div class="chart-wrapper">
+                <div class="svg-container" id="chartContainer">
+                  <svg id="balanceChart" viewBox="0 0 800 240" preserveAspectRatio="none" aria-label="Month by month amortization stacked bars"></svg>
+                </div>
+                <div class="chart-axis-labels">
+                  <span>Month 1 (Start)</span>
+                  <span id="chartMidMonth">Month 18</span>
+                  <span id="chartEndMonth">Month 38 (Debt-Free 🎉)</span>
+                </div>
+              </div>
+
+              <!-- Touch / Drag Hint -->
+              <div class="touch-hint-bar">
+                <span>👆 <strong>Tap or drag across the chart bars</strong> to inspect any month</span>
+              </div>
+
+              <!-- Selected Month Detail Box -->
+              <div class="month-detail-card" id="monthDetailCard" aria-live="polite">
+                <div class="detail-header">
+                  <div class="detail-title-group">
+                    <span class="detail-badge" id="detailBadge">Month 1</span>
+                    <h4 id="detailTimeElapsed">1 month in</h4>
+                  </div>
+                  <span class="detail-progress-pill" id="detailProgressPill">Month 1 of 38</span>
+                </div>
+
+                <div class="detail-stats-grid">
+                  <div class="detail-stat-item highlight-debt">
+                    <span class="stat-label">Total Debt Remaining</span>
+                    <span class="stat-value" id="detailTotalDebt">฿66,220</span>
+                    <div class="stat-sub-pills">
+                      <span class="sub-pill blue" id="detailPrincipalLeft">฿52,500 Principal</span>
+                      <span class="sub-pill red" id="detailInterestLeft">+฿13,720 Interest</span>
+                    </div>
+                  </div>
+
+                  <div class="detail-stat-item">
+                    <span class="stat-label">This Month's Payment</span>
+                    <span class="stat-value" id="detailPayment">฿4,200</span>
+                    <span class="stat-note" id="detailPaymentSplit">฿3,500 to laptop • ฿700 to bank</span>
+                  </div>
+
+                  <div class="detail-stat-item">
+                    <span class="stat-label">Ending Balance</span>
+                    <span class="stat-value" id="detailEndingBalance">฿49,000</span>
+                    <span class="stat-note" id="detailRemainingMonths">37 months remaining</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Full Strategy Comparison Matrix -->
+            <div class="comparison-section">
+              <h3 class="comparison-title">Full Strategy Comparison Table</h3>
+              <div class="table-responsive">
+                <table class="comparison-table">
+                  <thead>
+                    <tr>
+                      <th>Strategy</th>
+                      <th>First Payment</th>
+                      <th>Time to Freedom</th>
+                      <th>Total Interest</th>
+                      <th>Total Paid</th>
+                    </tr>
+                  </thead>
+                  <tbody id="comparisonTableBody">
+                    <!-- Populated dynamically in ccsim.js?v=20261001_125209 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Opportunity Cost Grid (Expanded View) -->
+            <div class="opportunity-card">
+              <div class="opportunity-header">
+                <span class="opp-icon">🛍️</span>
+                <h4>Full Opportunity Cost Equivalencies</h4>
+              </div>
+              <p class="opp-intro">What that <strong id="oppInterestAmount">฿13,720</strong> bank interest could have bought:</p>
+              <div class="opp-items-grid" id="oppItemsGrid">
+                <!-- Dynamically populated in ccsim.js?v=20261001_125209 -->
+              </div>
+            </div>
+
+          </div>
+        </details>
+      </section>
+
     </main>
 
     <!-- Educational Footer: Thai Rules & Financial Wisdom -->
     <footer class="app-footer">
       <div class="footer-columns">
         <div class="col">
-          <h4>🇹🇭 Thailand Credit Card Facts</h4>
+          <h4>🇹🇭 Bank of Thailand (BOT) Facts</h4>
           <ul>
-            <li><strong>Bank of Thailand (BOT) Cap:</strong> Max interest rate on credit cards is legally capped at <strong>16% APR</strong>.</li>
-            <li><strong>Personal / Cash Loans:</strong> Revolving cash card rates can reach <strong>25% APR</strong>.</li>
-            <li><strong>Minimum Payment Rule:</strong> Bank of Thailand requires 8% (2024) to 10% (2025+) of balance, or minimum ฿500.</li>
-            <li><strong>0% Installment Promos:</strong> Thai stores frequently offer "0% for 10 months". This is safe <em>only if</em> you pay on time and don't miss a single due date!</li>
+            <li><strong>Interest Rate Cap:</strong> Credit card interest is strictly capped at <strong>16% APR</strong> by Thai law.</li>
+            <li><strong>Revolving Cash Advances:</strong> Cash cards and personal loan rates can reach up to <strong>25% APR</strong>.</li>
+            <li><strong>Minimum Payment Rule:</strong> Bank of Thailand requires 8% to 10% of total balance, with a mandatory floor of ฿500.</li>
+            <li><strong>0% Installment Promos:</strong> Thai mall promotions ("0% for 10 months") are safe <em>only if</em> you pay every month on time without missing a due date!</li>
           </ul>
         </div>
         <div class="col">
-          <h4>💡 Smart Rules for Young Cardholders</h4>
+          <h4>💡 Smart Financial Habits</h4>
           <ul>
-            <li><strong>Rule 1:</strong> Always treat a credit card like a debit card—only spend money you already have in the bank.</li>
-            <li><strong>Rule 2:</strong> Always choose <strong>"Pay Statement in Full"</strong> to avoid paying a single baht of interest.</li>
-            <li><strong>Rule 3:</strong> Never take cash advances from a credit card; interest starts calculating immediately from day 1 with no grace period!</li>
-            <li><strong>Rule 4:</strong> Missed payments ruin your credit history (National Credit Bureau in Thailand).</li>
+            <li><strong>Rule 1:</strong> Always treat a credit card like a debit card—never spend money you do not already have in the bank.</li>
+            <li><strong>Rule 2:</strong> Always choose <strong>"Pay Statement Balance in Full"</strong> to avoid giving even 1 baht of interest to the bank.</li>
+            <li><strong>Rule 3:</strong> Beware of debt stacking—multiple small monthly payments quickly eat your entire salary.</li>
+            <li><strong>Rule 4:</strong> Late or missed payments harm your National Credit Bureau (NCB) score in Thailand.</li>
           </ul>
         </div>
       </div>
       <div class="footer-bottom">
-        <p>Built for High School Personal Finance & Computer Science Education • Client-side only simulation</p>
+        <p>Built for High School Personal Finance & Computer Science Education • Client-side simulation</p>
       </div>
     </footer>
   </div>
 
-  <script src="ccsim.js?v=20261001_110544"></script>
+  <script src="ccsim-core.js?v=20261001_125209"></script>
+  <script src="ccsim.js?v=20261001_125209"></script>
 </body>
 </html>
