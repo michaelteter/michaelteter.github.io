@@ -844,6 +844,35 @@
   }
 
   // =========================================================================
+  // 7. Story Mode Simulation Parameter Resolver
+  // =========================================================================
+
+  function getStorySimulationParams(storyState, cur = 'THB', laptopPrice) {
+    const currency = cur || 'THB';
+    const principal = laptopPrice || (currency === 'USD' ? 1500 : 52500);
+    const apr = 16; // Bank of Thailand official standard credit card APR ceiling
+
+    if (storyState.financing === 'card') {
+      if (storyState.habit === 'min') {
+        return { principal, apr, strategy: 'minimum', minPayPercent: 8, currency };
+      }
+      if (storyState.habit === 'fixed') {
+        return { principal, apr, strategy: 'fixed', fixedPay: currency === 'THB' ? 5000 : 150, currency };
+      }
+      return { principal, apr, strategy: 'full', currency };
+    }
+
+    // storyState.financing === 'promo'
+    if (storyState.habit === 'slip11') {
+      return { principal, apr, strategy: 'promo', promoScenario: 'slip11', currency };
+    }
+    if (storyState.habit === 'slipmin') {
+      return { principal, apr, strategy: 'promo', promoScenario: 'slipmin', minPayPercent: 8, currency };
+    }
+    return { principal, apr, strategy: 'promo', promoScenario: 'ideal', currency };
+  }
+
+  // =========================================================================
   // Public Exports
   // =========================================================================
 
@@ -879,6 +908,7 @@
     calculateComparisonTable,
     calculateRemainingInterests,
     calculateMonthDetail,
-    computeViewModel
+    computeViewModel,
+    getStorySimulationParams
   };
 });
