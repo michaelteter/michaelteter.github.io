@@ -793,19 +793,25 @@
       el.btnModeFree.forEach(btn => btn.addEventListener('click', () => setMode('free')));
     }
 
+    function goToStoryStep(step) {
+      storyState.step = step;
+      renderStoryMode();
+      if (el.storyModeContainer) {
+        el.storyModeContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
     // Story Mode Step 1 -> Step 2
     if (el.btnStoryToPhase2) {
       el.btnStoryToPhase2.addEventListener('click', () => {
-        storyState.step = 2;
-        renderStoryMode();
+        goToStoryStep(2);
       });
     }
 
     // Story Mode Step 2 Back
     if (el.btnStoryBackTo1) {
       el.btnStoryBackTo1.addEventListener('click', () => {
-        storyState.step = 1;
-        renderStoryMode();
+        goToStoryStep(1);
       });
     }
 
@@ -813,24 +819,21 @@
     if (el.btnStoryChoiceCard) {
       el.btnStoryChoiceCard.addEventListener('click', () => {
         storyState.financing = 'card';
-        storyState.step = 3;
-        renderStoryMode();
+        goToStoryStep(3);
       });
     }
 
     if (el.btnStoryChoicePromo) {
       el.btnStoryChoicePromo.addEventListener('click', () => {
         storyState.financing = 'promo';
-        storyState.step = 3;
-        renderStoryMode();
+        goToStoryStep(3);
       });
     }
 
     // Story Mode Step 3 Back
     if (el.btnStoryBackTo2) {
       el.btnStoryBackTo2.addEventListener('click', () => {
-        storyState.step = 2;
-        renderStoryMode();
+        goToStoryStep(2);
       });
     }
 
@@ -839,8 +842,7 @@
       el.storyHabitCards.forEach(card => {
         card.addEventListener('click', () => {
           storyState.habit = card.dataset.storyHabit;
-          storyState.step = 4;
-          renderStoryMode();
+          goToStoryStep(4);
         });
       });
     }
@@ -848,8 +850,7 @@
     // Story Mode Step 4: Replay & Explore in Sandbox
     if (el.btnStoryReplay) {
       el.btnStoryReplay.addEventListener('click', () => {
-        storyState.step = 1;
-        renderStoryMode();
+        goToStoryStep(1);
       });
     }
 
