@@ -100,6 +100,212 @@
   const STRATEGIES = ['minimum', 'fixed', 'full', 'promo'];
   const PROMO_SCENARIOS = ['ideal', 'slip11', 'slipmin'];
 
+  const GLOSSARY = {
+    apr: {
+      id: 'apr',
+      term: 'APR (Annual Percentage Rate)',
+      thai: 'อัตราดอกเบี้ยต่อปี',
+      badge: 'Credit Card Basics',
+      icon: '📈',
+      shortDef: 'The yearly percentage fee charged by the bank for borrowing money.',
+      bullets: [
+        'APR stands for <strong>Annual Percentage Rate</strong>. It measures the yearly cost of borrowing on your card.',
+        'In Thailand, the <strong>Bank of Thailand (BOT)</strong> legally caps credit card APR at <strong>16% per year</strong>.',
+        'Cash advance cards and revolving personal loans can charge up to <strong>25% APR</strong>.',
+        'If you do not pay your full balance, interest is calculated daily using this rate and billed every month.'
+      ],
+      proTip: '💡 <strong>Golden Rule:</strong> If you pay your statement balance in full before the due date, your effective APR is <strong>0%</strong> because no interest is ever charged!'
+    },
+    principal: {
+      id: 'principal',
+      term: 'Principal',
+      thai: 'เงินต้น',
+      badge: 'Loan Basics',
+      icon: '💻',
+      shortDef: 'The original purchase price of the item before interest or fees.',
+      bullets: [
+        'The <strong>principal</strong> is the actual price tag of what you bought (e.g., ฿52,500 for the laptop).',
+        'When you make a payment, part goes toward reducing the principal and part goes to the bank as interest.',
+        'Only payments that reduce principal bring you closer to owning the item debt-free!'
+      ],
+      proTip: '💡 <strong>Fun Fact:</strong> In school, "principal" is the school headmaster—in personal finance, it strictly refers to the original money you borrowed.'
+    },
+    interest: {
+      id: 'interest',
+      term: 'Interest & Compounding',
+      thai: 'ดอกเบี้ยและดอกเบี้ยทบต้น',
+      badge: 'Cost of Borrowing',
+      icon: '🔥',
+      shortDef: 'The extra fee you pay to the bank for borrowing their money.',
+      bullets: [
+        '<strong>Interest</strong> is the fee or "rent" the bank charges for letting you buy now and pay later.',
+        '<strong>Compounding:</strong> Any unpaid interest from this month gets added to your balance, so next month you pay <em>interest on top of interest</em>.',
+        'This compounding snowball is why small unpaid balances can quietly turn into huge debts over time.'
+      ],
+      proTip: '💡 <strong>The Antidote:</strong> Pay your statement in full every month so the bank never earns a single baht of interest from you.'
+    },
+    'minimum-payment': {
+      id: 'minimum-payment',
+      term: 'Minimum Payment',
+      thai: 'ยอดชำระขั้นต่ำ',
+      badge: 'The Bank Trap',
+      icon: '🪤',
+      shortDef: 'The smallest amount the bank legally requires you to pay each month.',
+      bullets: [
+        'The <strong>minimum payment</strong> is the lowest amount you can pay to avoid penalty fees (in Thailand, typically <strong>8% to 10%</strong> of your balance, min ฿500).',
+        'Because the payment shrinks as your balance drops, you pay less and less principal each month.',
+        'This stretches a single purchase over <strong>3 to 5+ years</strong>, allowing the bank to collect thousands of extra baht in interest.'
+      ],
+      proTip: '💡 <strong>The Illusion:</strong> Paying the minimum feels affordable each month, but it is a trap engineered to keep you on a debt treadmill for years.'
+    },
+    'grace-period': {
+      id: 'grace-period',
+      term: 'Grace Period',
+      thai: 'ระยะเวลาปลอดดอกเบี้ย',
+      badge: 'Smart Card Usage',
+      icon: '⏳',
+      shortDef: 'The interest-free window between buying and your bill due date.',
+      bullets: [
+        'The <strong>grace period</strong> is an interest-free window (usually <strong>45 to 55 days</strong> in Thailand) between when you swipe your card and when the bill is due.',
+        'If you pay 100% of your statement balance before this date, the bank charges you <strong>฿0 interest</strong>.',
+        'If you leave even 1 baht unpaid past the due date, you lose the grace period and interest is charged on the remaining balance.'
+      ],
+      proTip: '💡 <strong>Pro Move:</strong> Treat your credit card like a debit card: spend only what you already have in the bank and pay within the grace period.'
+    },
+    'statement-balance': {
+      id: 'statement-balance',
+      term: 'Statement Balance',
+      thai: 'ยอดเงินตามใบแจ้งหนี้',
+      badge: 'Monthly Billing',
+      icon: '📄',
+      shortDef: 'The total amount billed for your monthly statement cycle.',
+      bullets: [
+        'Your <strong>statement balance</strong> is the total amount owed at the end of your monthly billing cycle.',
+        'It is different from your <em>current balance</em>, which includes new purchases made today or yesterday after the statement closed.',
+        'To enjoy ฿0 interest and maintain your grace period, you only need to pay the <strong>statement balance</strong> by the due date.'
+      ],
+      proTip: '💡 <strong>In Your Banking App:</strong> Always select the payment option <em>"Pay Statement Balance in Full"</em>.'
+    },
+    'promo-plan': {
+      id: 'promo-plan',
+      term: '0% Installment Plan (Mall Deal)',
+      thai: 'โปรโมชั่นผ่อน 0% (10 เดือน)',
+      badge: 'Mall Financing',
+      icon: '⚡',
+      shortDef: 'Splitting payments equally over 6–10 months at 0% interest.',
+      bullets: [
+        'A very popular deal in Thai malls (e.g. Siam Paragon, Central, Lotus\'s) where you split the price over 6 to 10 equal monthly payments.',
+        'If you pay every required installment on time, you pay <strong>฿0 interest</strong>.',
+        '<strong>The Fine-Print Catch:</strong> If you are late or fail to clear 100% within the 10-month window, the 0% deal is canceled and regular 16% interest can be charged!'
+      ],
+      proTip: '💡 <strong>Budget Check:</strong> Only use 0% installment plans if you have steady income to pay every single month without slipping.'
+    },
+    amortization: {
+      id: 'amortization',
+      term: 'Amortization',
+      thai: 'ตารางการทยอยผ่อนชำระหนี้',
+      badge: 'Loan Mechanics',
+      icon: '📊',
+      shortDef: 'The month-by-month timeline showing how debt drops to ฿0.',
+      bullets: [
+        '<strong>Amortization</strong> is the step-by-step breakdown of how each monthly payment is divided between principal and interest over time.',
+        'In the beginning, more of each payment goes toward bank interest.',
+        'As the principal debt drops, interest decreases, and more of your money knocks down the debt until you reach ฿0.'
+      ],
+      proTip: '💡 <strong>Interactive Chart:</strong> Tap or drag across the chart below to inspect any month and see your principal vs. interest breakdown!'
+    },
+    'debt-stacking': {
+      id: 'debt-stacking',
+      term: 'Debt Stacking',
+      thai: 'หนี้พอกพูนซ้อนกันหลายก้อน',
+      badge: 'Financial Danger',
+      icon: '🥞',
+      shortDef: 'Accumulating multiple simultaneous installment payments.',
+      bullets: [
+        '<strong>Debt stacking</strong> occurs when someone finances multiple items at once (e.g., a phone, laptop, sneakers, and concert ticket).',
+        'While each monthly payment seems small (฿1,500/mo), having 4 or 5 plans running at once stacks up to <strong>฿8,000–฿10,000+ per month</strong>.',
+        'For a student or new graduate, stacked debt quickly eats their entire living allowance or starting salary.'
+      ],
+      proTip: '💡 <strong>One-at-a-Time Rule:</strong> Completely finish paying off one item before financing anything else.'
+    },
+    'opportunity-cost': {
+      id: 'opportunity-cost',
+      term: 'Opportunity Cost',
+      thai: 'ต้นทุนค่าเสียโอกาส',
+      badge: 'Smart Thinking',
+      icon: '🧋',
+      shortDef: 'The valuable things you give up when spending money on debt interest.',
+      bullets: [
+        'Every baht given to a bank in interest is money you cannot use for fun, savings, or investing.',
+        'For example, the <strong>฿13,720 extra interest</strong> on a laptop is equal to <strong>274 cups of Thai milk tea</strong> or 2 pairs of AirPods!',
+        'Thinking in opportunity costs helps you decide whether instant gratification is worth sacrificing real future experiences.'
+      ],
+      proTip: '💡 <strong>Before Borrowing:</strong> Ask yourself: <em>"What real-life treats or savings am I giving up to have this item right now?"</em>'
+    },
+    bot: {
+      id: 'bot',
+      term: 'Bank of Thailand (BOT)',
+      thai: 'ธนาคารแห่งประเทศไทย (ธปท.)',
+      badge: 'Thai Financial Law',
+      icon: '🏦',
+      shortDef: 'Thailand’s central bank and financial regulator.',
+      bullets: [
+        'The <strong>Bank of Thailand (BOT)</strong> is the country’s central financial authority that regulates banks and protects consumers.',
+        '<strong>Credit card interest cap:</strong> Legally capped at <strong>16% APR</strong>.',
+        '<strong>Cash advance cards:</strong> Capped at <strong>25% APR</strong>.',
+        '<strong>Minimum payments:</strong> Mandated at 8% to 10% of outstanding balance (with a mandatory ฿500 floor).'
+      ],
+      proTip: '💡 Any lender in Thailand charging higher rates than BOT limits is breaking the law or operating as an illegal loan shark.'
+    },
+    'cash-advance': {
+      id: 'cash-advance',
+      term: 'Cash Advance & Cash Cards',
+      thai: 'การเบิกถอนเงินสด / บัตรกดเงินสด',
+      badge: 'High Risk Debt',
+      icon: '🏧',
+      shortDef: 'Withdrawing physical cash from an ATM using credit.',
+      bullets: [
+        'A <strong>cash advance</strong> is withdrawing cash from an ATM using a credit card or cash card (บัตรกดเงินสด).',
+        '<strong>High interest:</strong> Rates can reach up to <strong>25% APR</strong> under Bank of Thailand rules.',
+        '<strong>No grace period:</strong> Interest begins accruing the very minute cash comes out of the ATM, plus a 3% cash withdrawal fee and 7% VAT.'
+      ],
+      proTip: '🚨 <strong>Emergency Only:</strong> Never withdraw ATM cash on credit for everyday shopping—it is one of the most expensive ways to borrow money.'
+    },
+    ncb: {
+      id: 'ncb',
+      term: 'National Credit Bureau (NCB)',
+      thai: 'บริษัท ข้อมูลเครดิตแห่งชาติ (เครดิตบูโร)',
+      badge: 'Credit History',
+      icon: '📋',
+      shortDef: 'The central system in Thailand that records your loan history.',
+      bullets: [
+        'The <strong>National Credit Bureau (NCB)</strong> keeps an official record of how reliably you pay your credit cards and loans in Thailand.',
+        'If you miss payments or default on debt, it stays on your NCB record for up to <strong>3 years</strong>.',
+        'A negative credit record makes it difficult to qualify for future car loans, condo mortgages, or business financing as an adult.'
+      ],
+      proTip: '💡 <strong>Build Good Credit:</strong> Paying bills in full and on time builds a strong, trusted financial reputation for your future.'
+    },
+    'impatience-tax': {
+      id: 'impatience-tax',
+      term: 'Impatience Tax',
+      thai: 'ภาษีความใจร้อน',
+      badge: 'Debt Reality',
+      icon: '🏷️',
+      shortDef: 'The markup paid for needing an item today instead of waiting.',
+      bullets: [
+        'The <strong>Impatience Tax</strong> is the percentage markup you pay over the retail price when financing with interest.',
+        'A ฿52,500 laptop that ends up costing ฿66,220 has a <strong>+26.1% Impatience Tax</strong> (฿13,720 extra).',
+        'Saving up cash in advance lets you skip this penalty completely and buy the item for its true sticker price.'
+      ],
+      proTip: '💡 If you can wait and save, you pay 0% extra and keep all your hard-earned money.'
+    }
+  };
+
+  function getGlossaryTerm(termId) {
+    if (!termId || typeof termId !== 'string') return null;
+    return GLOSSARY[termId.toLowerCase()] || null;
+  }
+
   // =========================================================================
   // 2. Pure Formatting Helpers
   // =========================================================================
@@ -881,6 +1087,8 @@
     CURRENCY_CONFIG,
     STRATEGIES,
     PROMO_SCENARIOS,
+    GLOSSARY,
+    getGlossaryTerm,
 
     // Formatting
     formatMoney,

@@ -172,7 +172,18 @@
 
     comparisonTableBody: document.getElementById('comparisonTableBody'),
     oppInterestAmount: document.getElementById('oppInterestAmount'),
-    oppItemsGrid: document.getElementById('oppItemsGrid')
+    oppItemsGrid: document.getElementById('oppItemsGrid'),
+
+    // Glossary Definition Modal
+    termModalBackdrop: document.getElementById('termModalBackdrop'),
+    termModalSheet: document.getElementById('termModalSheet'),
+    termModalIcon: document.getElementById('termModalIcon'),
+    termModalBadge: document.getElementById('termModalBadge'),
+    termModalTitle: document.getElementById('termModalTitle'),
+    termModalThai: document.getElementById('termModalThai'),
+    termModalClose: document.getElementById('termModalClose'),
+    termModalBody: document.getElementById('termModalBody'),
+    termModalDismiss: document.getElementById('termModalDismiss')
   };
 
   // =========================================================================
@@ -1041,6 +1052,101 @@
         });
       }
     }
+
+    // Glossary Definition Triggers & Dismissals
+    document.addEventListener('click', (e) => {
+      const termTrigger = e.target.closest('.term-lookup');
+      if (termTrigger) {
+        e.stopPropagation();
+        e.preventDefault();
+        const termKey = termTrigger.getAttribute('data-term');
+        openGlossaryModal(termKey);
+        return;
+      }
+
+      if (
+        e.target === el.termModalBackdrop ||
+        (el.termModalClose && el.termModalClose.contains(e.target)) ||
+        (el.termModalDismiss && el.termModalDismiss.contains(e.target))
+      ) {
+        closeGlossaryModal();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && el.termModalBackdrop && !el.termModalBackdrop.classList.contains('hidden')) {
+        closeGlossaryModal();
+        return;
+      }
+
+      const termTrigger = e.target.closest('.term-lookup');
+      if (termTrigger && (e.key === 'Enter' || e.key === ' ')) {
+        e.stopPropagation();
+        e.preventDefault();
+        const termKey = termTrigger.getAttribute('data-term');
+        openGlossaryModal(termKey);
+      }
+    });
+  }
+
+  // =========================================================================
+  // Glossary Definition Popover / Modal Controller
+  // =========================================================================
+
+  let lastFocusedElement = null;
+
+  function openGlossaryModal(termKey) {
+    if (!window.CCSim || !window.CCSim.getGlossaryTerm) return;
+    const term = window.CCSim.getGlossaryTerm(termKey);
+    if (!term || !el.termModalBackdrop) return;
+
+    lastFocusedElement = document.activeElement;
+
+    if (el.termModalIcon) el.termModalIcon.textContent = term.icon || '📖';
+    if (el.termModalBadge) el.termModalBadge.textContent = term.badge || 'Definition';
+    if (el.termModalTitle) el.termModalTitle.textContent = term.term || '';
+    if (el.termModalThai) el.termModalThai.textContent = term.thai || '';
+
+    if (el.termModalBody) {
+      let bulletsHtml = '';
+      if (term.bullets && term.bullets.length > 0) {
+        bulletsHtml = `
+          <div class="term-modal-bullets">
+            <ul>
+              ${term.bullets.map(b => `<li>${b}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      let tipHtml = '';
+      if (term.proTip) {
+        tipHtml = `<div class="term-modal-protip">${term.proTip}</div>`;
+      }
+
+      el.termModalBody.innerHTML = `
+        <p class="term-modal-lead">${term.shortDef || ''}</p>
+        ${bulletsHtml}
+        ${tipHtml}
+      `;
+    }
+
+    el.termModalBackdrop.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // Focus close button for keyboard accessibility
+    setTimeout(() => {
+      if (el.termModalClose) el.termModalClose.focus();
+    }, 50);
+  }
+
+  function closeGlossaryModal() {
+    if (!el.termModalBackdrop) return;
+    el.termModalBackdrop.classList.add('hidden');
+    document.body.style.overflow = '';
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      try { lastFocusedElement.focus(); } catch (err) {}
+    }
   }
 
   // Public debugging & automation API
@@ -1049,6 +1155,8 @@
   window.getStoryState = () => storyState;
   window.getActiveMode = () => activeMode;
   window.setSimMode = setMode;
+  window.openGlossaryModal = openGlossaryModal;
+  window.closeGlossaryModal = closeGlossaryModal;
 
   // Initialize
   initEvents();
