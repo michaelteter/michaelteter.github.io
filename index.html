@@ -28,333 +28,339 @@ nav_exclude: true
     or at <a href="mailto:connect@michaelteter.com">connect@michaelteter.com</a>.
   </p>
 
-  <section
-    class="featured-notice"
-    style="
-      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  <style>
+    .featured-showcase {
+      margin: 32px 0 24px 0;
+    }
+
+    .showcase-header {
+      margin-bottom: 20px;
+    }
+
+    .showcase-eyebrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #2563eb;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+
+    .showcase-title {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 6px 0;
+      padding: 0;
+      border-bottom: none;
+      line-height: 1.25;
+    }
+
+    .showcase-desc {
+      font-size: 1rem;
+      color: #475569;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .projects-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    @media screen and (min-width: 640px) {
+      .projects-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+      }
+    }
+
+    .project-card {
+      background: #ffffff;
       border: 1px solid #cbd5e1;
-      border-left: 5px solid #2563eb;
-      border-radius: 10px;
-      padding: 24px;
-      margin: 30px 0;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
-    ">
-    <div
-      style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap">
-      <span
-        style="
-          background-color: #2563eb;
-          color: #ffffff;
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.8px;
-          padding: 4px 12px;
-          border-radius: 20px;
-          display: inline-block;
-        ">
-        💳 Personal Finance Lab
-      </span>
+      border-top: 4px solid #2563eb;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      box-sizing: border-box;
+    }
+
+    @media (hover: hover) {
+      .project-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
+        border-color: #94a3b8;
+      }
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 8px 0;
+      padding: 0;
+      border-bottom: none;
+      line-height: 1.3;
+    }
+
+    .card-title a {
+      color: #0f172a;
+      text-decoration: none;
+    }
+
+    .card-title a:hover {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    .card-summary {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: #334155;
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+
+    .card-actions {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-showcase {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background-color: #2563eb;
+      color: #ffffff !important;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 11px 18px;
+      border-radius: 8px;
+      text-decoration: none !important;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      transition: background-color 0.15s ease, box-shadow 0.15s ease;
+      min-height: 44px;
+      text-align: center;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .btn-showcase:hover,
+    .btn-showcase:focus-visible {
+      background-color: #1d4ed8;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+      color: #ffffff !important;
+    }
+
+    /* Collapsible video preview inside WordNeighbor card */
+    .video-accordion {
+      margin-top: 14px;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
+    }
+
+    .video-accordion summary {
+      cursor: pointer;
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #2563eb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 0;
+      user-select: none;
+    }
+
+    .video-accordion summary:hover {
+      text-decoration: underline;
+    }
+
+    .video-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .video-frame-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #000000;
+    }
+
+    .video-frame-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .video-link {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .video-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+
+  <section class="featured-showcase" aria-labelledby="showcase-heading">
+    <div class="showcase-header">
+      <span class="showcase-eyebrow">Look Here</span>
+      <h2 id="showcase-heading" class="showcase-title">Featured Projects &amp; Tools</h2>
+      <p class="showcase-desc">A selection of recent web apps, games, and interactive tools:</p>
     </div>
 
-    <h2
-      style="
-        margin-top: 0;
-        margin-bottom: 12px;
-        font-weight: 700;
-        color: #0f172a;
-        font-size: 1.6rem;
-        border-bottom: none;
-        padding-bottom: 0;
-      ">
-      Credit Card Reality Simulator
-    </h2>
-
-    <p style="font-size: 1.05rem; line-height: 1.6; color: #334155; margin-bottom: 18px">
-      I've built a new tool:
-      <strong
-        ><a
-          href="/ccsim.html"
-          style="color: #2563eb; text-decoration: underline"
-          >Credit Card Reality Simulator</a
-        ></strong
-      >! See how compounding interest adds up, the true cost of credit card debt, and why paying only the minimum is a trap.
-    </p>
-
-    <div style="margin-bottom: 0">
-      <a
-        href="/ccsim.html"
-        style="
-          display: inline-block;
-          background-color: #2563eb;
-          color: #ffffff;
-          font-weight: 600;
-          font-size: 1rem;
-          padding: 10px 22px;
-          border-radius: 6px;
-          text-decoration: none;
-          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-          transition: background-color 0.2s ease;
-        ">
-        Launch Simulator <i class="fa fa-calculator" style="margin-left: 6px"></i>
-      </a>
-    </div>
-  </section>
-
-  <section
-    class="featured-notice"
-    style="
-      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-      border: 1px solid #cbd5e1;
-      border-left: 5px solid #2563eb;
-      border-radius: 10px;
-      padding: 24px;
-      margin: 30px 0;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
-    ">
-    <div
-      style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap">
-      <span
-        style="
-          background-color: #2563eb;
-          color: #ffffff;
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.8px;
-          padding: 4px 12px;
-          border-radius: 20px;
-          display: inline-block;
-        ">
-        ✈️ New Game Release
-      </span>
-    </div>
-
-    <h2
-      style="
-        margin-top: 0;
-        margin-bottom: 12px;
-        font-weight: 700;
-        color: #0f172a;
-        font-size: 1.6rem;
-        border-bottom: none;
-        padding-bottom: 0;
-      ">
-      Fly By
-    </h2>
-
-    <p style="font-size: 1.05rem; line-height: 1.6; color: #334155; margin-bottom: 18px">
-      I've created a new game:
-      <strong
-        ><a
-          href="/flyby.html"
-          style="color: #2563eb; text-decoration: underline"
-          >Fly By</a
-        ></strong
-      >! A retro 8-bit biplane flight game where you pop balloons, buzz barns, dodge airliners, and perform stunt maneuvers directly in your browser.
-    </p>
-
-    <div style="margin-bottom: 0">
-      <a
-        href="/flyby.html"
-        style="
-          display: inline-block;
-          background-color: #2563eb;
-          color: #ffffff;
-          font-weight: 600;
-          font-size: 1rem;
-          padding: 10px 22px;
-          border-radius: 6px;
-          text-decoration: none;
-          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-          transition: background-color 0.2s ease;
-        ">
-        Play Fly By <i class="fa fa-play" style="margin-left: 6px"></i>
-      </a>
-    </div>
-  </section>
-
-  <section
-    class="featured-notice"
-    style="
-      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-      border: 1px solid #cbd5e1;
-      border-left: 5px solid #2563eb;
-      border-radius: 10px;
-      padding: 24px;
-      margin: 30px 0;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
-    ">
-    <div
-      style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap">
-      <span
-        style="
-          background-color: #2563eb;
-          color: #ffffff;
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.8px;
-          padding: 4px 12px;
-          border-radius: 20px;
-          display: inline-block;
-        ">
-        🚀 New Game Release
-      </span>
-    </div>
-
-    <h2
-      style="
-        margin-top: 0;
-        margin-bottom: 12px;
-        font-weight: 700;
-        color: #0f172a;
-        font-size: 1.6rem;
-        border-bottom: none;
-        padding-bottom: 0;
-      ">
-      Word Neighbor
-    </h2>
-
-    <p style="font-size: 1.05rem; line-height: 1.6; color: #334155; margin-bottom: 18px">
-      I've just released a new game:
-      <strong
-        ><a
-          href="https://wordneighbor.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          style="color: #2563eb; text-decoration: underline"
-          >wordneighbor.com</a
-        ></strong
-      >! Play it directly in your browser.
-    </p>
-
-    <div style="margin-bottom: 24px">
-      <a
-        href="https://wordneighbor.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        style="
-          display: inline-block;
-          background-color: #2563eb;
-          color: #ffffff;
-          font-weight: 600;
-          font-size: 1rem;
-          padding: 10px 22px;
-          border-radius: 6px;
-          text-decoration: none;
-          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-          transition: background-color 0.2s ease;
-        ">
-        Play Word Neighbor <i class="fa fa-external-link" style="margin-left: 6px"></i>
-      </a>
-    </div>
-
-    <h3
-      style="
-        margin-top: 24px;
-        margin-bottom: 14px;
-        font-size: 1.15rem;
-        font-weight: 600;
-        color: #1e293b;
-        border-bottom: none;
-      ">
-      Gameplay Videos
-    </h3>
-
-    <div
-      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px">
-      <div
-        style="
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          overflow: hidden;
-          padding: 12px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-        ">
-        <div
-          style="
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: #000;
-          ">
-          <iframe
-            src="https://www.youtube.com/embed/NoKXEle_Rus"
-            title="Word Neighbor Gameplay Video 1"
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0"
-            allow="
-              accelerometer;
-              autoplay;
-              clipboard-write;
-              encrypted-media;
-              gyroscope;
-              picture-in-picture;
-              web-share;
-            "
-            allowfullscreen>
-          </iframe>
+    <div class="projects-grid">
+      <!-- 1. Good Meeting Time -->
+      <article class="project-card">
+        <div class="card-top">
+          <span class="card-badge">🌍 Timezone Planner</span>
         </div>
-        <div style="margin-top: 10px; font-size: 0.9rem; text-align: center">
-          <a
-            href="https://youtu.be/NoKXEle_Rus?si=6Me9CYmRkCLXgsa_"
-            target="_blank"
-            rel="noopener noreferrer"
-            style="color: #2563eb; font-weight: 500">
-            <i class="fa fa-youtube-play" style="color: #ff0000; margin-right: 4px"></i> Watch
-            Gameplay Video on YouTube <i class="fa fa-external-link"></i>
+        <h3 class="card-title">
+          <a href="https://goodmeetingtime.com" target="_blank" rel="noopener noreferrer">goodmeetingtime.com</a>
+        </h3>
+        <p class="card-summary">
+          A fast, clean, zero-dependency visual meeting planner for cross-timezone teams. Find ideal overlap times with a 24-hour visual grid, daylight curves, and instant sharable links.
+        </p>
+        <div class="card-actions">
+          <a href="https://goodmeetingtime.com" target="_blank" rel="noopener noreferrer" class="btn-showcase">
+            Open goodmeetingtime.com <i class="fa fa-external-link"></i>
           </a>
         </div>
-      </div>
+      </article>
 
-      <div
-        style="
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          overflow: hidden;
-          padding: 12px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-        ">
-        <div
-          style="
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: #000;
-          ">
-          <iframe
-            src="https://www.youtube.com/embed/ye5r0XCH3c0"
-            title="Word Neighbor Gameplay Video 2"
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0"
-            allow="
-              accelerometer;
-              autoplay;
-              clipboard-write;
-              encrypted-media;
-              gyroscope;
-              picture-in-picture;
-              web-share;
-            "
-            allowfullscreen>
-          </iframe>
+      <!-- 2. Word Neighbor -->
+      <article class="project-card">
+        <div class="card-top">
+          <span class="card-badge">🔤 Daily Word Game</span>
         </div>
-        <div style="margin-top: 10px; font-size: 0.9rem; text-align: center">
-          <a
-            href="https://youtu.be/ye5r0XCH3c0?si=cpbCr6Kh5bYbNaLJ"
-            target="_blank"
-            rel="noopener noreferrer"
-            style="color: #2563eb; font-weight: 500">
-            <i class="fa fa-youtube-play" style="color: #ff0000; margin-right: 4px"></i> Watch
-            Gameplay Video on YouTube <i class="fa fa-external-link"></i>
+        <h3 class="card-title">
+          <a href="https://wordneighbor.com" target="_blank" rel="noopener noreferrer">Word Neighbor</a>
+        </h3>
+        <p class="card-summary">
+          A clever daily word association puzzle game. Connect words through semantic leaps and associative thinking directly in your browser.
+        </p>
+        <div class="card-actions">
+          <a href="https://wordneighbor.com" target="_blank" rel="noopener noreferrer" class="btn-showcase">
+            Play Word Neighbor <i class="fa fa-external-link"></i>
+          </a>
+          <details class="video-accordion">
+            <summary><i class="fa fa-youtube-play" style="color: #ff0000"></i> Watch Gameplay Videos (2)</summary>
+            <div class="video-list">
+              <div>
+                <div class="video-frame-container">
+                  <iframe
+                    src="https://www.youtube.com/embed/NoKXEle_Rus"
+                    title="Word Neighbor Gameplay Video 1"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+                  </iframe>
+                </div>
+                <a href="https://youtu.be/NoKXEle_Rus?si=6Me9CYmRkCLXgsa_" target="_blank" rel="noopener noreferrer" class="video-link">
+                  <i class="fa fa-youtube-play" style="color: #ff0000; margin-right: 3px"></i> Watch Video 1 on YouTube <i class="fa fa-external-link"></i>
+                </a>
+              </div>
+              <div>
+                <div class="video-frame-container">
+                  <iframe
+                    src="https://www.youtube.com/embed/ye5r0XCH3c0"
+                    title="Word Neighbor Gameplay Video 2"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+                  </iframe>
+                </div>
+                <a href="https://youtu.be/ye5r0XCH3c0?si=cpbCr6Kh5bYbNaLJ" target="_blank" rel="noopener noreferrer" class="video-link">
+                  <i class="fa fa-youtube-play" style="color: #ff0000; margin-right: 3px"></i> Watch Video 2 on YouTube <i class="fa fa-external-link"></i>
+                </a>
+              </div>
+            </div>
+          </details>
+        </div>
+      </article>
+
+      <!-- 3. Fly By -->
+      <article class="project-card">
+        <div class="card-top">
+          <span class="card-badge">✈️ Retro Arcade Game</span>
+        </div>
+        <h3 class="card-title">
+          <a href="/flyby.html">Fly By</a>
+        </h3>
+        <p class="card-summary">
+          A retro 8-bit biplane flight game built in HTML5 canvas. Pop balloons, buzz barns, dodge airliners, and perform stunt maneuvers directly in your browser.
+        </p>
+        <div class="card-actions">
+          <a href="/flyby.html" class="btn-showcase">
+            Play Fly By <i class="fa fa-play"></i>
           </a>
         </div>
-      </div>
+      </article>
+
+      <!-- 4. Credit Card Reality Simulator -->
+      <article class="project-card">
+        <div class="card-top">
+          <span class="card-badge">💳 Personal Finance Lab</span>
+        </div>
+        <h3 class="card-title">
+          <a href="/ccsim.html">Credit Card Reality Simulator</a>
+        </h3>
+        <p class="card-summary">
+          An interactive simulation tool demonstrating compound interest, the true cost of credit card purchases over time, and why paying only the minimum balance is a trap.
+        </p>
+        <div class="card-actions">
+          <a href="/ccsim.html" class="btn-showcase">
+            Launch Simulator <i class="fa fa-calculator"></i>
+          </a>
+        </div>
+      </article>
     </div>
   </section>
 
