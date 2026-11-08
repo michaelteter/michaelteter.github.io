@@ -676,7 +676,6 @@
 
     svg.innerHTML = gridLinesHtml + floorLineHtml + axesHtml + barsHtml + calloutHtml;
   }
-  }
 
   // =========================================================================
   // Render: Declarative View Update
