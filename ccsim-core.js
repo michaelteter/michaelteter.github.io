@@ -866,6 +866,52 @@
     return remainingInterests;
   }
 
+  function analyzePaymentTrajectory(schedule) {
+    if (!schedule || schedule.length === 0) {
+      return {
+        isVariable: false,
+        firstPayment: 0,
+        lastPayment: 0,
+        minPayment: 0,
+        maxPayment: 0,
+        isDecreasing: false
+      };
+    }
+
+    const firstPayment = schedule[0].payment;
+    const lastPayment = schedule[schedule.length - 1].payment;
+    let minPayment = firstPayment;
+    let maxPayment = firstPayment;
+    let hasVariation = false;
+    let hasDecrease = false;
+
+    for (let i = 0; i < schedule.length; i++) {
+      const p = schedule[i].payment;
+      if (p < minPayment) minPayment = p;
+      if (p > maxPayment) maxPayment = p;
+
+      // Check variation across regular repayment months (prior to final residual payoff month)
+      if (i < schedule.length - 1 && Math.abs(p - firstPayment) > 1.0) {
+        hasVariation = true;
+      }
+      if (i > 0 && i < schedule.length - 1 && schedule[i].payment < schedule[i - 1].payment - 1.0) {
+        hasDecrease = true;
+      }
+    }
+
+    // Variable if regular monthly payments fluctuate, or if the final payment is higher (penalty balloon like slip11)
+    const isVariable = hasVariation || (lastPayment > firstPayment + 5.0);
+
+    return {
+      isVariable,
+      firstPayment,
+      lastPayment,
+      minPayment,
+      maxPayment,
+      isDecreasing: hasDecrease
+    };
+  }
+
   function calculateMonthDetail(schedule, selectedIndex, strategy, apr, currency) {
     if (!schedule || schedule.length === 0) return null;
     const totalMonths = schedule.length;
@@ -1045,7 +1091,8 @@
         itemName: context.itemName
       },
       promoBannerHtml,
-      monthDetail
+      monthDetail,
+      paymentTrajectory: analyzePaymentTrajectory(currentSim.schedule)
     });
   }
 
@@ -1117,6 +1164,7 @@
     calculateComparisonTable,
     calculateRemainingInterests,
     calculateMonthDetail,
+    analyzePaymentTrajectory,
     computeViewModel,
     getStorySimulationParams
   };

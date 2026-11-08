@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Credit Card Reality Simulator | The True Cost of Debt</title>
-  <link rel="stylesheet" href="ccsim.css?v=20261007_090812">
+  <link rel="stylesheet" href="ccsim.css?v=20261108_234747">
 </head>
 <body>
   <div class="app-container">
@@ -255,10 +255,55 @@
                 <span class="outcome-stat-val" id="storyOutcomeTotalInterest">+฿13,720</span>
                 <small id="storyOutcomeMarkup">+26.1% Impatience Tax</small>
               </div>
+              <div class="outcome-stat" id="storyOutcomePaymentStat">
+                <span class="outcome-stat-label" id="storyOutcomePaymentLabel">Monthly Payment</span>
+                <span class="outcome-stat-val" id="storyOutcomePayment">฿4,256</span>
+                <small id="storyOutcomePaymentSub">Starts at ฿4,256 • Decreases to ฿500</small>
+              </div>
               <div class="outcome-stat">
                 <span class="outcome-stat-label">Time to Debt-Free</span>
                 <span class="outcome-stat-val" id="storyOutcomeDuration">3 yrs 2 mos</span>
                 <small id="storyOutcomeFreedomDate">Free in Nov 2029</small>
+              </div>
+            </div>
+
+            <!-- Variable Monthly Payment Trajectory Section (shown for variable payment habits) -->
+            <div class="story-payment-chart-section hidden" id="storyPaymentChartSection">
+              <div class="story-chart-header">
+                <div class="story-chart-title-group">
+                  <span class="story-chart-badge">Payment Trajectory</span>
+                  <h4 class="story-chart-title">How Monthly Payments Shrink Over Time</h4>
+                </div>
+                <div class="story-chart-highlight-pill" id="storyPaymentHighlightPill">
+                  <span class="pill-dot"></span>
+                  <span><strong>Month 1:</strong> <span id="storyChartFirstPay">฿4,256</span> (Highest Payment)</span>
+                </div>
+              </div>
+
+              <p class="story-chart-subtitle" id="storyChartSubtitle">
+                The bank starts your payment high, but lets it steadily shrink each month as your balance drops.
+              </p>
+
+              <div class="story-chart-wrapper">
+                <div class="svg-container story-svg-container" id="storyChartContainer">
+                  <svg id="storyPaymentChart" viewBox="0 0 760 190" preserveAspectRatio="none" aria-label="Monthly payment trajectory chart"></svg>
+                </div>
+                <div class="chart-axis-labels">
+                  <span id="storyChartStartLabel">Month 1: Starts at ฿4,256</span>
+                  <span id="storyChartMidLabel">Midpoint</span>
+                  <span id="storyChartEndLabel">Month 45: ฿500 floor</span>
+                </div>
+              </div>
+
+              <div class="story-chart-inspector" id="storyChartInspector">
+                <span class="inspector-hint">👆 Hover or tap across the bars to inspect each month's payment</span>
+              </div>
+
+              <div class="story-payment-callout" id="storyPaymentCallout">
+                <span class="callout-icon">💡</span>
+                <div class="callout-text" id="storyPaymentCalloutText">
+                  <strong>The Shrinking Payment Trap:</strong> Notice how your payment dropped from <strong id="storyCalloutStartPay">฿4,256</strong> down to <strong id="storyCalloutEndPay">฿500</strong>. As your balance drops, the 8% minimum required by the bank drops too. While this feels easier on your monthly budget, you are paying less and less towards the real debt—keeping you paying interest for years!
+                </div>
               </div>
             </div>
 
@@ -915,7 +960,7 @@
     </div>
   </div>
 
-  <script src="ccsim-core.js?v=20261007_090812"></script>
-  <script src="ccsim.js?v=20261007_090812"></script>
+  <script src="ccsim-core.js?v=20261108_234747"></script>
+  <script src="ccsim.js?v=20261108_234747"></script>
 </body>
 </html>

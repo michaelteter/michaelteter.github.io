@@ -67,9 +67,28 @@
     storyOutcomeOriginalPrice: document.getElementById('storyOutcomeOriginalPrice'),
     storyOutcomeTotalInterest: document.getElementById('storyOutcomeTotalInterest'),
     storyOutcomeMarkup: document.getElementById('storyOutcomeMarkup'),
+    storyOutcomePaymentStat: document.getElementById('storyOutcomePaymentStat'),
+    storyOutcomePaymentLabel: document.getElementById('storyOutcomePaymentLabel'),
+    storyOutcomePayment: document.getElementById('storyOutcomePayment'),
+    storyOutcomePaymentSub: document.getElementById('storyOutcomePaymentSub'),
     storyOutcomeDuration: document.getElementById('storyOutcomeDuration'),
     storyOutcomeFreedomDate: document.getElementById('storyOutcomeFreedomDate'),
     storyOutcomeVerdict: document.getElementById('storyOutcomeVerdict'),
+
+    storyPaymentChartSection: document.getElementById('storyPaymentChartSection'),
+    storyPaymentHighlightPill: document.getElementById('storyPaymentHighlightPill'),
+    storyChartFirstPay: document.getElementById('storyChartFirstPay'),
+    storyChartSubtitle: document.getElementById('storyChartSubtitle'),
+    storyChartContainer: document.getElementById('storyChartContainer'),
+    storyPaymentChart: document.getElementById('storyPaymentChart'),
+    storyChartStartLabel: document.getElementById('storyChartStartLabel'),
+    storyChartMidLabel: document.getElementById('storyChartMidLabel'),
+    storyChartEndLabel: document.getElementById('storyChartEndLabel'),
+    storyChartInspector: document.getElementById('storyChartInspector'),
+    storyPaymentCallout: document.getElementById('storyPaymentCallout'),
+    storyPaymentCalloutText: document.getElementById('storyPaymentCalloutText'),
+    storyCalloutStartPay: document.getElementById('storyCalloutStartPay'),
+    storyCalloutEndPay: document.getElementById('storyCalloutEndPay'),
 
     storyWiseTitle: document.getElementById('storyWiseTitle'),
     storyWiseList: document.getElementById('storyWiseList'),
@@ -400,6 +419,9 @@
 
     const simParams = getStorySimulationParams(storyState, cur, laptopPrice);
     const sim = calculateSimulation(simParams);
+    const trajectory = window.CCSim.analyzePaymentTrajectory(sim.schedule);
+    const config = window.CCSim.CURRENCY_CONFIG[cur] || window.CCSim.CURRENCY_CONFIG.THB;
+    const floorMin = config.floorMinPayment;
 
     // Dynamic markup calculation:
     const markupPct = ((sim.totalInterest / laptopPrice) * 100).toFixed(1);
@@ -422,9 +444,57 @@
       }
     }
     if (el.storyOutcomeMarkup) el.storyOutcomeMarkup.textContent = markupNote;
+
+    // Monthly Payment Stat Box
+    if (el.storyOutcomePaymentStat) {
+      if (storyState.financing === 'card') {
+        if (storyState.habit === 'min') {
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'First Month Payment';
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = `Starts at ${formatMoney(sim.firstPayment, cur)}`;
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = `Decreases over time to ${formatMoney(floorMin, cur)} floor`;
+        } else if (storyState.habit === 'fixed') {
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'Monthly Payment';
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = `${formatMoney(sim.firstPayment, cur)} / mo`;
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = 'Fixed steady amount';
+        } else {
+          // full
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'Payment Amount';
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = formatMoney(sim.totalPaid, cur);
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = 'Paid once in full (grace period)';
+        }
+      } else {
+        // promo
+        if (storyState.habit === 'ideal') {
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'Monthly Payment';
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = `${formatMoney(sim.firstPayment, cur)} / mo`;
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = '10 equal installments (0% interest)';
+        } else if (storyState.habit === 'slip11') {
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'Monthly Payment';
+          const finalPay11 = sim.schedule[10] ? sim.schedule[10].payment : sim.firstPayment;
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = `${formatMoney(sim.firstPayment, cur)} / mo`;
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = `Months 1–10 • Spikes to ${formatMoney(finalPay11, cur)} in Mo 11`;
+        } else {
+          // slipmin
+          if (el.storyOutcomePaymentLabel) el.storyOutcomePaymentLabel.textContent = 'First Month Payment';
+          if (el.storyOutcomePayment) el.storyOutcomePayment.textContent = `Starts at ${formatMoney(sim.firstPayment, cur)}`;
+          if (el.storyOutcomePaymentSub) el.storyOutcomePaymentSub.textContent = `Decreases over time to ${formatMoney(floorMin, cur)} floor`;
+        }
+      }
+    }
+
     if (el.storyOutcomeDuration) el.storyOutcomeDuration.textContent = formatMonths(sim.durationMonths);
     if (el.storyOutcomeFreedomDate) el.storyOutcomeFreedomDate.textContent = `Free in ${calculateFreedomDate(sim.durationMonths)}`;
     if (el.storyOutcomeVerdict) el.storyOutcomeVerdict.innerHTML = outcomeMeta.buildVerdict(sim);
+
+    // Variable Payment Graph Rendering (emphasizes Month 1)
+    if (el.storyPaymentChartSection) {
+      if (trajectory.isVariable) {
+        el.storyPaymentChartSection.classList.remove('hidden');
+        renderStoryPaymentChart(sim.schedule, cur, floorMin, storyState);
+      } else {
+        el.storyPaymentChartSection.classList.add('hidden');
+      }
+    }
 
     // Dynamic reference for The Contrast Mirror (The Wise Move vs. The Dangerous Trap)
     const trapSim = calculateSimulation({
@@ -454,6 +524,158 @@
         <li><strong>Danger:</strong> Still paying for an old laptop long after high school graduation.</li>
       `;
     }
+  }
+
+  // =========================================================================
+  // Story Mode: Render Variable Payment Trajectory Chart (Emphasizing Month 1)
+  // =========================================================================
+  function renderStoryPaymentChart(schedule, cur, floorMin, storyState) {
+    const svg = el.storyPaymentChart;
+    if (!svg || !schedule || schedule.length === 0) return;
+    const { formatMoney } = window.CCSim;
+
+    const width = 760;
+    const height = 190;
+    const padLeft = 60;
+    const padRight = 35;
+    const padTop = 32;
+    const padBottom = 28;
+    const plotWidth = width - padLeft - padRight;
+    const plotHeight = height - padTop - padBottom;
+    const yZero = padTop + plotHeight;
+
+    const totalMonths = schedule.length;
+    const firstPay = schedule[0].payment;
+    const maxPay = Math.max(...schedule.map(r => r.payment));
+    const maxY = Math.max(firstPay, maxPay) * 1.25;
+
+    const getY = (val) => yZero - (val / maxY) * plotHeight;
+
+    // Header & Badge updates
+    if (el.storyChartFirstPay) {
+      el.storyChartFirstPay.textContent = formatMoney(firstPay, cur);
+    }
+    if (el.storyCalloutStartPay) {
+      el.storyCalloutStartPay.textContent = formatMoney(firstPay, cur);
+    }
+    if (el.storyCalloutEndPay) {
+      el.storyCalloutEndPay.textContent = formatMoney(floorMin, cur);
+    }
+    if (el.storyChartStartLabel) {
+      el.storyChartStartLabel.textContent = `Month 1: Starts at ${formatMoney(firstPay, cur)} (Highest)`;
+    }
+    if (el.storyChartMidLabel) {
+      const midMonth = Math.max(1, Math.round(totalMonths / 2));
+      const midPay = schedule[midMonth - 1] ? schedule[midMonth - 1].payment : 0;
+      el.storyChartMidLabel.textContent = `Month ${midMonth}: ${formatMoney(midPay, cur)}`;
+    }
+    if (el.storyChartEndLabel) {
+      el.storyChartEndLabel.textContent = `Month ${totalMonths}: ${formatMoney(floorMin, cur)} floor`;
+    }
+
+    // Default inspector text
+    if (el.storyChartInspector) {
+      el.storyChartInspector.innerHTML = `
+        <span><strong>Month 1</strong> requires the highest payment (<strong>${formatMoney(firstPay, cur)}</strong>). It steadily shrinks down to the <strong>${formatMoney(floorMin, cur)}</strong> floor.</span>
+      `;
+      el.storyChartInspector.classList.remove('active');
+    }
+
+    // Grid lines
+    const yTicks = [0, maxY * 0.45, maxY * 0.85];
+    let gridLinesHtml = '';
+    yTicks.forEach(tickVal => {
+      const y = getY(tickVal);
+      gridLinesHtml += `
+        <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3" />
+        <text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#64748b" text-anchor="end" font-family="system-ui">${formatMoney(tickVal, cur)}</text>
+      `;
+    });
+
+    // Floor line
+    let floorLineHtml = '';
+    if (floorMin > 0 && floorMin < maxY) {
+      const yFloor = getY(floorMin);
+      floorLineHtml += `
+        <line x1="${padLeft}" y1="${yFloor}" x2="${width - padRight}" y2="${yFloor}" stroke="#f97316" stroke-width="1.2" stroke-dasharray="4,4" />
+        <text x="${width - padRight}" y="${yFloor - 5}" font-size="9" font-weight="700" fill="#ea580c" text-anchor="end" font-family="system-ui">Floor Minimum (${formatMoney(floorMin, cur)})</text>
+      `;
+    }
+
+    const axesHtml = `
+      <line x1="${padLeft}" y1="${yZero}" x2="${width - padRight}" y2="${yZero}" stroke="#cbd5e1" stroke-width="1.5" />
+      <line x1="${padLeft}" y1="${padTop - 5}" x2="${padLeft}" y2="${yZero}" stroke="#cbd5e1" stroke-width="1.5" />
+    `;
+
+    const slotWidth = plotWidth / totalMonths;
+    const barWidth = Math.max(3, Math.min(26, slotWidth * 0.72));
+
+    let barsHtml = '';
+    let calloutHtml = '';
+
+    schedule.forEach((row, idx) => {
+      const xCenter = padLeft + (idx + 0.5) * slotWidth;
+      const xLeft = xCenter - barWidth / 2;
+      const barHeight = Math.max(2, (row.payment / maxY) * plotHeight);
+      const yBar = yZero - barHeight;
+
+      const isMonth1 = (idx === 0);
+      const isPenaltySpike = (row.month === 11 && (storyState.habit === 'slip11' || storyState.habit === 'slipmin') && row.payment > firstPay * 0.9);
+
+      let barFill = '#38bdf8';
+      let strokeAttr = '';
+      if (isMonth1) {
+        barFill = '#ef4444';
+        strokeAttr = 'stroke="#b91c1c" stroke-width="1.5"';
+      } else if (isPenaltySpike) {
+        barFill = '#dc2626';
+        strokeAttr = 'stroke="#991b1b" stroke-width="1.5"';
+      } else if (row.payment <= floorMin * 1.05) {
+        barFill = '#94a3b8';
+      } else {
+        barFill = '#0ea5e9';
+      }
+
+      barsHtml += `
+        <g class="story-bar-group" data-idx="${idx}" data-month="${row.month}" data-pay="${row.payment}" data-pp="${row.principalPaid}" data-int="${row.interest}">
+          <rect class="story-bar-rect" x="${xLeft}" y="${yBar}" width="${barWidth}" height="${barHeight}" rx="2" fill="${barFill}" ${strokeAttr} />
+          <rect class="story-bar-hitbox" x="${xCenter - slotWidth / 2}" y="${padTop}" width="${slotWidth}" height="${plotHeight + 10}" fill="transparent" />
+        </g>
+      `;
+
+      // Callout for Month 1 (EMPHASIS)
+      if (isMonth1) {
+        const pinWidth = 120;
+        const pinHeight = 22;
+        const pinX = Math.max(padLeft, Math.min(width - padRight - pinWidth, xCenter - pinWidth / 2));
+        const pinY = Math.max(4, yBar - 28);
+        calloutHtml += `
+          <g class="story-month1-pin" pointer-events="none">
+            <rect x="${pinX}" y="${pinY}" width="${pinWidth}" height="${pinHeight}" rx="4" fill="#0f172a" />
+            <polygon points="${xCenter - 5},${pinY + pinHeight} ${xCenter + 5},${pinY + pinHeight} ${xCenter},${yBar}" fill="#0f172a" />
+            <text x="${pinX + pinWidth / 2}" y="${pinY + 15}" fill="#ffffff" font-size="10.5" font-weight="800" text-anchor="middle" font-family="system-ui">★ Month 1: ${formatMoney(firstPay, cur)}</text>
+          </g>
+        `;
+      }
+
+      // Callout for Month 11 Penalty Spike (if slip11)
+      if (isPenaltySpike && storyState.habit === 'slip11') {
+        const pinWidth = 110;
+        const pinHeight = 20;
+        const pinX = Math.max(padLeft, Math.min(width - padRight - pinWidth, xCenter - pinWidth / 2));
+        const pinY = Math.max(4, yBar - 26);
+        calloutHtml += `
+          <g class="story-spike-pin" pointer-events="none">
+            <rect x="${pinX}" y="${pinY}" width="${pinWidth}" height="${pinHeight}" rx="4" fill="#7f1d1d" />
+            <polygon points="${xCenter - 4},${pinY + pinHeight} ${xCenter + 4},${pinY + pinHeight} ${xCenter},${yBar}" fill="#7f1d1d" />
+            <text x="${pinX + pinWidth / 2}" y="${pinY + 14}" fill="#fecaca" font-size="9.5" font-weight="700" text-anchor="middle" font-family="system-ui">⚠️ Mo 11 Penalty!</text>
+          </g>
+        `;
+      }
+    });
+
+    svg.innerHTML = gridLinesHtml + floorLineHtml + axesHtml + barsHtml + calloutHtml;
+  }
   }
 
   // =========================================================================
@@ -1048,6 +1270,135 @@
           if (group) {
             const idx = parseInt(group.dataset.idx, 10);
             if (!isNaN(idx)) dispatch({ type: 'SELECT_MONTH_INDEX', index: idx });
+          }
+        });
+      }
+    }
+
+    // Story Mode Variable Payment Chart Touch / Drag Scrubber
+    let isStoryDragging = false;
+    function scrubStoryChart(e) {
+      if (!el.storyChartContainer || !el.storyPaymentChart) return;
+      const cur = context.currency;
+      const laptopPrice = cur === 'THB' ? 52500 : 1500;
+      const simParams = window.CCSim.getStorySimulationParams(storyState, cur, laptopPrice);
+      const sim = window.CCSim.calculateSimulation(simParams);
+      if (!sim.schedule || sim.schedule.length === 0) return;
+
+      const rect = el.storyChartContainer.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const padLeft = 60;
+      const padRight = 35;
+      const plotWidth = rect.width - padLeft - padRight;
+      if (plotWidth <= 0) return;
+
+      const relX = Math.max(0, Math.min(plotWidth, x - padLeft));
+      const totalMonths = sim.schedule.length;
+      const idx = Math.min(totalMonths - 1, Math.max(0, Math.floor((relX / plotWidth) * totalMonths)));
+      const row = sim.schedule[idx];
+      if (!row) return;
+
+      const { formatMoney } = window.CCSim;
+
+      if (el.storyChartInspector) {
+        el.storyChartInspector.classList.add('active');
+        el.storyChartInspector.innerHTML = `
+          <span><strong>Month ${row.month}:</strong> Payment = <strong>${formatMoney(row.payment, cur)}</strong> (${formatMoney(row.principalPaid, cur)} to laptop • ${formatMoney(row.interest, cur)} interest)</span>
+        `;
+      }
+
+      const allBars = el.storyPaymentChart.querySelectorAll('.story-bar-group');
+      allBars.forEach((g, i) => {
+        const rectEl = g.querySelector('.story-bar-rect');
+        if (rectEl) {
+          if (i === idx) {
+            rectEl.setAttribute('opacity', '1');
+            rectEl.setAttribute('stroke', '#0284c7');
+            rectEl.setAttribute('stroke-width', '2.5');
+          } else {
+            rectEl.setAttribute('opacity', '0.6');
+            if (i !== 0) rectEl.removeAttribute('stroke');
+            else {
+              rectEl.setAttribute('stroke', '#b91c1c');
+              rectEl.setAttribute('stroke-width', '1.5');
+            }
+          }
+        }
+      });
+    }
+
+    function resetStoryInspector() {
+      if (!el.storyPaymentChart) return;
+      const cur = context.currency;
+      const laptopPrice = cur === 'THB' ? 52500 : 1500;
+      const simParams = window.CCSim.getStorySimulationParams(storyState, cur, laptopPrice);
+      const sim = window.CCSim.calculateSimulation(simParams);
+      const config = window.CCSim.CURRENCY_CONFIG[cur] || window.CCSim.CURRENCY_CONFIG.THB;
+      const floorMin = config.floorMinPayment;
+      const { formatMoney } = window.CCSim;
+
+      if (el.storyChartInspector && sim.schedule && sim.schedule.length > 0) {
+        el.storyChartInspector.classList.remove('active');
+        el.storyChartInspector.innerHTML = `
+          <span><strong>Month 1</strong> requires the highest payment (<strong>${formatMoney(sim.firstPayment, cur)}</strong>). It steadily shrinks down to the <strong>${formatMoney(floorMin, cur)}</strong> floor.</span>
+        `;
+      }
+
+      const allBars = el.storyPaymentChart.querySelectorAll('.story-bar-group');
+      allBars.forEach((g, i) => {
+        const rectEl = g.querySelector('.story-bar-rect');
+        if (rectEl) {
+          rectEl.setAttribute('opacity', '1');
+          if (i === 0) {
+            rectEl.setAttribute('stroke', '#b91c1c');
+            rectEl.setAttribute('stroke-width', '1.5');
+          } else {
+            const isSpike = g.dataset.month === '11' && (storyState.habit === 'slip11' || storyState.habit === 'slipmin');
+            if (isSpike) {
+              rectEl.setAttribute('stroke', '#991b1b');
+              rectEl.setAttribute('stroke-width', '1.5');
+            } else {
+              rectEl.removeAttribute('stroke');
+            }
+          }
+        }
+      });
+    }
+
+    if (el.storyChartContainer) {
+      el.storyChartContainer.addEventListener('pointerdown', (e) => {
+        isStoryDragging = true;
+        try { el.storyChartContainer.setPointerCapture(e.pointerId); } catch (err) {}
+        scrubStoryChart(e);
+      });
+
+      el.storyChartContainer.addEventListener('pointermove', (e) => {
+        if (isStoryDragging) scrubStoryChart(e);
+      });
+
+      const stopStoryDrag = (e) => {
+        if (isStoryDragging) {
+          isStoryDragging = false;
+          try { el.storyChartContainer.releasePointerCapture(e.pointerId); } catch (err) {}
+        }
+      };
+
+      el.storyChartContainer.addEventListener('pointerup', stopStoryDrag);
+      el.storyChartContainer.addEventListener('pointercancel', stopStoryDrag);
+      el.storyChartContainer.addEventListener('lostpointercapture', stopStoryDrag);
+
+      el.storyChartContainer.addEventListener('mousemove', (e) => {
+        if (!isStoryDragging) scrubStoryChart(e);
+      });
+      el.storyChartContainer.addEventListener('mouseleave', () => {
+        if (!isStoryDragging) resetStoryInspector();
+      });
+
+      if (el.storyPaymentChart) {
+        el.storyPaymentChart.addEventListener('click', (e) => {
+          const group = e.target.closest('.story-bar-group');
+          if (group) {
+            scrubStoryChart(e);
           }
         });
       }
