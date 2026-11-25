@@ -24,3 +24,14 @@ permalink: /archived-posts/:year/:month/:day/:title:output_ext
 header_pages:
   - digital-art.md
   - resume.md # if you make one
+
+exclude:
+  - GEMINI.md
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/
+  - scripts/
+  - temp/
+
