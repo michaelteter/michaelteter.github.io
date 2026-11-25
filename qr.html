@@ -1,0 +1,668 @@
+---
+layout: default
+title: QR Code Generator — Michael Teter
+nav_exclude: true
+---
+
+<style>
+  .qr-page {
+    --qr-brand: #2563eb;
+    --qr-brand-dark: #1d4ed8;
+    --qr-ink: #0f172a;
+    --qr-muted: #475569;
+    --qr-border: #cbd5e1;
+    --qr-input-border: #767676;
+    --qr-surface: #ffffff;
+    --qr-subtle: #f8fafc;
+    accent-color: var(--qr-brand);
+  }
+
+  .qr-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: var(--qr-muted);
+    margin-block-end: 16px;
+    text-decoration: none;
+  }
+
+  .qr-back:hover,
+  .qr-back:focus-visible {
+    color: var(--qr-brand);
+    text-decoration: underline;
+  }
+
+  .qr-header {
+    margin-block-end: 24px;
+  }
+
+  .qr-eyebrow {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--qr-brand);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-block-end: 8px;
+  }
+
+  .qr-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--qr-ink);
+    margin: 0 0 6px 0;
+    line-height: 1.25;
+  }
+
+  .qr-header p {
+    color: var(--qr-muted);
+    margin: 0;
+    font-size: 0.98rem;
+  }
+
+  .qr-card {
+    background: var(--qr-surface);
+    border: 1px solid var(--qr-border);
+    border-top: 4px solid var(--qr-brand);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    box-sizing: border-box;
+  }
+
+  .qr-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media screen and (min-width: 680px) {
+    .qr-layout {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 28px;
+    }
+  }
+
+  .qr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-block-end: 20px;
+  }
+
+  .qr-field label,
+  .qr-group legend {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--qr-ink);
+    padding: 0;
+  }
+
+  .qr-url-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .qr-url-input {
+    width: 100%;
+    font: inherit;
+    font-size: max(1rem, 1em);
+    line-height: 1.4;
+    padding: 11px 44px 11px 13px;
+    min-height: 48px;
+    border: 1.5px solid var(--qr-input-border);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--qr-ink);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .qr-url-input:focus-visible {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+    border-color: var(--qr-brand);
+  }
+
+  .qr-url-input[aria-invalid="true"] {
+    border-color: #dc2626;
+  }
+
+  .qr-clear-btn {
+    position: absolute;
+    inset-inline-end: 6px;
+    min-inline-size: 36px;
+    min-block-size: 36px;
+    border: none;
+    background: transparent;
+    color: var(--qr-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.15rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qr-clear-btn:hover {
+    background: #f1f5f9;
+    color: var(--qr-ink);
+  }
+
+  .qr-clear-btn:focus-visible {
+    outline: 2px solid var(--qr-brand);
+    outline-offset: 1px;
+  }
+
+  .qr-hint {
+    font-size: 0.82rem;
+    color: var(--qr-muted);
+    min-height: 1.2em;
+    word-break: break-all;
+  }
+
+  .qr-error {
+    font-size: 0.85rem;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-block-start: 4px;
+  }
+
+  .qr-group {
+    border: none;
+    padding: 0;
+    margin: 0 0 18px 0;
+  }
+
+  .qr-group legend {
+    margin-block-end: 8px;
+  }
+
+  .qr-pills {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .qr-pills-2x2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .qr-pill {
+    position: relative;
+  }
+
+  .qr-pill input {
+    position: absolute;
+    clip-path: inset(50%);
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    white-space: nowrap;
+  }
+
+  .qr-pill label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--qr-border);
+    border-radius: 8px;
+    background: var(--qr-subtle);
+    color: #334155;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    user-select: none;
+  }
+
+  .qr-pill label:hover {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+  }
+
+  .qr-pill input:checked + label {
+    background: #eff6ff;
+    border-color: var(--qr-brand);
+    color: var(--qr-brand-dark);
+    font-weight: 600;
+  }
+
+  .qr-pill input:focus-visible + label {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+  }
+
+  .qr-colors-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: center;
+  }
+
+  .qr-color-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 8px;
+    min-height: 48px;
+    border: 1.5px solid var(--qr-border);
+    border-radius: 8px;
+    background: var(--qr-subtle);
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+
+  .qr-color-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+  }
+
+  .qr-color-control input[type="color"] {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #94a3b8;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+  }
+
+  .qr-color-control input[type="color"]:focus-visible {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+  }
+
+  .qr-color-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .qr-color-hex {
+    font-family: "Inconsolata", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    color: var(--qr-muted);
+  }
+
+  .qr-reset-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid var(--qr-border);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--qr-muted);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .qr-reset-btn:hover {
+    border-color: #94a3b8;
+    color: var(--qr-ink);
+  }
+
+  .qr-reset-btn:focus-visible {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+  }
+
+  .qr-warning {
+    margin-block-start: 10px;
+    font-size: 0.83rem;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .qr-preview-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .qr-canvas-frame {
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--qr-border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qr-canvas-frame canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .qr-meta {
+    font-size: 0.8rem;
+    color: var(--qr-muted);
+    text-align: center;
+    margin: 0;
+  }
+
+  .qr-actions {
+    width: 100%;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .qr-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    padding: 11px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--qr-brand);
+    color: #ffffff;
+    font: inherit;
+    font-size: 0.96rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .qr-btn-primary:hover {
+    background: var(--qr-brand-dark);
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+  }
+
+  .qr-btn-primary:focus-visible {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+  }
+
+  .qr-secondary-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .qr-copy-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .qr-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-inline-size: 48px;
+    min-block-size: 44px;
+    padding: 9px 14px;
+    border: 1.5px solid var(--qr-border);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--qr-ink);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .qr-btn-secondary:hover {
+    border-color: #94a3b8;
+    background: var(--qr-subtle);
+  }
+
+  .qr-btn-secondary:focus-visible {
+    outline: 3px solid var(--qr-brand);
+    outline-offset: 2px;
+  }
+
+  .qr-btn-secondary[data-copied] {
+    border-color: #16a34a;
+    color: #15803d;
+    background: #f0fdf4;
+  }
+
+  .qr-btn-secondary[data-failed] {
+    border-color: #dc2626;
+    color: #b91c1c;
+    background: #fef2f2;
+  }
+
+  .qr-copy-status {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #15803d;
+    text-align: center;
+    min-height: 1.25em;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .qr-btn-secondary[data-copied] + .qr-copy-status {
+    opacity: 1;
+    color: #15803d;
+  }
+
+  .qr-btn-secondary[data-failed] + .qr-copy-status {
+    opacity: 1;
+    color: #b91c1c;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .qr-url-input,
+    .qr-pill label,
+    .qr-btn-primary,
+    .qr-btn-secondary,
+    .qr-copy-status {
+      transition: none;
+    }
+  }
+</style>
+
+<div class="qr-page">
+  <a href="/" class="qr-back"><i class="fa fa-arrow-left" aria-hidden="true"></i> Back to michaelteter.com</a>
+
+  <div class="qr-header">
+    <span class="qr-eyebrow">Browser Utility</span>
+    <h1>QR Code Generator</h1>
+    <p>Paste a URL to create a clean, permanent QR code. Generated locally in your browser.</p>
+  </div>
+
+  <form id="qr-form" class="qr-card" novalidate>
+    <div class="qr-layout">
+      <div class="qr-controls-col">
+        <div class="qr-field">
+          <label for="qr-url">Target URL</label>
+          <div class="qr-url-wrap">
+            <input
+              type="text"
+              id="qr-url"
+              name="url"
+              class="qr-url-input"
+              inputmode="url"
+              autocomplete="url"
+              autocorrect="off"
+              autocapitalize="none"
+              spellcheck="false"
+              enterkeyhint="done"
+              placeholder="michaelteter.com or https://example.com"
+              aria-describedby="qr-url-hint qr-error"
+            />
+            <button
+              type="button"
+              id="qr-clear"
+              class="qr-clear-btn"
+              aria-label="Clear URL"
+              hidden
+            >
+              &times;
+            </button>
+          </div>
+          <span id="qr-url-hint" class="qr-hint"></span>
+          <div id="qr-error" class="qr-error" role="alert" hidden></div>
+        </div>
+
+        <fieldset class="qr-group">
+          <legend>Style</legend>
+          <div class="qr-pills">
+            <div class="qr-pill">
+              <input type="radio" id="style-rounded" name="qr-style" value="rounded" checked />
+              <label for="style-rounded">Modern</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="style-classic" name="qr-style" value="classic" />
+              <label for="style-classic">Classic</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="style-dots" name="qr-style" value="dots" />
+              <label for="style-dots">Dots</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="qr-group">
+          <legend>Quality (Error Correction)</legend>
+          <div class="qr-pills qr-pills-2x2">
+            <div class="qr-pill">
+              <input type="radio" id="ecl-l" name="qr-ecl" value="L" />
+              <label for="ecl-l">Low (7%)</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="ecl-m" name="qr-ecl" value="M" checked />
+              <label for="ecl-m">Standard (15%)</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="ecl-q" name="qr-ecl" value="Q" />
+              <label for="ecl-q">High (25%)</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="ecl-h" name="qr-ecl" value="H" />
+              <label for="ecl-h">Max (30%)</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="qr-group">
+          <legend>PNG Size</legend>
+          <div class="qr-pills">
+            <div class="qr-pill">
+              <input type="radio" id="size-512" name="qr-size" value="512" />
+              <label for="size-512">512 px</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="size-1024" name="qr-size" value="1024" checked />
+              <label for="size-1024">1024 px</label>
+            </div>
+            <div class="qr-pill">
+              <input type="radio" id="size-2048" name="qr-size" value="2048" />
+              <label for="size-2048">2048 px</label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="qr-group" style="margin-block-end: 0;">
+          <legend>Colors</legend>
+          <div class="qr-colors-row">
+            <label class="qr-color-control" for="qr-fg">
+              <input type="color" id="qr-fg" name="fg" value="#000000" />
+              <span class="qr-color-text">
+                <span class="qr-color-label">Foreground</span>
+                <span id="qr-fg-hex" class="qr-color-hex">#000000</span>
+              </span>
+            </label>
+            <label class="qr-color-control" for="qr-bg">
+              <input type="color" id="qr-bg" name="bg" value="#ffffff" />
+              <span class="qr-color-text">
+                <span class="qr-color-label">Background</span>
+                <span id="qr-bg-hex" class="qr-color-hex">#FFFFFF</span>
+              </span>
+            </label>
+            <button type="button" id="qr-reset-colors" class="qr-reset-btn" hidden>
+              Reset colors
+            </button>
+          </div>
+          <div id="qr-contrast-warning" class="qr-warning" role="status" hidden></div>
+        </fieldset>
+      </div>
+
+      <div class="qr-preview-col">
+        <div class="qr-canvas-frame">
+          <canvas
+            id="qr-canvas"
+            width="1024"
+            height="1024"
+            role="img"
+            aria-label="QR code preview"
+          ></canvas>
+        </div>
+
+        <p id="qr-meta" class="qr-meta"></p>
+
+        <div class="qr-actions">
+          <button type="submit" class="qr-btn-primary">
+            <i class="fa fa-download" aria-hidden="true"></i> Download PNG
+          </button>
+          <div class="qr-secondary-row">
+            <div class="qr-copy-wrap">
+              <button
+                type="button"
+                id="qr-copy-png"
+                class="qr-btn-secondary"
+                command="--copy-png"
+                commandfor="qr-canvas"
+              >
+                <i class="fa fa-copy" aria-hidden="true"></i> Copy PNG
+              </button>
+              <span id="qr-copy-status" class="qr-copy-status" role="status"></span>
+            </div>
+            <button type="button" id="qr-download-svg" class="qr-btn-secondary">
+              SVG
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="/qr-core.js?v=20261125" defer></script>
+<script src="/qr.js?v=20261125" defer></script>
